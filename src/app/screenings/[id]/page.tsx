@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { getScreeningById } from '@/lib/localstore'
+import { RED_FLAGS } from '@/lib/scoring'
 import type { Screening } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
 
@@ -121,12 +122,23 @@ export default function ScreeningDetailPage() {
         </ul>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm mb-4">
         <h3 className="font-semibold text-slate-700 mb-3">PT Program</h3>
         <ul className="space-y-1.5">
           {screening.rehabProgram.map(p => (
             <li key={p} className="flex items-start gap-2 text-sm text-slate-700">
               <span className="text-blue-500 mt-0.5">•</span>{p}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="bg-red-50 border-2 border-red-400 rounded-xl p-5">
+        <h3 className="font-bold text-red-700 mb-3">RED FLAG — หยุดทันที</h3>
+        <ul className="space-y-1.5">
+          {RED_FLAGS.map(f => (
+            <li key={f} className="flex items-start gap-2 text-sm text-red-800">
+              <span className="font-bold mt-0.5 shrink-0">!</span>{f}
             </li>
           ))}
         </ul>

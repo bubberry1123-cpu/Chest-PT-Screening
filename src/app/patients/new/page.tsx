@@ -3,7 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { createPatient, getPatientByHn } from '@/lib/localstore'
 import { createScreening } from '@/lib/localstore'
-import { calculateScreening, CFS_DESCRIPTIONS } from '@/lib/scoring'
+import { calculateScreening, CFS_DESCRIPTIONS, RED_FLAGS } from '@/lib/scoring'
 import type { O2Support, Cooperativeness, Sex, ScreeningInput } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
 
@@ -411,6 +411,17 @@ export default function NewPatientPage() {
               {result.rehabProgram.map(p => (
                 <li key={p} className="flex items-start gap-2 text-sm text-slate-700">
                   <span className="text-blue-500 mt-0.5">•</span> {p}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="bg-red-50 border-2 border-red-400 rounded-xl p-5">
+            <h3 className="font-bold text-red-700 mb-3">RED FLAG — หยุดทันที</h3>
+            <ul className="space-y-1.5">
+              {RED_FLAGS.map(f => (
+                <li key={f} className="flex items-start gap-2 text-sm text-red-800">
+                  <span className="font-bold mt-0.5 shrink-0">!</span>{f}
                 </li>
               ))}
             </ul>

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getPatientById, createScreening } from '@/lib/localstore'
-import { calculateScreening, CFS_DESCRIPTIONS } from '@/lib/scoring'
+import { calculateScreening, CFS_DESCRIPTIONS, RED_FLAGS } from '@/lib/scoring'
 import type { Patient, O2Support, Cooperativeness, ScreeningInput } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
 
@@ -263,6 +263,15 @@ export default function NewScreeningPage() {
             <ul className="space-y-1">{result.rehabProgram.map(p => (
               <li key={p} className="text-sm text-slate-700 flex items-start gap-2">
                 <span className="text-blue-500">•</span>{p}
+              </li>
+            ))}</ul>
+          </div>
+
+          <div className="bg-red-50 border-2 border-red-400 rounded-xl p-5">
+            <h4 className="font-bold text-red-700 mb-3">RED FLAG — หยุดทันที</h4>
+            <ul className="space-y-1.5">{RED_FLAGS.map(f => (
+              <li key={f} className="text-sm text-red-800 flex items-start gap-2">
+                <span className="font-bold mt-0.5 shrink-0">!</span>{f}
               </li>
             ))}</ul>
           </div>

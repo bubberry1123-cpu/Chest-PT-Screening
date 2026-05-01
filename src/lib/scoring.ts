@@ -28,48 +28,58 @@ const LEVEL_NAMES: Record<number, string> = {
 }
 
 const LEVEL_GOALS: Record<number, string> = {
-  1: 'Return to ADL and maximize physical function',
-  2: 'Improve respiratory function and physical capacity',
-  3: 'Manage symptoms and maintain functional independence',
-  4: 'Maintain airway clearance and prevent complications',
+  1: 'Improve Self-Confidence',
+  2: 'Enhance Functional Restoration',
+  3: 'Reconditioning and Weaning',
+  4: 'Secretion Clearance & Prevent Complication',
 }
 
 const OUTCOME_MEASUREMENTS: Record<number, string[]> = {
-  1: ['AMPAC', 'BRFA', 'Peak flow', 'Incentive spirometry', '6-Minute Walk Test (6MWT)', 'Grip Strength'],
-  2: ['AMPAC', 'BRFA', 'Peak flow', 'Incentive spirometry', '2-Minute Marching Test', 'Grip Strength'],
+  1: ['AMPAC', 'BRFA', 'Peak flow', 'Incentive spirometry', '6MWT', 'Grip Strength'],
+  2: ['AMPAC', 'BRFA', 'Peak flow', 'Incentive spirometry', '2-min Marching Test', 'Grip Strength'],
   3: ['AMPAC', 'BRFA', 'Dyspnea scale', 'Peak flow'],
   4: ['AMPAC', 'BRFA', 'Dyspnea scale'],
 }
 
 const REHAB_PROGRAMS: Record<number, string[]> = {
   1: [
-    'Return to ADL',
     'Circuit training (ACSM)',
     'Work Hardening',
-    'Motivational Interviewing & Educational Program',
+    'Return to ADL',
+    'Motivational Interviewing',
+    'Educational Program',
   ],
   2: [
     'Lung Expansion Exercise with IS training',
     'Cough Training and IMT',
     'AROM',
-    'Endurance (Bicycle/Treadmill)',
-    'IMT',
+    'Endurance training (Bicycle/Treadmill)',
     'Self-Management with Energy Conservation',
   ],
   3: [
     'Chest Program (Trilogy/Vibration/Suction)',
     'Lung Expansion + IS',
-    'Incentive Muscle Training',
-    'AAROM / Bed Mobility Training',
+    'Incentive Muscle Training (IMT)',
+    'AAROM',
+    'Bed Mobility Training',
     'Self-Management with Energy Conservation',
   ],
   4: [
-    'Positioning & Postural Drainage',
+    'Positioning & Postural drainage',
     'Chest Program (Trilogy/Vibration/Suction)',
     'PROM/Stretching',
     'Lung Expansion with Manual Hyperinflation',
   ],
 }
+
+export const RED_FLAGS = [
+  'SpO₂ < 95% หรือลดลง > 4% จาก baseline',
+  'RR > 30 ครั้ง/นาที หรือใช้ accessory muscle เพิ่มขึ้น',
+  'HR > 120 หรือ < 50 bpm หรือ new arrhythmia',
+  'Borg dyspnea ≥ 7/10',
+  'BP systolic < 90 หรือ > 180 mmHg / MAP < 65 mmHg',
+  'Altered consciousness / Agitation (RASS ≤ -3 หรือ ≥ +2)',
+]
 
 export function calculateScreening(input: ScreeningInput): ScreeningResult {
   const fLevel = calculateFLevel(input.cfsScore)

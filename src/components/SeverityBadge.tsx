@@ -19,11 +19,10 @@ export default function SeverityBadge({ level, size = 'sm' }: Props) {
   if (size === 'lg') {
     return (
       <div className={`${c.bg} ${c.border} ${c.text} border-2 rounded-xl p-5 text-center`}>
-        <div className="flex items-center justify-center gap-2 mb-1">
+        <div className="flex items-center justify-center gap-2">
           <span className={`w-4 h-4 rounded-full ${c.dot} inline-block`} />
           <span className="text-2xl font-bold">Level {level} — {cfg.label}</span>
         </div>
-        <p className="text-base font-medium">{cfg.th}</p>
       </div>
     )
   }
