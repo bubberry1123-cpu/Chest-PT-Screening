@@ -4,8 +4,15 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getPatientById, createScreening } from '@/lib/localstore'
 import { calculateScreening, CFS_DESCRIPTIONS } from '@/lib/scoring'
-import type { Patient, O2Support, ScreeningInput } from '@/types'
+import type { Patient, O2Support, Cooperativeness, ScreeningInput } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
+
+const DRIVER_LABELS: Record<string, string> = {
+  Functional: 'Functional (F > R)',
+  Respiratory: 'Respiratory (R > F)',
+  Equal: 'Equal (F = R)',
+  'Non-Cooperative': 'Non-Cooperative',
+}
 
 export default function NewScreeningPage() {
   const { id } = useParams<{ id: string }>()
@@ -14,57 +21,52 @@ export default function NewScreeningPage() {
   const [step, setStep] = useState<1 | 2>(1)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [screeningId, setScreeningId] = useState<string | null>(null)
 
   const [clinical, setClinical] = useState<{
+    cooperativeness: Cooperativeness | null
     cfsScore: number | null
     o2Support: O2Support | null
-    o2FlowRate: string
-    peakCoughFlow: string
     assessedBy: string
     notes: string
   }>({
-    cfsScore: null, o2Support: null, o2FlowRate: '', peakCoughFlow: '',
-    assessedBy: '', notes: '',
+    cooperativeness: null, cfsScore: null, o2Support: null, assessedBy: '', notes: '',
   })
 
   useEffect(() => {
     getPatientById(id).then(setPatient)
   }, [id])
 
-  const result = clinical.cfsScore !== null && clinical.o2Support !== null
+  const result = clinical.cooperativeness && clinical.cfsScore !== null && clinical.o2Support
     ? calculateScreening({
+        cooperativeness: clinical.cooperativeness,
         cfsScore: clinical.cfsScore,
         o2Support: clinical.o2Support,
-        peakCoughFlow: clinical.peakCoughFlow ? Number(clinical.peakCoughFlow) : undefined,
       })
     : null
 
   const handleSave = async () => {
-    if (!clinical.cfsScore || !clinical.o2Support) {
-      setError('กรุณากรอกข้อมูลที่จำเป็นให้ครบ')
-      return
-    }
+    if (!clinical.cooperativeness) { setError('กรุณาเลือก Ability to Follow Commands'); return }
+    if (!clinical.cfsScore) { setError('กรุณาเลือก CFS Score'); return }
+    if (!clinical.o2Support) { setError('กรุณาเลือก Oxygen Support'); return }
     if (!patient) return
     setError('')
     setSaving(true)
     try {
       const input: ScreeningInput = {
+        cooperativeness: clinical.cooperativeness,
         cfsScore: clinical.cfsScore,
         o2Support: clinical.o2Support,
-        peakCoughFlow: clinical.peakCoughFlow ? Number(clinical.peakCoughFlow) : undefined,
       }
       const res = calculateScreening(input)
-      const sid = await createScreening({
+      await createScreening({
         patientId: id,
         patientHn: patient.hn,
-        ward: patient.ward,
+        location: patient.location,
         assessedBy: clinical.assessedBy || 'PT',
         notes: clinical.notes,
         ...input,
         ...res,
       })
-      setScreeningId(sid)
       setStep(2)
     } catch {
       setError('เกิดข้อผิดพลาด กรุณาลองใหม่')
@@ -84,7 +86,7 @@ export default function NewScreeningPage() {
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-5 text-sm">
         <span className="font-semibold text-blue-800">{patient.firstName} {patient.lastName}</span>
         <span className="text-blue-600 ml-2 font-mono">HN: {patient.hn}</span>
-        <span className="text-blue-600 ml-2">• {patient.ward}</span>
+        <span className="text-blue-600 ml-2">• {patient.location}</span>
       </div>
 
       {error && (
@@ -95,9 +97,40 @@ export default function NewScreeningPage() {
 
       {step === 1 && (
         <div className="space-y-4">
+          {/* Cooperativeness */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="font-bold text-slate-800 mb-4">A. Ability to Follow Commands *</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <button type="button"
+                onClick={() => setClinical(c => ({ ...c, cooperativeness: 'fully_cooperative' }))}
+                className={`py-4 rounded-xl border-2 text-sm font-semibold transition-all ${
+                  clinical.cooperativeness === 'fully_cooperative'
+                    ? 'bg-green-600 border-green-600 text-white shadow'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-green-400 hover:bg-green-50'
+                }`}>
+                Fully Cooperative
+                <div className={`text-xs mt-1 font-normal ${clinical.cooperativeness === 'fully_cooperative' ? 'text-green-100' : 'text-slate-400'}`}>
+                  ทำตามคำสั่งได้
+                </div>
+              </button>
+              <button type="button"
+                onClick={() => setClinical(c => ({ ...c, cooperativeness: 'non_cooperative' }))}
+                className={`py-4 rounded-xl border-2 text-sm font-semibold transition-all ${
+                  clinical.cooperativeness === 'non_cooperative'
+                    ? 'bg-red-600 border-red-600 text-white shadow'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-red-400 hover:bg-red-50'
+                }`}>
+                Non-Cooperative
+                <div className={`text-xs mt-1 font-normal ${clinical.cooperativeness === 'non_cooperative' ? 'text-red-100' : 'text-slate-400'}`}>
+                  ทำตามคำสั่งไม่ได้ → Level 4
+                </div>
+              </button>
+            </div>
+          </div>
+
           {/* CFS */}
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="font-bold text-slate-800 mb-4">A. Clinical Frailty Scale (CFS) *</h3>
+            <h3 className="font-bold text-slate-800 mb-4">B. Clinical Frailty Scale (CFS) *</h3>
             <div className="space-y-1.5">
               {[1,2,3,4,5,6,7,8,9].map(n => (
                 <button key={n} type="button"
@@ -121,39 +154,34 @@ export default function NewScreeningPage() {
 
           {/* O2 */}
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="font-bold text-slate-800 mb-4">B. Oxygen Support *</h3>
-            <div className="space-y-2">
+            <h3 className="font-bold text-slate-800 mb-4">C. Oxygen Support *</h3>
+            <div className="space-y-2.5">
               {([
                 { value: 'room_air', label: 'Room Air', desc: 'หายใจเองได้ปกติ' },
                 { value: 'low_flow', label: 'Low Flow', desc: '1–6 L/min' },
-                { value: 'high_flow', label: 'High Flow', desc: '≥ 30–60 L/min' },
+                { value: 'high_flow', label: 'High Flow', desc: '> 6 L/min (HFNC/Mask)' },
                 { value: 'ventilator', label: 'Ventilator', desc: 'เครื่องช่วยหายใจ' },
               ] as const).map(opt => (
                 <label key={opt.value}
-                  className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                    clinical.o2Support === opt.value ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-300'
+                  className={`flex items-center gap-3 p-3.5 rounded-lg border-2 cursor-pointer transition-all ${
+                    clinical.o2Support === opt.value
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-slate-200 hover:border-blue-300'
                   }`}>
-                  <input type="radio" name="o2" checked={clinical.o2Support === opt.value}
-                    onChange={() => setClinical(c => ({ ...c, o2Support: opt.value }))} />
-                  <span className="font-medium text-sm">{opt.label}</span>
-                  <span className="text-slate-500 text-xs">({opt.desc})</span>
+                  <input type="radio" name="o2" value={opt.value}
+                    checked={clinical.o2Support === opt.value}
+                    onChange={() => setClinical(c => ({ ...c, o2Support: opt.value }))}
+                    className="text-blue-600" />
+                  <div>
+                    <span className="font-medium text-slate-800 text-sm">{opt.label}</span>
+                    <span className="text-slate-500 text-xs ml-2">({opt.desc})</span>
+                  </div>
                 </label>
               ))}
             </div>
           </div>
 
-          {/* Peak Cough Flow */}
-          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="font-bold text-slate-800 mb-4">C. Peak Cough Flow (ถ้ามี)</h3>
-            <div className="flex items-center gap-3">
-              <input type="number" value={clinical.peakCoughFlow} placeholder="–"
-                onChange={e => setClinical(c => ({ ...c, peakCoughFlow: e.target.value }))}
-                className="w-40 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
-              <span className="text-slate-500 text-sm">L/min</span>
-            </div>
-          </div>
-
-          {/* Notes */}
+          {/* Extra info */}
           <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -172,11 +200,12 @@ export default function NewScreeningPage() {
           </div>
 
           {result && (
-            <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 text-sm text-slate-600 flex flex-wrap gap-4">
-              <span>F{result.fLevel}</span><span>R{result.rLevel}</span>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 text-sm text-slate-600 flex flex-wrap gap-4 items-center">
+              <span className="font-semibold text-slate-800">{result.levelName}</span>
+              <span>F{result.fLevel} / R{result.rLevel}</span>
               <span>Level {result.overallLevel}</span>
-              <span className={result.programType === 'Standard' ? 'text-green-700 font-medium' : 'text-orange-700 font-medium'}>
-                {result.programType}
+              <span className={result.driver === 'Non-Cooperative' ? 'text-red-600 font-medium' : result.programType === 'Standard' ? 'text-green-700 font-medium' : 'text-orange-700 font-medium'}>
+                {result.driver}
               </span>
             </div>
           )}
@@ -193,23 +222,53 @@ export default function NewScreeningPage() {
       {step === 2 && result && (
         <div className="space-y-4">
           <SeverityBadge level={result.overallLevel} size="lg" />
+
           <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-            <div className="grid grid-cols-4 gap-3 text-center text-sm">
-              <div className="bg-slate-50 rounded-lg p-2.5"><div className="text-xs text-slate-500">CFS</div><div className="font-bold text-lg">{clinical.cfsScore}</div></div>
-              <div className="bg-slate-50 rounded-lg p-2.5"><div className="text-xs text-slate-500">F Level</div><div className="font-bold text-lg text-blue-700">F{result.fLevel}</div></div>
-              <div className="bg-slate-50 rounded-lg p-2.5"><div className="text-xs text-slate-500">R Level</div><div className="font-bold text-lg text-blue-700">R{result.rLevel}</div></div>
-              <div className="bg-slate-50 rounded-lg p-2.5"><div className="text-xs text-slate-500">Program</div><div className={`font-bold text-sm ${result.programType === 'Standard' ? 'text-green-700' : 'text-orange-700'}`}>{result.programType}</div></div>
+            <div className="mb-3">
+              <div className="text-xs text-slate-500 mb-0.5">Goal</div>
+              <div className="text-sm text-slate-700 font-medium">{result.goal}</div>
+            </div>
+            <div className="grid grid-cols-3 gap-3 text-center text-sm">
+              <div className="bg-slate-50 rounded-lg p-2.5">
+                <div className="text-xs text-slate-500">CFS</div>
+                <div className="font-bold text-lg">{clinical.cfsScore}</div>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-2.5">
+                <div className="text-xs text-slate-500">Code F / R</div>
+                <div className="font-bold text-lg text-blue-700">F{result.fLevel} / R{result.rLevel}</div>
+              </div>
+              <div className="bg-slate-50 rounded-lg p-2.5">
+                <div className="text-xs text-slate-500">Driver</div>
+                <div className="font-bold text-xs mt-1 text-slate-700">{DRIVER_LABELS[result.driver]}</div>
+              </div>
+            </div>
+            <div className="mt-3 text-center">
+              <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${result.programType === 'Standard' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                {result.programType} Program
+              </span>
             </div>
           </div>
+
           <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
             <h4 className="font-semibold text-slate-700 mb-2">Outcome Measurements</h4>
-            <ul className="space-y-1">{result.outcomeMeasurements.map(m => <li key={m} className="text-sm text-slate-700 flex items-center gap-2"><span className="text-green-500">✓</span>{m}</li>)}</ul>
+            <ul className="space-y-1">{result.outcomeMeasurements.map(m => (
+              <li key={m} className="text-sm text-slate-700 flex items-center gap-2">
+                <span className="text-green-500">✓</span>{m}
+              </li>
+            ))}</ul>
           </div>
+
           <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-            <h4 className="font-semibold text-slate-700 mb-2">Rehabilitation Program</h4>
-            <ul className="space-y-1">{result.rehabProgram.map(p => <li key={p} className="text-sm text-slate-700 flex items-start gap-2"><span className="text-blue-500">•</span>{p}</li>)}</ul>
+            <h4 className="font-semibold text-slate-700 mb-2">PT Program</h4>
+            <ul className="space-y-1">{result.rehabProgram.map(p => (
+              <li key={p} className="text-sm text-slate-700 flex items-start gap-2">
+                <span className="text-blue-500">•</span>{p}
+              </li>
+            ))}</ul>
           </div>
-          <Link href={`/patients/${id}`} className="block text-center bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition-colors">
+
+          <Link href={`/patients/${id}`}
+            className="block text-center bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-semibold text-sm transition-colors">
             กลับหน้าผู้ป่วย
           </Link>
         </div>

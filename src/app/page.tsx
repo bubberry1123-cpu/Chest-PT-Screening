@@ -69,7 +69,7 @@ export default function HomePage() {
               <tr>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">ชื่อ-นามสกุล</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600">HN</th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden sm:table-cell">Ward</th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden sm:table-cell">Location</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden sm:table-cell">อายุ</th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 hidden sm:table-cell">สัญชาติ</th>
                 <th className="px-4 py-3" />
@@ -82,7 +82,7 @@ export default function HomePage() {
                     {p.firstName} {p.lastName}
                   </td>
                   <td className="px-4 py-3 text-slate-600 font-mono">{p.hn}</td>
-                  <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{p.ward}</td>
+                  <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{p.location}</td>
                   <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{p.age} ปี</td>
                   <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{p.nationality}</td>
                   <td className="px-4 py-3 text-right">

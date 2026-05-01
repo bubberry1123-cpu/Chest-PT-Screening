@@ -1,4 +1,4 @@
-import type { FLevel, RLevel, OverallLevel, O2Support, ProgramType, ScreeningInput, ScreeningResult } from '@/types'
+import type { FLevel, RLevel, OverallLevel, O2Support, ProgramType, Driver, ScreeningInput, ScreeningResult } from '@/types'
 
 export function calculateFLevel(cfsScore: number): FLevel {
   if (cfsScore <= 3) return 1
@@ -16,31 +16,34 @@ function o2ToRLevel(o2Support: O2Support): RLevel {
   }
 }
 
-function coughToRLevel(peakCoughFlow: number): RLevel {
-  if (peakCoughFlow > 400) return 1
-  if (peakCoughFlow >= 360) return 2
-  if (peakCoughFlow >= 160) return 3
-  return 4
+export function calculateRLevel(o2Support: O2Support): RLevel {
+  return o2ToRLevel(o2Support)
 }
 
-export function calculateRLevel(
-  o2Support: O2Support,
-  peakCoughFlow?: number
-): RLevel {
-  const levels: RLevel[] = [o2ToRLevel(o2Support)]
-  if (peakCoughFlow != null) levels.push(coughToRLevel(peakCoughFlow))
-  return Math.max(...levels) as RLevel
+const LEVEL_NAMES: Record<number, string> = {
+  1: 'Mild',
+  2: 'Moderate',
+  3: 'Mild Severe',
+  4: 'Severe',
+}
+
+const LEVEL_GOALS: Record<number, string> = {
+  1: 'Return to ADL and maximize physical function',
+  2: 'Improve respiratory function and physical capacity',
+  3: 'Manage symptoms and maintain functional independence',
+  4: 'Maintain airway clearance and prevent complications',
 }
 
 const OUTCOME_MEASUREMENTS: Record<number, string[]> = {
   1: ['AMPAC', 'BRFA', 'Peak flow', 'Incentive spirometry', '6-Minute Walk Test (6MWT)', 'Grip Strength'],
   2: ['AMPAC', 'BRFA', 'Peak flow', 'Incentive spirometry', '2-Minute Marching Test', 'Grip Strength'],
   3: ['AMPAC', 'BRFA', 'Dyspnea scale', 'Peak flow'],
-  4: ['AMPAC', 'Dyspnea scale'],
+  4: ['AMPAC', 'BRFA', 'Dyspnea scale'],
 }
 
 const REHAB_PROGRAMS: Record<number, string[]> = {
   1: [
+    'Return to ADL',
     'Circuit training (ACSM)',
     'Work Hardening',
     'Motivational Interviewing & Educational Program',
@@ -70,15 +73,34 @@ const REHAB_PROGRAMS: Record<number, string[]> = {
 
 export function calculateScreening(input: ScreeningInput): ScreeningResult {
   const fLevel = calculateFLevel(input.cfsScore)
-  const rLevel = calculateRLevel(input.o2Support, input.peakCoughFlow)
+  const rLevel = calculateRLevel(input.o2Support)
+
+  if (input.cooperativeness === 'non_cooperative') {
+    return {
+      fLevel,
+      rLevel,
+      overallLevel: 4,
+      programType: 'Intensive',
+      driver: 'Non-Cooperative',
+      levelName: LEVEL_NAMES[4],
+      goal: LEVEL_GOALS[4],
+      outcomeMeasurements: OUTCOME_MEASUREMENTS[4],
+      rehabProgram: REHAB_PROGRAMS[4],
+    }
+  }
+
   const overallLevel = Math.max(fLevel, rLevel) as OverallLevel
   const programType: ProgramType = fLevel === rLevel ? 'Standard' : 'Intensive'
+  const driver: Driver = fLevel > rLevel ? 'Functional' : rLevel > fLevel ? 'Respiratory' : 'Equal'
 
   return {
     fLevel,
     rLevel,
     overallLevel,
     programType,
+    driver,
+    levelName: LEVEL_NAMES[overallLevel],
+    goal: LEVEL_GOALS[overallLevel],
     outcomeMeasurements: OUTCOME_MEASUREMENTS[overallLevel],
     rehabProgram: REHAB_PROGRAMS[overallLevel],
   }
@@ -95,7 +117,6 @@ export const CFS_DESCRIPTIONS: Record<number, { th: string; en: string }> = {
   8: { en: 'Very severely frail', th: 'เปราะบางรุนแรงมาก — ใกล้เสียชีวิต' },
   9: { en: 'Terminally ill', th: 'ป่วยระยะสุดท้าย — คาดว่าจะมีชีวิตอยู่ไม่เกิน 6 เดือน' },
 }
-
 
 export const LEVEL_CONFIG = {
   1: { label: 'Mild', color: 'green', th: 'ระดับเบา' },

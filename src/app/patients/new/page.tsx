@@ -1,61 +1,54 @@
 'use client'
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createPatient, getPatientByHn } from '@/lib/localstore'
 import { createScreening } from '@/lib/localstore'
 import { calculateScreening, CFS_DESCRIPTIONS } from '@/lib/scoring'
-import type { O2Support, ScreeningInput } from '@/types'
+import type { O2Support, Cooperativeness, Sex, ScreeningInput } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
 
 type Step = 1 | 2 | 3
 
 const NATIONALITIES = ['ไทย', 'พม่า', 'ลาว', 'กัมพูชา', 'เวียดนาม', 'จีน', 'อื่นๆ']
-type WardType = 'Ward' | 'Critical Care' | ''
+
+const DRIVER_LABELS: Record<string, string> = {
+  Functional: 'Functional (F > R)',
+  Respiratory: 'Respiratory (R > F)',
+  Equal: 'Equal (F = R)',
+  'Non-Cooperative': 'Non-Cooperative',
+}
 
 export default function NewPatientPage() {
-  const router = useRouter()
   const [step, setStep] = useState<Step>(1)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // Step 1 — Patient info
   const [patientForm, setPatientForm] = useState({
-    hn: '', firstName: '', lastName: '', age: '', nationality: 'ไทย',
+    hn: '', firstName: '', lastName: '', age: '', nationality: 'ไทย', location: '',
   })
-  const [wardType, setWardType] = useState<WardType>('')
-  const [wardRoom, setWardRoom] = useState('')
+  const [sex, setSex] = useState<Sex | ''>('')
   const [existingPatientId, setExistingPatientId] = useState<string | null>(null)
 
-  // Step 2 — Clinical
   const [clinical, setClinical] = useState<{
+    cooperativeness: Cooperativeness | null
     cfsScore: number | null
     o2Support: O2Support | null
-    o2FlowRate: string
-    peakCoughFlow: string
     assessedBy: string
     notes: string
   }>({
-    cfsScore: null,
-    o2Support: null,
-    o2FlowRate: '',
-    peakCoughFlow: '',
-    assessedBy: '',
-    notes: '',
+    cooperativeness: null, cfsScore: null, o2Support: null, assessedBy: '', notes: '',
   })
 
-  // Step 3 — Result
   const [screeningId, setScreeningId] = useState<string | null>(null)
   const [savedPatientId, setSavedPatientId] = useState<string | null>(null)
-
-  const wardValue = wardType ? `${wardType}${wardRoom.trim() ? ` ${wardRoom.trim()}` : ''}` : ''
 
   const validateStep1 = () => {
     if (!patientForm.hn.trim()) return 'กรุณากรอก HN'
     if (!patientForm.firstName.trim()) return 'กรุณากรอกชื่อ'
     if (!patientForm.lastName.trim()) return 'กรุณากรอกนามสกุล'
     if (!patientForm.age || isNaN(Number(patientForm.age)) || Number(patientForm.age) <= 0) return 'กรุณากรอกอายุที่ถูกต้อง'
-    if (!wardType) return 'กรุณาเลือกประเภท Ward'
+    if (!sex) return 'กรุณาเลือกเพศ'
+    if (!patientForm.location.trim()) return 'กรุณากรอก Location (Ward/ห้อง)'
     return ''
   }
 
@@ -63,8 +56,6 @@ export default function NewPatientPage() {
     const err = validateStep1()
     if (err) { setError(err); return }
     setError('')
-
-    // Check if HN exists
     const existing = await getPatientByHn(patientForm.hn.trim())
     if (existing) {
       setExistingPatientId(existing.id!)
@@ -74,20 +65,15 @@ export default function NewPatientPage() {
         lastName: existing.lastName,
         age: String(existing.age),
         nationality: existing.nationality,
+        location: existing.location,
       })
-      // parse existing ward back into type + room
-      if (existing.ward.startsWith('Critical Care')) {
-        setWardType('Critical Care')
-        setWardRoom(existing.ward.replace('Critical Care', '').trim())
-      } else if (existing.ward.startsWith('Ward')) {
-        setWardType('Ward')
-        setWardRoom(existing.ward.replace('Ward', '').trim())
-      }
+      setSex(existing.sex)
     }
     setStep(2)
   }
 
   const validateStep2 = () => {
+    if (!clinical.cooperativeness) return 'กรุณาเลือก Ability to Follow Commands'
     if (clinical.cfsScore === null) return 'กรุณาเลือก CFS Score'
     if (!clinical.o2Support) return 'กรุณาเลือก Oxygen Support'
     return ''
@@ -98,9 +84,7 @@ export default function NewPatientPage() {
     if (err) { setError(err); return }
     setError('')
     setSaving(true)
-
     try {
-      // Save or use existing patient
       let patientId = existingPatientId
       if (!patientId) {
         patientId = await createPatient({
@@ -108,28 +92,27 @@ export default function NewPatientPage() {
           firstName: patientForm.firstName.trim(),
           lastName: patientForm.lastName.trim(),
           age: Number(patientForm.age),
+          sex: sex as Sex,
           nationality: patientForm.nationality,
-          ward: wardValue,
+          location: patientForm.location.trim(),
         })
       }
       setSavedPatientId(patientId)
 
       const input: ScreeningInput = {
+        cooperativeness: clinical.cooperativeness!,
         cfsScore: clinical.cfsScore!,
         o2Support: clinical.o2Support!,
-        o2FlowRate: clinical.o2FlowRate ? Number(clinical.o2FlowRate) : undefined,
-        peakCoughFlow: clinical.peakCoughFlow ? Number(clinical.peakCoughFlow) : undefined,
       }
-
-      const result = calculateScreening(input)
+      const res = calculateScreening(input)
       const sid = await createScreening({
         patientId,
         patientHn: patientForm.hn.trim(),
-        ward: wardValue,
+        location: patientForm.location.trim(),
         assessedBy: clinical.assessedBy || 'PT',
         notes: clinical.notes,
         ...input,
-        ...result,
+        ...res,
       })
       setScreeningId(sid)
       setStep(3)
@@ -141,17 +124,16 @@ export default function NewPatientPage() {
     }
   }
 
-  const result = clinical.cfsScore !== null && clinical.o2Support !== null
+  const result = clinical.cooperativeness && clinical.cfsScore !== null && clinical.o2Support
     ? calculateScreening({
+        cooperativeness: clinical.cooperativeness,
         cfsScore: clinical.cfsScore,
         o2Support: clinical.o2Support,
-        peakCoughFlow: clinical.peakCoughFlow ? Number(clinical.peakCoughFlow) : undefined,
       })
     : null
 
   return (
     <div className="max-w-2xl mx-auto">
-      {/* Progress */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-2">
           <Link href="/" className="text-slate-400 hover:text-slate-600 text-sm">← กลับ</Link>
@@ -216,31 +198,25 @@ export default function NewPatientPage() {
               </select>
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-2">Ward *</label>
-              <div className="flex gap-2 mb-2">
-                {(['Ward', 'Critical Care'] as WardType[]).map(t => (
-                  <button key={t} type="button"
-                    onClick={() => setWardType(t)}
-                    className={`flex-1 py-2.5 rounded-lg text-sm font-semibold border-2 transition-all ${
-                      wardType === t
-                        ? t === 'Critical Care'
-                          ? 'bg-red-600 border-red-600 text-white'
-                          : 'bg-blue-600 border-blue-600 text-white'
-                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'
+              <label className="block text-sm font-medium text-slate-700 mb-2">เพศ *</label>
+              <div className="flex gap-2">
+                {(['Male', 'Female', 'Other'] as Sex[]).map(s => (
+                  <button key={s} type="button"
+                    onClick={() => setSex(s)}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium border-2 transition-all ${
+                      sex === s ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-400'
                     }`}>
-                    {t === 'Critical Care' ? '🔴 Critical Care' : '🏥 Ward'}
+                    {s === 'Male' ? 'ชาย' : s === 'Female' ? 'หญิง' : 'อื่นๆ'}
                   </button>
                 ))}
               </div>
-              {wardType && (
-                <input type="text" value={wardRoom}
-                  onChange={e => setWardRoom(e.target.value)}
-                  placeholder={wardType === 'Critical Care' ? 'เช่น ICU, CCU, MICU...' : 'เช่น 201, อายุรกรรมชาย...'}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
-              )}
-              {wardValue && (
-                <p className="text-xs text-slate-500 mt-1">ห้อง: <span className="font-medium text-slate-700">{wardValue}</span></p>
-              )}
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Location (Ward / ห้อง) *</label>
+              <input type="text" value={patientForm.location}
+                onChange={e => setPatientForm(f => ({ ...f, location: e.target.value }))}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                placeholder="เช่น ICU, Ward 5, CCU..." />
             </div>
           </div>
           <div className="mt-6 flex justify-end">
@@ -255,9 +231,40 @@ export default function NewPatientPage() {
       {/* Step 2 */}
       {step === 2 && (
         <div className="space-y-4">
+          {/* Cooperativeness */}
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+            <h3 className="font-bold text-slate-800 mb-4">A. Ability to Follow Commands *</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <button type="button"
+                onClick={() => setClinical(c => ({ ...c, cooperativeness: 'fully_cooperative' }))}
+                className={`py-4 rounded-xl border-2 text-sm font-semibold transition-all ${
+                  clinical.cooperativeness === 'fully_cooperative'
+                    ? 'bg-green-600 border-green-600 text-white shadow'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-green-400 hover:bg-green-50'
+                }`}>
+                Fully Cooperative
+                <div className={`text-xs mt-1 font-normal ${clinical.cooperativeness === 'fully_cooperative' ? 'text-green-100' : 'text-slate-400'}`}>
+                  ทำตามคำสั่งได้
+                </div>
+              </button>
+              <button type="button"
+                onClick={() => setClinical(c => ({ ...c, cooperativeness: 'non_cooperative' }))}
+                className={`py-4 rounded-xl border-2 text-sm font-semibold transition-all ${
+                  clinical.cooperativeness === 'non_cooperative'
+                    ? 'bg-red-600 border-red-600 text-white shadow'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-red-400 hover:bg-red-50'
+                }`}>
+                Non-Cooperative
+                <div className={`text-xs mt-1 font-normal ${clinical.cooperativeness === 'non_cooperative' ? 'text-red-100' : 'text-slate-400'}`}>
+                  ทำตามคำสั่งไม่ได้ → Level 4
+                </div>
+              </button>
+            </div>
+          </div>
+
           {/* CFS */}
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="font-bold text-slate-800 mb-4">A. Clinical Frailty Scale (CFS) *</h3>
+            <h3 className="font-bold text-slate-800 mb-4">B. Clinical Frailty Scale (CFS) *</h3>
             <div className="space-y-1.5">
               {[1,2,3,4,5,6,7,8,9].map(n => (
                 <button key={n} type="button"
@@ -281,16 +288,16 @@ export default function NewPatientPage() {
 
           {/* O2 */}
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="font-bold text-slate-800 mb-4">B. Oxygen Support *</h3>
+            <h3 className="font-bold text-slate-800 mb-4">C. Oxygen Support *</h3>
             <div className="space-y-2.5">
               {([
                 { value: 'room_air', label: 'Room Air', desc: 'หายใจเองได้ปกติ' },
                 { value: 'low_flow', label: 'Low Flow', desc: '1–6 L/min' },
-                { value: 'high_flow', label: 'High Flow', desc: '≥ 30–60 L/min' },
+                { value: 'high_flow', label: 'High Flow', desc: '> 6 L/min (HFNC/Mask)' },
                 { value: 'ventilator', label: 'Ventilator', desc: 'เครื่องช่วยหายใจ' },
               ] as const).map(opt => (
                 <label key={opt.value}
-                  className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                  className={`flex items-center gap-3 p-3.5 rounded-lg border-2 cursor-pointer transition-all ${
                     clinical.o2Support === opt.value
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-slate-200 hover:border-blue-300'
@@ -303,30 +310,14 @@ export default function NewPatientPage() {
                     <span className="font-medium text-slate-800 text-sm">{opt.label}</span>
                     <span className="text-slate-500 text-xs ml-2">({opt.desc})</span>
                   </div>
-                  {(opt.value === 'low_flow' || opt.value === 'high_flow') && clinical.o2Support === opt.value && (
-                    <input type="number" placeholder="L/min" value={clinical.o2FlowRate}
-                      onChange={e => setClinical(c => ({ ...c, o2FlowRate: e.target.value }))}
-                      className="ml-auto w-24 border border-slate-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500" />
-                  )}
                 </label>
               ))}
             </div>
           </div>
 
-          {/* Peak Cough Flow */}
+          {/* Extra info */}
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="font-bold text-slate-800 mb-4">C. Peak Cough Flow (ถ้ามี)</h3>
-            <div className="flex items-center gap-3">
-              <input type="number" value={clinical.peakCoughFlow} placeholder="–"
-                onChange={e => setClinical(c => ({ ...c, peakCoughFlow: e.target.value }))}
-                className="w-40 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
-              <span className="text-slate-500 text-sm">L/min</span>
-            </div>
-          </div>
-
-          {/* Assessed by */}
-          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="font-bold text-slate-800 mb-4">E. ข้อมูลเพิ่มเติม</h3>
+            <h3 className="font-bold text-slate-800 mb-4">D. ข้อมูลเพิ่มเติม</h3>
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">ผู้ประเมิน (PT)</label>
@@ -345,11 +336,16 @@ export default function NewPatientPage() {
 
           {/* Preview */}
           {result && (
-            <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 text-sm text-slate-600 flex flex-wrap gap-4">
-              <span>F Level: <strong className="text-slate-800">F{result.fLevel}</strong></span>
-              <span>R Level: <strong className="text-slate-800">R{result.rLevel}</strong></span>
-              <span>Overall: <strong className="text-slate-800">Level {result.overallLevel}</strong></span>
-              <span>Program: <strong className="text-slate-800">{result.programType}</strong></span>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3 text-sm text-slate-600 flex flex-wrap gap-4 items-center">
+              <span className="font-semibold text-slate-800">{result.levelName}</span>
+              <span>F{result.fLevel} / R{result.rLevel}</span>
+              <span>Level {result.overallLevel}</span>
+              <span className={result.driver === 'Non-Cooperative' ? 'text-red-600 font-medium' : result.programType === 'Standard' ? 'text-green-700 font-medium' : 'text-orange-700 font-medium'}>
+                {result.driver}
+              </span>
+              <span className={result.programType === 'Standard' ? 'text-green-700' : 'text-orange-700'}>
+                {result.programType}
+              </span>
             </div>
           )}
 
@@ -367,36 +363,39 @@ export default function NewPatientPage() {
       )}
 
       {/* Step 3 */}
-      {step === 3 && result && screeningId && (
+      {step === 3 && result && (
         <div className="space-y-4">
           <SeverityBadge level={result.overallLevel} size="lg" />
 
-          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="font-semibold text-slate-700 mb-3">สรุปผลการประเมิน</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-sm mb-4">
-              <div className="bg-slate-50 rounded-lg p-3">
-                <div className="text-xs text-slate-500 mb-1">CFS Score</div>
+          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+            <div className="mb-3">
+              <div className="text-xs text-slate-500 mb-0.5">Goal</div>
+              <div className="text-sm text-slate-700 font-medium">{result.goal}</div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-sm">
+              <div className="bg-slate-50 rounded-lg p-2.5">
+                <div className="text-xs text-slate-500">CFS</div>
                 <div className="font-bold text-lg text-slate-800">{clinical.cfsScore}</div>
               </div>
-              <div className="bg-slate-50 rounded-lg p-3">
-                <div className="text-xs text-slate-500 mb-1">F Level</div>
-                <div className="font-bold text-lg text-blue-700">F{result.fLevel}</div>
+              <div className="bg-slate-50 rounded-lg p-2.5">
+                <div className="text-xs text-slate-500">Code F / R</div>
+                <div className="font-bold text-lg text-blue-700">F{result.fLevel} / R{result.rLevel}</div>
               </div>
-              <div className="bg-slate-50 rounded-lg p-3">
-                <div className="text-xs text-slate-500 mb-1">R Level</div>
-                <div className="font-bold text-lg text-blue-700">R{result.rLevel}</div>
+              <div className="bg-slate-50 rounded-lg p-2.5">
+                <div className="text-xs text-slate-500">Driver</div>
+                <div className="font-bold text-sm mt-1 text-slate-700">{DRIVER_LABELS[result.driver]}</div>
               </div>
-              <div className="bg-slate-50 rounded-lg p-3">
-                <div className="text-xs text-slate-500 mb-1">Program</div>
-                <div className={`font-bold text-sm ${result.programType === 'Standard' ? 'text-green-700' : 'text-orange-700'}`}>
+              <div className="bg-slate-50 rounded-lg p-2.5">
+                <div className="text-xs text-slate-500">Program</div>
+                <div className={`font-bold text-sm mt-1 ${result.programType === 'Standard' ? 'text-green-700' : 'text-orange-700'}`}>
                   {result.programType}
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="font-semibold text-slate-700 mb-3">Outcome Measurements ที่แนะนำ</h3>
+          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+            <h3 className="font-semibold text-slate-700 mb-3">Outcome Measurements</h3>
             <ul className="space-y-1.5">
               {result.outcomeMeasurements.map(m => (
                 <li key={m} className="flex items-center gap-2 text-sm text-slate-700">
@@ -406,8 +405,8 @@ export default function NewPatientPage() {
             </ul>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="font-semibold text-slate-700 mb-3">Rehabilitation Program</h3>
+          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+            <h3 className="font-semibold text-slate-700 mb-3">PT Program</h3>
             <ul className="space-y-1.5">
               {result.rehabProgram.map(p => (
                 <li key={p} className="flex items-start gap-2 text-sm text-slate-700">

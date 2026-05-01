@@ -8,9 +8,21 @@ import SeverityBadge from '@/components/SeverityBadge'
 
 const O2_LABELS: Record<string, string> = {
   room_air: 'Room Air',
-  low_flow: 'Low Flow',
-  high_flow: 'High Flow',
+  low_flow: 'Low Flow (1–6 L/min)',
+  high_flow: 'High Flow (> 6 L/min)',
   ventilator: 'Ventilator',
+}
+
+const COOP_LABELS: Record<string, string> = {
+  fully_cooperative: 'Fully Cooperative',
+  non_cooperative: 'Non-Cooperative',
+}
+
+const DRIVER_LABELS: Record<string, string> = {
+  Functional: 'Functional (F > R)',
+  Respiratory: 'Respiratory (R > F)',
+  Equal: 'Equal (F = R)',
+  'Non-Cooperative': 'Non-Cooperative',
 }
 
 export default function ScreeningDetailPage() {
@@ -40,24 +52,33 @@ export default function ScreeningDetailPage() {
 
       <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4 shadow-sm text-sm text-slate-600">
         <div className="font-mono">HN: {screening.patientHn}</div>
-        <div className="mt-0.5">Ward: {screening.ward} • {date}</div>
+        <div className="mt-0.5">Location: {screening.location} • {date}</div>
         {screening.assessedBy && <div className="mt-0.5">ผู้ประเมิน: {screening.assessedBy}</div>}
       </div>
 
       <SeverityBadge level={screening.overallLevel} size="lg" />
 
-      <div className="grid grid-cols-4 gap-3 my-4 text-center text-sm">
+      {/* Level name + Goal */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4 my-4 shadow-sm">
+        <div className="text-xs text-slate-500 mb-0.5">Level</div>
+        <div className="text-lg font-bold text-slate-800 mb-2">{screening.levelName}</div>
+        <div className="text-xs text-slate-500 mb-0.5">Goal</div>
+        <div className="text-sm text-slate-700">{screening.goal}</div>
+      </div>
+
+      {/* Scores */}
+      <div className="grid grid-cols-4 gap-3 mb-4 text-center text-sm">
         <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
           <div className="text-xs text-slate-500">CFS</div>
           <div className="font-bold text-xl text-slate-800">{screening.cfsScore}</div>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
-          <div className="text-xs text-slate-500">F Level</div>
-          <div className="font-bold text-xl text-blue-700">F{screening.fLevel}</div>
+          <div className="text-xs text-slate-500">Code F / R</div>
+          <div className="font-bold text-base text-blue-700 mt-0.5">F{screening.fLevel} / R{screening.rLevel}</div>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
-          <div className="text-xs text-slate-500">R Level</div>
-          <div className="font-bold text-xl text-blue-700">R{screening.rLevel}</div>
+          <div className="text-xs text-slate-500">Driver</div>
+          <div className="font-bold text-xs mt-1 text-slate-700 leading-tight">{DRIVER_LABELS[screening.driver]}</div>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
           <div className="text-xs text-slate-500">Program</div>
@@ -67,19 +88,20 @@ export default function ScreeningDetailPage() {
         </div>
       </div>
 
+      {/* Clinical info */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm mb-4">
         <h3 className="font-semibold text-slate-700 mb-3">ข้อมูล Clinical</h3>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="flex justify-between py-1.5 border-b border-slate-100">
+        <div className="space-y-0">
+          <div className="flex justify-between py-1.5 border-b border-slate-100 text-sm">
+            <span className="text-slate-500">Ability to Follow Commands</span>
+            <span className={`font-medium ${screening.cooperativeness === 'non_cooperative' ? 'text-red-600' : 'text-green-700'}`}>
+              {COOP_LABELS[screening.cooperativeness]}
+            </span>
+          </div>
+          <div className="flex justify-between py-1.5 text-sm">
             <span className="text-slate-500">O2 Support</span>
             <span className="font-medium">{O2_LABELS[screening.o2Support]}</span>
           </div>
-          {screening.peakCoughFlow && (
-            <div className="flex justify-between py-1.5 border-b border-slate-100">
-              <span className="text-slate-500">Peak Cough Flow</span>
-              <span className="font-medium">{screening.peakCoughFlow} L/min</span>
-            </div>
-          )}
         </div>
         {screening.notes && (
           <div className="mt-3 pt-3 border-t border-slate-100 text-sm text-slate-600">
@@ -100,7 +122,7 @@ export default function ScreeningDetailPage() {
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-        <h3 className="font-semibold text-slate-700 mb-3">Rehabilitation Program</h3>
+        <h3 className="font-semibold text-slate-700 mb-3">PT Program</h3>
         <ul className="space-y-1.5">
           {screening.rehabProgram.map(p => (
             <li key={p} className="flex items-start gap-2 text-sm text-slate-700">

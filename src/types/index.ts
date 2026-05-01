@@ -1,8 +1,11 @@
 export type O2Support = 'room_air' | 'low_flow' | 'high_flow' | 'ventilator'
+export type Sex = 'Male' | 'Female' | 'Other'
+export type Cooperativeness = 'fully_cooperative' | 'non_cooperative'
 export type FLevel = 1 | 2 | 3 | 4
 export type RLevel = 1 | 2 | 3 | 4
 export type OverallLevel = 1 | 2 | 3 | 4
 export type ProgramType = 'Standard' | 'Intensive'
+export type Driver = 'Functional' | 'Respiratory' | 'Equal' | 'Non-Cooperative'
 
 export interface Patient {
   id?: string
@@ -10,16 +13,16 @@ export interface Patient {
   firstName: string
   lastName: string
   age: number
+  sex: Sex
   nationality: string
-  ward: string
+  location: string
   createdAt?: Date
 }
 
 export interface ScreeningInput {
+  cooperativeness: Cooperativeness
   cfsScore: number
   o2Support: O2Support
-  o2FlowRate?: number
-  peakCoughFlow?: number
 }
 
 export interface ScreeningResult {
@@ -27,6 +30,9 @@ export interface ScreeningResult {
   rLevel: RLevel
   overallLevel: OverallLevel
   programType: ProgramType
+  driver: Driver
+  levelName: string
+  goal: string
   outcomeMeasurements: string[]
   rehabProgram: string[]
 }
@@ -35,7 +41,7 @@ export interface Screening extends ScreeningInput, ScreeningResult {
   id?: string
   patientId: string
   patientHn: string
-  ward: string
+  location: string
   assessedBy: string
   notes?: string
   assessedAt?: Date

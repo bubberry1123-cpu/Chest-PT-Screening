@@ -44,18 +44,22 @@ export default function PatientPage() {
             + ประเมินใหม่
           </Link>
         </div>
-        <div className="grid grid-cols-3 gap-3 mt-4 text-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-sm">
           <div className="bg-slate-50 rounded-lg p-2.5">
             <div className="text-xs text-slate-500">อายุ</div>
             <div className="font-semibold text-slate-800">{patient.age} ปี</div>
+          </div>
+          <div className="bg-slate-50 rounded-lg p-2.5">
+            <div className="text-xs text-slate-500">เพศ</div>
+            <div className="font-semibold text-slate-800">{patient.sex}</div>
           </div>
           <div className="bg-slate-50 rounded-lg p-2.5">
             <div className="text-xs text-slate-500">สัญชาติ</div>
             <div className="font-semibold text-slate-800">{patient.nationality}</div>
           </div>
           <div className="bg-slate-50 rounded-lg p-2.5">
-            <div className="text-xs text-slate-500">Ward</div>
-            <div className="font-semibold text-slate-800">{patient.ward}</div>
+            <div className="text-xs text-slate-500">Location</div>
+            <div className="font-semibold text-slate-800">{patient.location}</div>
           </div>
         </div>
       </div>
