@@ -23,30 +23,12 @@ function coughToRLevel(peakCoughFlow: number): RLevel {
   return 4
 }
 
-function abgToRLevel(abgPaO2: number): RLevel {
-  if (abgPaO2 > 80) return 1
-  if (abgPaO2 >= 60) return 2
-  if (abgPaO2 >= 40) return 3
-  return 4
-}
-
-function mmrcToRLevel(mmrc: number): RLevel {
-  if (mmrc === 0) return 1
-  if (mmrc <= 2) return 2
-  if (mmrc === 3) return 3
-  return 4
-}
-
 export function calculateRLevel(
   o2Support: O2Support,
-  peakCoughFlow?: number,
-  abgPaO2?: number,
-  mmrcDyspnea?: number
+  peakCoughFlow?: number
 ): RLevel {
   const levels: RLevel[] = [o2ToRLevel(o2Support)]
   if (peakCoughFlow != null) levels.push(coughToRLevel(peakCoughFlow))
-  if (abgPaO2 != null) levels.push(abgToRLevel(abgPaO2))
-  if (mmrcDyspnea != null) levels.push(mmrcToRLevel(mmrcDyspnea))
   return Math.max(...levels) as RLevel
 }
 
@@ -88,7 +70,7 @@ const REHAB_PROGRAMS: Record<number, string[]> = {
 
 export function calculateScreening(input: ScreeningInput): ScreeningResult {
   const fLevel = calculateFLevel(input.cfsScore)
-  const rLevel = calculateRLevel(input.o2Support, input.peakCoughFlow, input.abgPaO2, input.mmrcDyspnea)
+  const rLevel = calculateRLevel(input.o2Support, input.peakCoughFlow)
   const overallLevel = Math.max(fLevel, rLevel) as OverallLevel
   const programType: ProgramType = fLevel === rLevel ? 'Standard' : 'Intensive'
 
@@ -114,13 +96,6 @@ export const CFS_DESCRIPTIONS: Record<number, { th: string; en: string }> = {
   9: { en: 'Terminally ill', th: 'ป่วยระยะสุดท้าย — คาดว่าจะมีชีวิตอยู่ไม่เกิน 6 เดือน' },
 }
 
-export const MMRC_DESCRIPTIONS: Record<number, string> = {
-  0: 'ไม่มีอาการหายใจลำบาก ยกเว้นออกแรงมาก',
-  1: 'หายใจลำบากเมื่อเดินเร็วหรือขึ้นเนิน',
-  2: 'เดินช้ากว่าคนปกติ หรือต้องหยุดพักเป็นระยะ',
-  3: 'ต้องหยุดพักทุก 100 เมตร หรือหลังเดินไม่กี่นาที',
-  4: 'หายใจลำบากจนไม่สามารถออกจากบ้านได้ / เหนื่อยแม้ขณะพัก',
-}
 
 export const LEVEL_CONFIG = {
   1: { label: 'Mild', color: 'green', th: 'ระดับเบา' },

@@ -20,8 +20,6 @@ export interface ScreeningInput {
   o2Support: O2Support
   o2FlowRate?: number
   peakCoughFlow?: number
-  abgPaO2?: number
-  mmrcDyspnea: number
 }
 
 export interface ScreeningResult {

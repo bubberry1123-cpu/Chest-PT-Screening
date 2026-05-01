@@ -80,16 +80,6 @@ export default function ScreeningDetailPage() {
               <span className="font-medium">{screening.peakCoughFlow} L/min</span>
             </div>
           )}
-          {screening.abgPaO2 && (
-            <div className="flex justify-between py-1.5 border-b border-slate-100">
-              <span className="text-slate-500">ABG PaO₂</span>
-              <span className="font-medium">{screening.abgPaO2} mmHg</span>
-            </div>
-          )}
-          <div className="flex justify-between py-1.5 border-b border-slate-100">
-            <span className="text-slate-500">mMRC Dyspnea</span>
-            <span className="font-medium">Grade {screening.mmrcDyspnea}</span>
-          </div>
         </div>
         {screening.notes && (
           <div className="mt-3 pt-3 border-t border-slate-100 text-sm text-slate-600">

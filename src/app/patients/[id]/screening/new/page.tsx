@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getPatientById, createScreening } from '@/lib/localstore'
-import { calculateScreening, CFS_DESCRIPTIONS, MMRC_DESCRIPTIONS } from '@/lib/scoring'
+import { calculateScreening, CFS_DESCRIPTIONS } from '@/lib/scoring'
 import type { Patient, O2Support, ScreeningInput } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
 
@@ -21,31 +21,27 @@ export default function NewScreeningPage() {
     o2Support: O2Support | null
     o2FlowRate: string
     peakCoughFlow: string
-    abgPaO2: string
-    mmrcDyspnea: number | null
     assessedBy: string
     notes: string
   }>({
     cfsScore: null, o2Support: null, o2FlowRate: '', peakCoughFlow: '',
-    abgPaO2: '', mmrcDyspnea: null, assessedBy: '', notes: '',
+    assessedBy: '', notes: '',
   })
 
   useEffect(() => {
     getPatientById(id).then(setPatient)
   }, [id])
 
-  const result = clinical.cfsScore !== null && clinical.o2Support !== null && clinical.mmrcDyspnea !== null
+  const result = clinical.cfsScore !== null && clinical.o2Support !== null
     ? calculateScreening({
         cfsScore: clinical.cfsScore,
         o2Support: clinical.o2Support,
         peakCoughFlow: clinical.peakCoughFlow ? Number(clinical.peakCoughFlow) : undefined,
-        abgPaO2: clinical.abgPaO2 ? Number(clinical.abgPaO2) : undefined,
-        mmrcDyspnea: clinical.mmrcDyspnea,
       })
     : null
 
   const handleSave = async () => {
-    if (!clinical.cfsScore || !clinical.o2Support || clinical.mmrcDyspnea === null) {
+    if (!clinical.cfsScore || !clinical.o2Support) {
       setError('กรุณากรอกข้อมูลที่จำเป็นให้ครบ')
       return
     }
@@ -57,8 +53,6 @@ export default function NewScreeningPage() {
         cfsScore: clinical.cfsScore,
         o2Support: clinical.o2Support,
         peakCoughFlow: clinical.peakCoughFlow ? Number(clinical.peakCoughFlow) : undefined,
-        abgPaO2: clinical.abgPaO2 ? Number(clinical.abgPaO2) : undefined,
-        mmrcDyspnea: clinical.mmrcDyspnea,
       }
       const res = calculateScreening(input)
       const sid = await createScreening({
@@ -148,39 +142,14 @@ export default function NewScreeningPage() {
             </div>
           </div>
 
-          {/* Lab values */}
+          {/* Peak Cough Flow */}
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="font-bold text-slate-800 mb-4">C. ค่าวัดทางคลินิก (ถ้ามี)</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Peak Cough Flow (L/min)</label>
-                <input type="number" value={clinical.peakCoughFlow} placeholder="–"
-                  onChange={e => setClinical(c => ({ ...c, peakCoughFlow: e.target.value }))}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">ABG PaO₂ (mmHg)</label>
-                <input type="number" value={clinical.abgPaO2} placeholder="–"
-                  onChange={e => setClinical(c => ({ ...c, abgPaO2: e.target.value }))}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
-              </div>
-            </div>
-          </div>
-
-          {/* mMRC */}
-          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="font-bold text-slate-800 mb-4">D. mMRC Dyspnea Scale *</h3>
-            <div className="space-y-2">
-              {[0,1,2,3,4].map(g => (
-                <label key={g}
-                  className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                    clinical.mmrcDyspnea === g ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-300'
-                  }`}>
-                  <input type="radio" name="mmrc" checked={clinical.mmrcDyspnea === g}
-                    onChange={() => setClinical(c => ({ ...c, mmrcDyspnea: g }))} className="mt-0.5 shrink-0" />
-                  <span className="text-sm"><span className="font-semibold">Grade {g}:</span> {MMRC_DESCRIPTIONS[g]}</span>
-                </label>
-              ))}
+            <h3 className="font-bold text-slate-800 mb-4">C. Peak Cough Flow (ถ้ามี)</h3>
+            <div className="flex items-center gap-3">
+              <input type="number" value={clinical.peakCoughFlow} placeholder="–"
+                onChange={e => setClinical(c => ({ ...c, peakCoughFlow: e.target.value }))}
+                className="w-40 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+              <span className="text-slate-500 text-sm">L/min</span>
             </div>
           </div>
 
