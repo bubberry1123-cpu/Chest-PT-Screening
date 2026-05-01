@@ -11,7 +11,7 @@ import SeverityBadge from '@/components/SeverityBadge'
 type Step = 1 | 2 | 3
 
 const NATIONALITIES = ['ไทย', 'พม่า', 'ลาว', 'กัมพูชา', 'เวียดนาม', 'จีน', 'อื่นๆ']
-const WARDS = ['ICU', 'CCU', 'MICU', 'SICU', 'Ward ทั่วไป', 'อื่นๆ']
+type WardType = 'Ward' | 'Critical Care' | ''
 
 export default function NewPatientPage() {
   const router = useRouter()
@@ -21,8 +21,10 @@ export default function NewPatientPage() {
 
   // Step 1 — Patient info
   const [patientForm, setPatientForm] = useState({
-    hn: '', firstName: '', lastName: '', age: '', nationality: 'ไทย', ward: 'ICU',
+    hn: '', firstName: '', lastName: '', age: '', nationality: 'ไทย',
   })
+  const [wardType, setWardType] = useState<WardType>('')
+  const [wardRoom, setWardRoom] = useState('')
   const [existingPatientId, setExistingPatientId] = useState<string | null>(null)
 
   // Step 2 — Clinical
@@ -50,11 +52,14 @@ export default function NewPatientPage() {
   const [screeningId, setScreeningId] = useState<string | null>(null)
   const [savedPatientId, setSavedPatientId] = useState<string | null>(null)
 
+  const wardValue = wardType ? `${wardType}${wardRoom.trim() ? ` ${wardRoom.trim()}` : ''}` : ''
+
   const validateStep1 = () => {
     if (!patientForm.hn.trim()) return 'กรุณากรอก HN'
     if (!patientForm.firstName.trim()) return 'กรุณากรอกชื่อ'
     if (!patientForm.lastName.trim()) return 'กรุณากรอกนามสกุล'
     if (!patientForm.age || isNaN(Number(patientForm.age)) || Number(patientForm.age) <= 0) return 'กรุณากรอกอายุที่ถูกต้อง'
+    if (!wardType) return 'กรุณาเลือกประเภท Ward'
     return ''
   }
 
@@ -67,15 +72,21 @@ export default function NewPatientPage() {
     const existing = await getPatientByHn(patientForm.hn.trim())
     if (existing) {
       setExistingPatientId(existing.id!)
-      // Pre-fill form with existing data
       setPatientForm({
         hn: existing.hn,
         firstName: existing.firstName,
         lastName: existing.lastName,
         age: String(existing.age),
         nationality: existing.nationality,
-        ward: existing.ward,
       })
+      // parse existing ward back into type + room
+      if (existing.ward.startsWith('Critical Care')) {
+        setWardType('Critical Care')
+        setWardRoom(existing.ward.replace('Critical Care', '').trim())
+      } else if (existing.ward.startsWith('Ward')) {
+        setWardType('Ward')
+        setWardRoom(existing.ward.replace('Ward', '').trim())
+      }
     }
     setStep(2)
   }
@@ -103,7 +114,7 @@ export default function NewPatientPage() {
           lastName: patientForm.lastName.trim(),
           age: Number(patientForm.age),
           nationality: patientForm.nationality,
-          ward: patientForm.ward,
+          ward: wardValue,
         })
       }
       setSavedPatientId(patientId)
@@ -121,7 +132,7 @@ export default function NewPatientPage() {
       const sid = await createScreening({
         patientId,
         patientHn: patientForm.hn.trim(),
-        ward: patientForm.ward,
+        ward: wardValue,
         assessedBy: clinical.assessedBy || 'PT',
         notes: clinical.notes,
         ...input,
@@ -214,12 +225,31 @@ export default function NewPatientPage() {
               </select>
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Ward *</label>
-              <select value={patientForm.ward}
-                onChange={e => setPatientForm(f => ({ ...f, ward: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 bg-white">
-                {WARDS.map(w => <option key={w}>{w}</option>)}
-              </select>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Ward *</label>
+              <div className="flex gap-2 mb-2">
+                {(['Ward', 'Critical Care'] as WardType[]).map(t => (
+                  <button key={t} type="button"
+                    onClick={() => setWardType(t)}
+                    className={`flex-1 py-2.5 rounded-lg text-sm font-semibold border-2 transition-all ${
+                      wardType === t
+                        ? t === 'Critical Care'
+                          ? 'bg-red-600 border-red-600 text-white'
+                          : 'bg-blue-600 border-blue-600 text-white'
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'
+                    }`}>
+                    {t === 'Critical Care' ? '🔴 Critical Care' : '🏥 Ward'}
+                  </button>
+                ))}
+              </div>
+              {wardType && (
+                <input type="text" value={wardRoom}
+                  onChange={e => setWardRoom(e.target.value)}
+                  placeholder={wardType === 'Critical Care' ? 'เช่น ICU, CCU, MICU...' : 'เช่น 201, อายุรกรรมชาย...'}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+              )}
+              {wardValue && (
+                <p className="text-xs text-slate-500 mt-1">ห้อง: <span className="font-medium text-slate-700">{wardValue}</span></p>
+              )}
             </div>
           </div>
           <div className="mt-6 flex justify-end">
