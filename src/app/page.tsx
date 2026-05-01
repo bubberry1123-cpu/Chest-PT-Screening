@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { getAllPatients, searchPatients } from '@/lib/firestore'
+import { getAllPatients, searchPatients } from '@/lib/localstore'
 import type { Patient } from '@/types'
 
 export default function HomePage() {

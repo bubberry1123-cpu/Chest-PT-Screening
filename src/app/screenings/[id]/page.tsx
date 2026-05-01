@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { getScreeningById } from '@/lib/firestore'
+import { getScreeningById } from '@/lib/localstore'
 import type { Screening } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
 

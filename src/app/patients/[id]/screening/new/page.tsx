@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getPatientById, createScreening } from '@/lib/firestore'
+import { getPatientById, createScreening } from '@/lib/localstore'
 import { calculateScreening, CFS_DESCRIPTIONS, MMRC_DESCRIPTIONS } from '@/lib/scoring'
 import type { Patient, O2Support, ScreeningInput } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
