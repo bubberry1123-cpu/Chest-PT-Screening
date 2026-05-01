@@ -103,15 +103,15 @@ export function calculateScreening(input: ScreeningInput): ScreeningResult {
 }
 
 export const CFS_DESCRIPTIONS: Record<number, { th: string; en: string }> = {
-  1: { en: 'Very Fit', th: 'แข็งแรงมาก — ออกกำลังกายสม่ำเสมอ' },
+  1: { en: 'Very fit', th: 'แข็งแรงมาก — ออกกำลังกายสม่ำเสมอ' },
   2: { en: 'Fit', th: 'แข็งแรง — ไม่มีโรคประจำตัว' },
-  3: { en: 'Managing Well', th: 'จัดการได้ดี — มีโรคประจำตัวที่ควบคุมได้' },
+  3: { en: 'Managing well', th: 'จัดการได้ดี — มีโรคประจำตัวที่ควบคุมได้' },
   4: { en: 'Vulnerable', th: 'เปราะบางเล็กน้อย — มีข้อจำกัดในกิจกรรมซับซ้อน' },
-  5: { en: 'Mildly Frail', th: 'เปราะบางปานกลาง — ต้องการความช่วยเหลือบ้าง' },
-  6: { en: 'Moderately Frail', th: 'เปราะบางปานกลางถึงมาก — ต้องการช่วยแต่งตัว/อาบน้ำ' },
-  7: { en: 'Severely Frail', th: 'เปราะบางรุนแรง — ต้องพึ่งพาผู้อื่นสมบูรณ์' },
-  8: { en: 'Very Severely Frail', th: 'เปราะบางรุนแรงมาก — ใกล้เสียชีวิต' },
-  9: { en: 'Terminally Ill', th: 'ป่วยระยะสุดท้าย — คาดว่าจะมีชีวิตอยู่ไม่เกิน 6 เดือน' },
+  5: { en: 'Mildly frail', th: 'เปราะบางปานกลาง — ต้องการความช่วยเหลือบ้าง' },
+  6: { en: 'Moderate frail', th: 'เปราะบางปานกลางถึงมาก — ต้องการช่วยแต่งตัว/อาบน้ำ' },
+  7: { en: 'Severely frail', th: 'เปราะบางรุนแรง — ต้องพึ่งพาผู้อื่นสมบูรณ์' },
+  8: { en: 'Very severely frail', th: 'เปราะบางรุนแรงมาก — ใกล้เสียชีวิต' },
+  9: { en: 'Terminally ill', th: 'ป่วยระยะสุดท้าย — คาดว่าจะมีชีวิตอยู่ไม่เกิน 6 เดือน' },
 }
 
 export const MMRC_DESCRIPTIONS: Record<number, string> = {

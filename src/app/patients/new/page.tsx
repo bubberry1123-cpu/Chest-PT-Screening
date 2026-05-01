@@ -266,26 +266,26 @@ export default function NewPatientPage() {
         <div className="space-y-4">
           {/* CFS */}
           <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="font-bold text-slate-800 mb-1">A. Clinical Frailty Scale (CFS) *</h3>
-            <p className="text-slate-500 text-xs mb-4">เลือก 1 คะแนน ที่ตรงกับสภาวะผู้ป่วย</p>
-            <div className="grid grid-cols-9 gap-1.5 mb-3">
+            <h3 className="font-bold text-slate-800 mb-4">A. Clinical Frailty Scale (CFS) *</h3>
+            <div className="space-y-1.5">
               {[1,2,3,4,5,6,7,8,9].map(n => (
-                <button key={n} onClick={() => setClinical(c => ({ ...c, cfsScore: n }))}
-                  className={`h-12 rounded-lg font-bold text-sm transition-all border-2 ${
+                <button key={n} type="button"
+                  onClick={() => setClinical(c => ({ ...c, cfsScore: n }))}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg border-2 text-left transition-all ${
                     clinical.cfsScore === n
                       ? 'bg-blue-600 border-blue-600 text-white shadow'
-                      : 'bg-white border-slate-200 text-slate-600 hover:border-blue-400 hover:text-blue-600'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-blue-400 hover:bg-blue-50'
                   }`}>
-                  {n}
+                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+                    clinical.cfsScore === n ? 'bg-white text-blue-600' : 'bg-slate-100 text-slate-600'
+                  }`}>{n}</span>
+                  <span className="font-medium text-sm">{CFS_DESCRIPTIONS[n].en}</span>
+                  <span className={`text-xs ml-auto hidden sm:block ${clinical.cfsScore === n ? 'text-blue-100' : 'text-slate-400'}`}>
+                    {CFS_DESCRIPTIONS[n].th.split(' — ')[0]}
+                  </span>
                 </button>
               ))}
             </div>
-            {clinical.cfsScore && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 text-sm">
-                <span className="font-semibold text-blue-800">CFS {clinical.cfsScore}: </span>
-                <span className="text-blue-700">{CFS_DESCRIPTIONS[clinical.cfsScore].en} — {CFS_DESCRIPTIONS[clinical.cfsScore].th}</span>
-              </div>
-            )}
           </div>
 
           {/* O2 */}
