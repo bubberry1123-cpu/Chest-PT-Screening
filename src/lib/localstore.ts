@@ -1,4 +1,4 @@
-import type { Patient, Screening } from '@/types'
+import type { Patient, Screening, OutcomeMeasurement, OutcomeSession } from '@/types'
 
 const PATIENTS_KEY = 'cpt_patients'
 const SCREENINGS_KEY = 'cpt_screenings'
@@ -74,4 +74,29 @@ export async function getScreeningById(id: string): Promise<Screening | null> {
   const s = load<Screening>(SCREENINGS_KEY).find(s => s.id === id)
   if (!s) return null
   return { ...s, assessedAt: s.assessedAt ? new Date(s.assessedAt) : undefined }
+}
+
+// --- Outcomes ---
+
+const OUTCOMES_KEY = 'cpt_outcomes'
+
+export async function saveOutcome(data: Omit<OutcomeMeasurement, 'id' | 'recordedAt'>): Promise<string> {
+  const outcomes = load<OutcomeMeasurement>(OUTCOMES_KEY)
+  const idx = outcomes.findIndex(o => o.patientId === data.patientId && o.session === data.session)
+  if (idx >= 0) {
+    const id = outcomes[idx].id!
+    outcomes[idx] = { ...data, id, recordedAt: new Date() }
+    save(OUTCOMES_KEY, outcomes)
+    return id
+  }
+  const id = uid()
+  outcomes.push({ ...data, id, recordedAt: new Date() })
+  save(OUTCOMES_KEY, outcomes)
+  return id
+}
+
+export async function getOutcomesByPatient(patientId: string): Promise<OutcomeMeasurement[]> {
+  return load<OutcomeMeasurement>(OUTCOMES_KEY)
+    .filter(o => o.patientId === patientId)
+    .map(o => ({ ...o, recordedAt: o.recordedAt ? new Date(o.recordedAt) : undefined }))
 }

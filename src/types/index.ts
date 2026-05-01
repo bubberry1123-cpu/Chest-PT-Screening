@@ -46,3 +46,20 @@ export interface Screening extends ScreeningInput, ScreeningResult {
   notes?: string
   assessedAt?: Date
 }
+
+export type OutcomeSession = 'Initial' | 'Follow-up 1' | 'Follow-up 2' | 'Follow-up 3' | 'Discharge'
+
+export interface OutcomeEntry {
+  value: number
+  note?: string
+}
+
+export interface OutcomeMeasurement {
+  id?: string
+  patientId: string
+  patientHn: string
+  session: OutcomeSession
+  level: OverallLevel
+  items: Record<string, OutcomeEntry>
+  recordedAt?: Date
+}
