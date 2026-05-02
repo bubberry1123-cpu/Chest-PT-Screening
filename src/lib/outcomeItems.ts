@@ -6,6 +6,8 @@ export interface OutcomeItemDef {
   unit: string
   lowerIsBetter?: boolean
   step?: number
+  min?: number
+  max?: number
 }
 
 export const OUTCOME_SESSIONS = [
@@ -20,35 +22,41 @@ export const SESSION_SHORT: Record<string, string> = {
   'Discharge': 'D/C',
 }
 
+const AMPAC_ITEMS: OutcomeItemDef[] = [
+  { key: 'ampac_part1', label: 'AMPAC — Part 1: Basic Mobility',   unit: 'score', min: 0, max: 24 },
+  { key: 'ampac_part2', label: 'AMPAC — Part 2: Daily Activity',   unit: 'score', min: 0, max: 24 },
+  { key: 'ampac_part3', label: 'AMPAC — Part 3: Applied Cognitive',unit: 'score', min: 0, max: 24 },
+]
+
 export const OUTCOME_ITEMS: Record<OverallLevel, OutcomeItemDef[]> = {
   1: [
-    { key: 'ampac',               label: 'AMPAC',               unit: 'คะแนน' },
-    { key: 'brfa',                label: 'BRFA',                unit: 'คะแนน' },
+    ...AMPAC_ITEMS,
+    { key: 'brfa',                label: 'BRFA',                unit: 'score' },
     { key: 'peakCoughFlow',       label: 'Peak Cough Flow',     unit: 'L/min' },
     { key: 'wrightSpirometer',    label: 'Wright Spirometer',   unit: 'mL' },
     { key: 'incentiveSpirometry', label: 'Incentive spirometry',unit: 'mL' },
-    { key: 'sixMWT',              label: '6MWT',                unit: 'เมตร' },
+    { key: 'sixMWT',              label: '6MWT',                unit: 'meters' },
     { key: 'gripStrength',        label: 'Grip Strength',       unit: 'kg', step: 0.1 },
   ],
   2: [
-    { key: 'ampac',               label: 'AMPAC',               unit: 'คะแนน' },
-    { key: 'brfa',                label: 'BRFA',                unit: 'คะแนน' },
+    ...AMPAC_ITEMS,
+    { key: 'brfa',                label: 'BRFA',                unit: 'score' },
     { key: 'peakCoughFlow',       label: 'Peak Cough Flow',     unit: 'L/min' },
     { key: 'wrightSpirometer',    label: 'Wright Spirometer',   unit: 'mL' },
     { key: 'incentiveSpirometry', label: 'Incentive spirometry',unit: 'mL' },
-    { key: 'twoMinMarching',      label: '2-min Marching Test', unit: 'ครั้ง' },
+    { key: 'twoMinMarching',      label: '2-min Marching Test', unit: 'steps' },
     { key: 'gripStrength',        label: 'Grip Strength',       unit: 'kg', step: 0.1 },
   ],
   3: [
-    { key: 'ampac',            label: 'AMPAC',          unit: 'คะแนน' },
-    { key: 'brfa',             label: 'BRFA',           unit: 'คะแนน' },
-    { key: 'dyspneaScale',     label: 'Dyspnea scale',  unit: '0–10', lowerIsBetter: true },
+    ...AMPAC_ITEMS,
+    { key: 'brfa',             label: 'BRFA',           unit: 'score' },
+    { key: 'dyspneaScale',     label: 'Dyspnea scale',  unit: '0–10', lowerIsBetter: true, min: 0, max: 10 },
     { key: 'peakCoughFlow',    label: 'Peak Cough Flow',unit: 'L/min' },
     { key: 'wrightSpirometer', label: 'Wright Spirometer', unit: 'mL' },
   ],
   4: [
-    { key: 'ampac',        label: 'AMPAC',         unit: 'คะแนน' },
-    { key: 'brfa',         label: 'BRFA',          unit: 'คะแนน' },
-    { key: 'dyspneaScale', label: 'Dyspnea scale', unit: '0–10', lowerIsBetter: true },
+    ...AMPAC_ITEMS,
+    { key: 'brfa',         label: 'BRFA',          unit: 'score' },
+    { key: 'dyspneaScale', label: 'Dyspnea scale', unit: '0–10', lowerIsBetter: true, min: 0, max: 10 },
   ],
 }
