@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { getPatientById, getScreeningsByPatient, getOutcomesByPatient } from '@/lib/localstore'
-import { OUTCOME_ITEMS, OUTCOME_SESSIONS, SESSION_SHORT } from '@/lib/outcomeItems'
+import { OUTCOME_GROUPS, OUTCOME_SESSIONS, SESSION_SHORT } from '@/lib/outcomeItems'
 import type { Patient, Screening, OutcomeMeasurement, OverallLevel } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
 
@@ -15,7 +15,7 @@ function trendSymbol(diff: number, lowerIsBetter?: boolean) {
 }
 
 function OutcomeTable({ outcomes, level }: { outcomes: OutcomeMeasurement[]; level: OverallLevel }) {
-  const items = OUTCOME_ITEMS[level]
+  const groups = OUTCOME_GROUPS[level]
   const bySession: Record<string, OutcomeMeasurement> = {}
   outcomes.forEach(o => { bySession[o.session] = o })
   const initial = bySession['Initial']
@@ -23,57 +23,79 @@ function OutcomeTable({ outcomes, level }: { outcomes: OutcomeMeasurement[]; lev
   const filledSessions = OUTCOME_SESSIONS.filter(s => bySession[s])
   if (filledSessions.length === 0) return null
 
+  // Build flat row list with group headers
+  type Row =
+    | { type: 'header'; key: string; label: string }
+    | { type: 'item'; key: string; itemKey: string; label: string; unit: string; lowerIsBetter?: boolean; indent: boolean }
+
+  const rows: Row[] = []
+  for (const group of groups) {
+    if (group.items.length > 1) {
+      rows.push({ type: 'header', key: `h-${group.groupKey}`, label: group.label })
+      group.items.forEach(item => rows.push({
+        type: 'item', key: item.key, itemKey: item.key,
+        label: item.label, unit: item.unit, lowerIsBetter: item.lowerIsBetter, indent: true,
+      }))
+    } else {
+      const item = group.items[0]
+      rows.push({
+        type: 'item', key: item.key, itemKey: item.key,
+        label: group.label, unit: item.unit, lowerIsBetter: item.lowerIsBetter, indent: false,
+      })
+    }
+  }
+
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
       <table className="w-full text-sm min-w-max">
         <thead className="bg-slate-50 border-b border-slate-200">
           <tr>
-            <th className="text-left px-4 py-2.5 font-semibold text-slate-600 sticky left-0 bg-slate-50 min-w-[160px]">
+            <th className="text-left px-4 py-2.5 font-semibold text-slate-600 sticky left-0 bg-slate-50 min-w-[190px]">
               Outcome
             </th>
             {OUTCOME_SESSIONS.map(s => (
-              <th key={s} className={`px-4 py-2.5 font-semibold text-center min-w-[80px] ${bySession[s] ? 'text-slate-700' : 'text-slate-300'}`}>
+              <th key={s} className={`px-3 py-2.5 font-semibold text-center min-w-[72px] ${bySession[s] ? 'text-slate-700' : 'text-slate-300'}`}>
                 {SESSION_SHORT[s]}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100 bg-white">
-          {items.map(item => (
-            <tr key={item.key} className="hover:bg-slate-50 transition-colors">
-              <td className="px-4 py-2.5 sticky left-0 bg-white">
-                <div className="font-medium text-slate-700">{item.label}</div>
-                <div className="text-xs text-slate-400">{item.unit}</div>
-              </td>
-              {OUTCOME_SESSIONS.map(s => {
-                const entry = bySession[s]?.items[item.key]
-                if (!entry) {
-                  return (
-                    <td key={s} className="px-4 py-2.5 text-center text-slate-300">–</td>
-                  )
-                }
-                const isInitial = s === 'Initial'
-                const initVal = initial?.items[item.key]?.value
-                const trend = !isInitial && initVal !== undefined
-                  ? trendSymbol(entry.value - initVal, item.lowerIsBetter)
-                  : null
-
-                return (
-                  <td key={s} className="px-4 py-2.5 text-center">
-                    <div className="font-semibold text-slate-800">{entry.value}</div>
-                    {trend && (
-                      <div className={`text-xs font-bold ${trend.color}`}>{trend.symbol}</div>
-                    )}
-                    {entry.note && (
-                      <div className="text-xs text-slate-400 truncate max-w-[72px]" title={entry.note}>
-                        {entry.note}
-                      </div>
-                    )}
+        <tbody className="bg-white">
+          {rows.map(row => {
+            if (row.type === 'header') {
+              return (
+                <tr key={row.key} className="border-t border-slate-100">
+                  <td colSpan={6} className="px-4 pt-3 pb-1 text-xs font-bold text-slate-500 uppercase tracking-wider sticky left-0 bg-white">
+                    {row.label}
                   </td>
-                )
-              })}
-            </tr>
-          ))}
+                </tr>
+              )
+            }
+            const { itemKey, label, unit, lowerIsBetter, indent } = row
+            return (
+              <tr key={row.key} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                <td className={`py-2 sticky left-0 bg-white ${indent ? 'pl-8 pr-4' : 'px-4'}`}>
+                  <div className={indent ? 'text-slate-600 text-sm' : 'font-medium text-slate-700 text-sm'}>{label}</div>
+                  <div className="text-xs text-slate-400">{unit}</div>
+                </td>
+                {OUTCOME_SESSIONS.map(s => {
+                  const entry = bySession[s]?.items[itemKey]
+                  if (!entry) return <td key={s} className="px-3 py-2 text-center text-slate-300 text-sm">–</td>
+                  const isInitial = s === 'Initial'
+                  const initVal = initial?.items[itemKey]?.value
+                  const trend = !isInitial && initVal !== undefined
+                    ? trendSymbol(entry.value - initVal, lowerIsBetter)
+                    : null
+                  return (
+                    <td key={s} className="px-3 py-2 text-center">
+                      <div className="font-semibold text-slate-800">{entry.value}</div>
+                      {trend && <div className={`text-xs font-bold ${trend.color}`}>{trend.symbol}</div>}
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>

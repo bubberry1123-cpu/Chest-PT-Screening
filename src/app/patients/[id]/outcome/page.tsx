@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { getPatientById, getScreeningsByPatient, saveOutcome, getOutcomesByPatient } from '@/lib/localstore'
-import { OUTCOME_ITEMS, OUTCOME_SESSIONS, SESSION_SHORT } from '@/lib/outcomeItems'
+import { OUTCOME_GROUPS, OUTCOME_SESSIONS, SESSION_SHORT, getFlatItems } from '@/lib/outcomeItems'
 import type { Patient, Screening, OutcomeMeasurement, OutcomeSession, OverallLevel } from '@/types'
 
 export default function OutcomePage() {
@@ -13,63 +13,50 @@ export default function OutcomePage() {
   const [outcomes, setOutcomes] = useState<OutcomeMeasurement[]>([])
   const [session, setSession] = useState<OutcomeSession>('Initial')
   const [values, setValues] = useState<Record<string, string>>({})
-  const [notes, setNotes] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
-  const reload = async () => {
-    const [p, s, o] = await Promise.all([
-      getPatientById(id),
-      getScreeningsByPatient(id),
-      getOutcomesByPatient(id),
-    ])
-    setPatient(p)
-    setLatestScreening(s[0] ?? null)
-    setOutcomes(o)
-    setLoading(false)
-  }
-
-  useEffect(() => { reload() }, [id])
+  useEffect(() => {
+    Promise.all([getPatientById(id), getScreeningsByPatient(id), getOutcomesByPatient(id)])
+      .then(([p, s, o]) => {
+        setPatient(p)
+        setLatestScreening(s[0] ?? null)
+        setOutcomes(o)
+        setLoading(false)
+      })
+  }, [id])
 
   useEffect(() => {
     const existing = outcomes.find(o => o.session === session)
     if (existing) {
       const v: Record<string, string> = {}
-      const n: Record<string, string> = {}
-      Object.entries(existing.items).forEach(([k, e]) => {
-        v[k] = String(e.value)
-        n[k] = e.note ?? ''
-      })
+      Object.entries(existing.items).forEach(([k, e]) => { v[k] = String(e.value) })
       setValues(v)
-      setNotes(n)
     } else {
       setValues({})
-      setNotes({})
     }
     setSaved(false)
     setError('')
   }, [session, outcomes])
 
   const level = latestScreening?.overallLevel as OverallLevel | undefined
-  const items = level ? OUTCOME_ITEMS[level] : []
+  const groups = level ? OUTCOME_GROUPS[level] : []
 
   const handleSave = async () => {
     if (!level || !patient) return
-    const filledItems: Record<string, { value: number; note?: string }> = {}
+    const allItems = getFlatItems(level)
+    const filledItems: Record<string, { value: number }> = {}
     let hasAny = false
-    for (const item of items) {
+    for (const item of allItems) {
       const raw = values[item.key]
       if (raw !== undefined && raw !== '') {
-        filledItems[item.key] = {
-          value: Number(raw),
-          note: notes[item.key]?.trim() || undefined,
-        }
+        filledItems[item.key] = { value: Number(raw) }
         hasAny = true
       }
     }
-    if (!hasAny) { setError('กรุณากรอกข้อมูลอย่างน้อย 1 รายการ'); return }
+    if (!hasAny) { setError('Please enter at least one value.'); return }
     setError('')
     setSaving(true)
     try {
@@ -78,18 +65,18 @@ export default function OutcomePage() {
       setOutcomes(updated)
       setSaved(true)
     } catch {
-      setError('เกิดข้อผิดพลาด กรุณาลองใหม่')
+      setError('Error saving. Please try again.')
     } finally {
       setSaving(false)
     }
   }
 
-  if (loading) return <div className="text-center py-16 text-slate-400">กำลังโหลด...</div>
-  if (!patient) return <div className="text-center py-16 text-slate-400">ไม่พบผู้ป่วย</div>
+  if (loading) return <div className="text-center py-16 text-slate-400">Loading...</div>
+  if (!patient) return <div className="text-center py-16 text-slate-400">Patient not found.</div>
   if (!latestScreening) return (
     <div className="max-w-2xl mx-auto">
-      <Link href={`/patients/${id}`} className="text-slate-400 hover:text-slate-600 text-sm">← กลับ</Link>
-      <div className="text-center py-16 text-slate-400 mt-8">ยังไม่มีผลการประเมิน กรุณาประเมินก่อน</div>
+      <Link href={`/patients/${id}`} className="text-slate-400 hover:text-slate-600 text-sm">← Back</Link>
+      <div className="text-center py-16 text-slate-400 mt-8">No screening found. Please complete a screening first.</div>
     </div>
   )
 
@@ -98,7 +85,7 @@ export default function OutcomePage() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="flex items-center gap-2 mb-5">
-        <Link href={`/patients/${id}`} className="text-slate-400 hover:text-slate-600 text-sm">← กลับ</Link>
+        <Link href={`/patients/${id}`} className="text-slate-400 hover:text-slate-600 text-sm">← Back</Link>
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-5 text-sm flex items-center justify-between">
@@ -111,99 +98,118 @@ export default function OutcomePage() {
         </span>
       </div>
 
-      <h2 className="text-lg font-bold text-slate-800 mb-4">บันทึก Outcome Measurement</h2>
+      <h2 className="text-lg font-bold text-slate-800 mb-4">Outcome Measurement</h2>
 
       {/* Session selector */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm mb-4">
-        <h3 className="font-semibold text-slate-700 mb-3">เลือก Session</h3>
+      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm mb-5">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Select Session</p>
         <div className="flex flex-wrap gap-2">
           {OUTCOME_SESSIONS.map(s => {
             const hasDone = outcomes.some(o => o.session === s)
             const active = session === s
             return (
               <button key={s} type="button" onClick={() => setSession(s)}
-                className={`relative px-4 py-2.5 rounded-lg text-sm font-medium border-2 transition-all ${
+                className={`relative px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all ${
                   active
                     ? 'bg-blue-600 border-blue-600 text-white'
                     : hasDone
-                      ? 'bg-green-50 border-green-400 text-green-700'
+                      ? 'bg-emerald-50 border-emerald-400 text-emerald-700'
                       : 'bg-white border-slate-200 text-slate-600 hover:border-blue-400'
                 }`}>
                 {SESSION_SHORT[s]}
                 {hasDone && !active && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full border border-white" />
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
                 )}
               </button>
             )
           })}
         </div>
-        <p className="text-xs text-slate-400 mt-2">สีเขียว = มีข้อมูลแล้ว (คลิกเพื่อแก้ไข)</p>
+        {hasDataForSession && (
+          <p className="text-xs text-emerald-600 mt-2">✓ Has existing data — editing will overwrite</p>
+        )}
       </div>
 
-      {/* Form */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm mb-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-slate-700">
-            {session}
-          </h3>
-          {hasDataForSession && (
-            <span className="text-xs text-green-600 font-medium bg-green-50 px-2 py-0.5 rounded-full border border-green-200">
-              มีข้อมูลเดิม — แก้ไข
-            </span>
-          )}
-        </div>
-        <div className="space-y-5">
-          {items.map(item => (
-            <div key={item.key}>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-sm font-medium text-slate-700">{item.label}</span>
-                <span className="text-xs text-slate-400">({item.unit})</span>
-                {item.lowerIsBetter && (
-                  <span className="text-xs text-indigo-500 font-medium">↓ ดีขึ้น</span>
-                )}
+      {/* Grouped form */}
+      <div className="space-y-3 mb-5">
+        {groups.map(group => {
+          const isMulti = group.items.length > 1
+          if (isMulti) {
+            return (
+              <div key={group.groupKey} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-5 py-3 bg-slate-50 border-b border-slate-200">
+                  <h4 className="font-bold text-slate-800 text-sm">{group.label}</h4>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {group.items.map(item => (
+                    <div key={item.key} className="flex items-center px-5 py-3 gap-3">
+                      <label className="flex-1 text-sm text-slate-600 pl-2">{item.label}</label>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <input
+                          type="number"
+                          min={item.min}
+                          max={item.max}
+                          step={item.step ?? 1}
+                          value={values[item.key] ?? ''}
+                          onChange={e => setValues(v => ({ ...v, [item.key]: e.target.value }))}
+                          placeholder="–"
+                          className="w-20 text-right border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
+                        />
+                        <span className="text-sm text-slate-400 w-10 shrink-0">{item.unit}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  step={item.step ?? 1}
-                  min={0}
-                  value={values[item.key] ?? ''}
-                  onChange={e => setValues(v => ({ ...v, [item.key]: e.target.value }))}
-                  placeholder="–"
-                  className="w-32 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-                />
-                <input
-                  type="text"
-                  value={notes[item.key] ?? ''}
-                  onChange={e => setNotes(n => ({ ...n, [item.key]: e.target.value }))}
-                  placeholder="หมายเหตุ (optional)"
-                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
-                />
+            )
+          }
+
+          // Single-item group
+          const item = group.items[0]
+          return (
+            <div key={group.groupKey} className="bg-white rounded-xl border border-slate-200 shadow-sm">
+              <div className="flex items-center px-5 py-3.5 gap-3">
+                <label className="flex-1 font-medium text-slate-700 text-sm">
+                  {group.label}
+                  {item.lowerIsBetter && (
+                    <span className="ml-2 text-xs font-normal text-indigo-400">↓ better</span>
+                  )}
+                </label>
+                <div className="flex items-center gap-2 shrink-0">
+                  <input
+                    type="number"
+                    min={item.min}
+                    max={item.max}
+                    step={item.step ?? 1}
+                    value={values[item.key] ?? ''}
+                    onChange={e => setValues(v => ({ ...v, [item.key]: e.target.value }))}
+                    placeholder="–"
+                    className="w-20 text-right border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
+                  />
+                  <span className="text-sm text-slate-400 w-10 shrink-0">{item.unit}</span>
+                </div>
               </div>
             </div>
-          ))}
-        </div>
+          )
+        })}
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-2.5 rounded-lg text-sm mb-4">
-          ⚠ {error}
-        </div>
+        <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-2.5 rounded-lg text-sm mb-4">⚠ {error}</div>
       )}
       {saved && (
         <div className="bg-green-50 border border-green-300 text-green-700 px-4 py-2.5 rounded-lg text-sm mb-4">
-          ✓ บันทึก {session} สำเร็จแล้ว
+          ✓ {session} saved successfully
         </div>
       )}
 
       <div className="flex gap-3 justify-between">
         <Link href={`/patients/${id}`}
           className="px-5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors">
-          ← กลับ
+          ← Back
         </Link>
         <button onClick={handleSave} disabled={saving}
           className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors">
-          {saving ? 'กำลังบันทึก...' : `บันทึก ${SESSION_SHORT[session]}`}
+          {saving ? 'Saving...' : `Save ${SESSION_SHORT[session]}`}
         </button>
       </div>
     </div>
