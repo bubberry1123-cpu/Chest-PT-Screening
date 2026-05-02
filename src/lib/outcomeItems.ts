@@ -8,6 +8,7 @@ export interface OutcomeItemDef {
   step?: number
   min?: number
   max?: number
+  showNotes?: boolean
 }
 
 export interface OutcomeGroupDef {
@@ -67,6 +68,7 @@ export const OUTCOME_GROUPS: Record<OverallLevel, OutcomeGroupDef[]> = {
     single('wrightSpirometer',    'Wright Spirometer',    'mL'),
     single('incentiveSpirometry', 'Incentive Spirometry', 'mL'),
     single('sixMWT',              '6MWT',                 'meters'),
+    single('cs30', '30-Second Chair Stand Test (CS-30)', 'stands', { showNotes: true }),
     GRIP_GROUP,
   ],
   2: [
@@ -76,6 +78,7 @@ export const OUTCOME_GROUPS: Record<OverallLevel, OutcomeGroupDef[]> = {
     single('wrightSpirometer',    'Wright Spirometer',    'mL'),
     single('incentiveSpirometry', 'Incentive Spirometry', 'mL'),
     single('twoMinMarching',      '2-min Marching Test',  'steps'),
+    single('cs30', '30-Second Chair Stand Test (CS-30)', 'stands', { showNotes: true }),
     GRIP_GROUP,
   ],
   3: [

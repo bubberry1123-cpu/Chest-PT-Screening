@@ -13,6 +13,7 @@ export default function OutcomePage() {
   const [outcomes, setOutcomes] = useState<OutcomeMeasurement[]>([])
   const [session, setSession] = useState<OutcomeSession>('Initial')
   const [values, setValues] = useState<Record<string, string>>({})
+  const [notes, setNotes] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
@@ -32,10 +33,16 @@ export default function OutcomePage() {
     const existing = outcomes.find(o => o.session === session)
     if (existing) {
       const v: Record<string, string> = {}
-      Object.entries(existing.items).forEach(([k, e]) => { v[k] = String(e.value) })
+      const n: Record<string, string> = {}
+      Object.entries(existing.items).forEach(([k, e]) => {
+        v[k] = String(e.value)
+        if (e.note) n[k] = e.note
+      })
       setValues(v)
+      setNotes(n)
     } else {
       setValues({})
+      setNotes({})
     }
     setSaved(false)
     setError('')
@@ -47,12 +54,12 @@ export default function OutcomePage() {
   const handleSave = async () => {
     if (!level || !patient) return
     const allItems = getFlatItems(level)
-    const filledItems: Record<string, { value: number }> = {}
+    const filledItems: Record<string, { value: number; note?: string }> = {}
     let hasAny = false
     for (const item of allItems) {
       const raw = values[item.key]
       if (raw !== undefined && raw !== '') {
-        filledItems[item.key] = { value: Number(raw) }
+        filledItems[item.key] = { value: Number(raw), note: notes[item.key]?.trim() || undefined }
         hasAny = true
       }
     }
@@ -188,6 +195,17 @@ export default function OutcomePage() {
                   <span className="text-sm text-slate-400 w-10 shrink-0">{item.unit}</span>
                 </div>
               </div>
+              {item.showNotes && (
+                <div className="px-5 pb-3.5 -mt-1">
+                  <input
+                    type="text"
+                    value={notes[item.key] ?? ''}
+                    onChange={e => setNotes(n => ({ ...n, [item.key]: e.target.value }))}
+                    placeholder="Notes (optional)"
+                    className="w-full text-xs border border-slate-200 rounded-lg px-3 py-1.5 text-slate-500 placeholder-slate-300 focus:outline-none focus:border-blue-400 bg-slate-50"
+                  />
+                </div>
+              )}
             </div>
           )
         })}
