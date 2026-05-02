@@ -125,7 +125,7 @@ export default function PatientPage() {
             </Link>
             <Link href={`/patients/${id}/outcome`}
               className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-center whitespace-nowrap">
-              บันทึก Outcome
+              + Outcome
             </Link>
           </div>
         </div>

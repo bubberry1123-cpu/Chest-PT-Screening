@@ -73,7 +73,7 @@ const REHAB_PROGRAMS: Record<number, string[]> = {
 }
 
 export const RED_FLAGS = [
-  'SpO₂ < 95% หรือลดลง > 4% จาก baseline',
+  'SpO₂ < 95% หรือลดลง > 2% จาก baseline',
   'RR > 30 ครั้ง/นาที หรือใช้ accessory muscle เพิ่มขึ้น',
   'HR > 120 หรือ < 50 bpm หรือ new arrhythmia',
   'Borg dyspnea ≥ 7/10',
