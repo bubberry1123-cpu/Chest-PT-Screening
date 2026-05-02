@@ -56,42 +56,51 @@ const GRIP_GROUP: OutcomeGroupDef = {
   ],
 }
 
+const WALK_TEST_GROUP: OutcomeGroupDef = {
+  groupKey: 'walkTest',
+  label: '6-Minute Walk Test or 2-Minute Marching Test',
+  items: [
+    { key: 'sixMWT',        label: '6-Minute Walk Test',      unit: 'meters' },
+    { key: 'twoMinMarching', label: '2-Minute Marching Test', unit: 'steps' },
+  ],
+}
+
 function single(key: string, label: string, unit: string, opts?: Partial<OutcomeItemDef>): OutcomeGroupDef {
   return { groupKey: key, label, items: [{ key, label, unit, ...opts }] }
 }
+
+const DYSPNEA = single('dyspneaScale', 'Dyspnea scale', '/10', { lowerIsBetter: true, min: 0, max: 10 })
 
 export const OUTCOME_GROUPS: Record<OverallLevel, OutcomeGroupDef[]> = {
   1: [
     AMPAC_GROUP,
     BRFA_GROUP,
-    single('peakCoughFlow',       'Peak Cough Flow',      'L/min'),
-    single('wrightSpirometer',    'Wright Spirometer',    'mL'),
-    single('incentiveSpirometry', 'Incentive Spirometry', 'mL'),
-    single('sixMWT',              '6MWT',                 'meters'),
-    single('cs30', '30-Second Chair Stand Test (CS-30)', 'stands', { showNotes: true }),
+    DYSPNEA,
+    single('peakCoughFlow',    'Peak Cough Flow',   'L/min'),
+    single('wrightSpirometer', 'Wright Spirometer', 'mL'),
+    WALK_TEST_GROUP,
     GRIP_GROUP,
   ],
   2: [
     AMPAC_GROUP,
     BRFA_GROUP,
-    single('peakCoughFlow',       'Peak Cough Flow',      'L/min'),
-    single('wrightSpirometer',    'Wright Spirometer',    'mL'),
-    single('incentiveSpirometry', 'Incentive Spirometry', 'mL'),
-    single('twoMinMarching',      '2-min Marching Test',  'steps'),
+    DYSPNEA,
+    single('peakCoughFlow',    'Peak Cough Flow',   'L/min'),
+    single('wrightSpirometer', 'Wright Spirometer', 'mL'),
     single('cs30', '30-Second Chair Stand Test (CS-30)', 'stands', { showNotes: true }),
     GRIP_GROUP,
   ],
   3: [
     AMPAC_GROUP,
     BRFA_GROUP,
+    DYSPNEA,
     single('peakCoughFlow',    'Peak Cough Flow',   'L/min'),
     single('wrightSpirometer', 'Wright Spirometer', 'mL'),
-    single('dyspneaScale',     'Dyspnea scale',     '/10', { lowerIsBetter: true, min: 0, max: 10 }),
   ],
   4: [
     AMPAC_GROUP,
     BRFA_GROUP,
-    single('dyspneaScale', 'Dyspnea scale', '/10', { lowerIsBetter: true, min: 0, max: 10 }),
+    DYSPNEA,
   ],
 }
 
