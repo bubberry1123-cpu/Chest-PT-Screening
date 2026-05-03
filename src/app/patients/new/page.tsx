@@ -10,7 +10,7 @@ import SeverityBadge from '@/components/SeverityBadge'
 
 type Step = 1 | 2 | 3
 
-const NATIONALITIES = ['ไทย', 'พม่า', 'ลาว', 'กัมพูชา', 'เวียดนาม', 'จีน', 'อื่นๆ']
+const NATIONALITIES = ['Thai', 'Arab', 'Inter', 'CLMV (Cambodia,Laos,Myanmar,Vietnam)', 'Asia']
 
 const DRIVER_LABELS: Record<string, string> = {
   Functional: 'Functional (F > R)',
@@ -25,7 +25,7 @@ export default function NewPatientPage() {
   const [error, setError] = useState('')
 
   const [patientForm, setPatientForm] = useState({
-    hn: '', firstName: '', lastName: '', age: '', nationality: 'ไทย', location: '',
+    hn: '', firstName: '', lastName: '', age: '', nationality: 'Thai', location: '',
   })
   const [sex, setSex] = useState<Sex | ''>('')
   const [existingPatientId, setExistingPatientId] = useState<string | null>(null)
