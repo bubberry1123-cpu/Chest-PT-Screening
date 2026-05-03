@@ -409,8 +409,62 @@ function PatientModal({ row, onClose }: { row: PatientRow; onClose: () => void }
   )
 }
 
+// ── Password Gate ─────────────────────────────────────────────────────────────
+const AUTH_KEY = 'cpt_admin_auth'
+const ADMIN_PASSWORD = '2813'
+
+function PasswordGate({ onAuth }: { onAuth: () => void }) {
+  const [input, setInput] = useState('')
+  const [error, setError] = useState(false)
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (input === ADMIN_PASSWORD) {
+      sessionStorage.setItem(AUTH_KEY, '1')
+      onAuth()
+    } else {
+      setError(true)
+      setInput('')
+    }
+  }
+
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 w-full max-w-sm">
+        <div className="text-center mb-6">
+          <div className="text-4xl mb-3">🔒</div>
+          <h2 className="text-lg font-bold text-slate-800">Admin Access</h2>
+          <p className="text-slate-500 text-sm mt-1">กรอก password เพื่อเข้าใช้งาน</p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="password"
+            value={input}
+            onChange={e => { setInput(e.target.value); setError(false) }}
+            placeholder="Password"
+            autoFocus
+            className={`w-full border rounded-lg px-4 py-2.5 text-sm text-center tracking-widest focus:outline-none focus:ring-2 ${
+              error
+                ? 'border-red-400 focus:ring-red-200 bg-red-50'
+                : 'border-slate-300 focus:ring-blue-200 focus:border-blue-500'
+            }`}
+          />
+          {error && (
+            <p className="text-red-600 text-sm text-center font-medium">Incorrect password</p>
+          )}
+          <button type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-semibold text-sm transition-colors">
+            Enter
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Admin Page ───────────────────────────────────────────────────────────
 export default function AdminPage() {
+  const [authed, setAuthed] = useState<boolean | null>(null)
   const [patients, setPatients] = useState<Patient[]>([])
   const [screenings, setScreenings] = useState<Screening[]>([])
   const [outcomes, setOutcomes] = useState<OutcomeMeasurement[]>([])
@@ -421,6 +475,11 @@ export default function AdminPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   useEffect(() => {
+    setAuthed(sessionStorage.getItem(AUTH_KEY) === '1')
+  }, [])
+
+  useEffect(() => {
+    if (!authed) return
     Promise.all([getAllPatients(), getAllScreenings(), getAllOutcomes()])
       .then(([p, s, o]) => {
         setPatients(p)
@@ -428,7 +487,12 @@ export default function AdminPage() {
         setOutcomes(o)
         setLoading(false)
       })
-  }, [])
+  }, [authed])
+
+  const handleLogout = () => {
+    sessionStorage.removeItem(AUTH_KEY)
+    setAuthed(false)
+  }
 
   const rows = useMemo(
     () => patients.map(p => buildRow(p, screenings, outcomes)),
@@ -503,13 +567,21 @@ export default function AdminPage() {
     .sort((a, b) => a.daysUntilDue - b.daysUntilDue)
   const alertRows = rows.filter(r => r.missingItems.length > 0)
 
+  if (authed === null) return null
+  if (!authed) return <PasswordGate onAuth={() => setAuthed(true)} />
   if (loading) return <div className="text-center py-16 text-slate-400">Loading...</div>
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-slate-800">Admin Dashboard</h2>
-        <span className="text-xs text-slate-400">{now.toLocaleDateString('th-TH', { dateStyle: 'long' })}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-400">{now.toLocaleDateString('th-TH', { dateStyle: 'long' })}</span>
+          <button onClick={handleLogout}
+            className="text-xs text-slate-500 hover:text-red-600 border border-slate-200 hover:border-red-300 px-3 py-1.5 rounded-lg transition-colors">
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* ── Overview Stats ── */}
