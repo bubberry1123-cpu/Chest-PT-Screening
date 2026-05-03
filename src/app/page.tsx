@@ -1,10 +1,12 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { getAllPatients, searchPatients } from '@/lib/localstore'
+import { getAllPatients, searchPatients, deletePatient } from '@/lib/localstore'
+import { useIsAdmin } from '@/lib/useIsAdmin'
 import type { Patient } from '@/types'
 
 export default function HomePage() {
+  const isAdmin = useIsAdmin()
   const [patients, setPatients] = useState<Patient[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -25,6 +27,12 @@ export default function HomePage() {
       const data = await searchPatients(term)
       setPatients(data)
     }
+  }
+
+  const handleDelete = async (p: Patient) => {
+    if (!window.confirm(`ลบผู้ป่วย "${p.firstName} ${p.lastName}" (HN: ${p.hn}) และข้อมูลทั้งหมด?`)) return
+    await deletePatient(p.id!)
+    setPatients(prev => prev.filter(x => x.id !== p.id))
   }
 
   return (
@@ -86,12 +94,17 @@ export default function HomePage() {
                   <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{p.age} ปี</td>
                   <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{p.nationality}</td>
                   <td className="px-4 py-3 text-right">
-                    <Link
-                      href={`/patients/${p.id}`}
-                      className="text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                      ดูข้อมูล →
-                    </Link>
+                    <div className="flex items-center justify-end gap-3">
+                      <Link href={`/patients/${p.id}`} className="text-blue-600 hover:text-blue-800 font-medium text-sm">
+                        ดูข้อมูล →
+                      </Link>
+                      {isAdmin && (
+                        <button onClick={() => handleDelete(p)}
+                          className="text-red-500 hover:text-red-700 text-xs font-medium transition-colors">
+                          ลบ
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

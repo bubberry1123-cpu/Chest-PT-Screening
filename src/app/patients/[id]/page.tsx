@@ -1,9 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getPatientById, getScreeningsByPatient, getOutcomesByPatient } from '@/lib/localstore'
+import { getPatientById, getScreeningsByPatient, getOutcomesByPatient, updatePatient, deletePatient, deleteScreening } from '@/lib/localstore'
 import { OUTCOME_GROUPS, OUTCOME_SESSIONS, SESSION_SHORT } from '@/lib/outcomeItems'
+import { useIsAdmin } from '@/lib/useIsAdmin'
 import type { Patient, Screening, OutcomeMeasurement, OverallLevel } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
 
@@ -102,12 +103,102 @@ function OutcomeTable({ outcomes, level }: { outcomes: OutcomeMeasurement[]; lev
   )
 }
 
+// ── Edit Patient Modal ────────────────────────────────────────────────────────
+interface EditModalProps { patient: Patient; onSave: (p: Patient) => void; onClose: () => void }
+
+function EditPatientModal({ patient, onSave, onClose }: EditModalProps) {
+  const [form, setForm] = useState({ ...patient })
+  const [saving, setSaving] = useState(false)
+
+  const set = (k: keyof Patient, v: string | number) =>
+    setForm(f => ({ ...f, [k]: v }))
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    await updatePatient(patient.id!, {
+      firstName: form.firstName,
+      lastName: form.lastName,
+      age: Number(form.age),
+      sex: form.sex,
+      nationality: form.nationality,
+      location: form.location,
+    })
+    onSave({ ...patient, ...form, age: Number(form.age) })
+    setSaving(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-slate-200">
+          <h3 className="font-bold text-slate-800">แก้ไขข้อมูลผู้ป่วย</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none px-1">×</button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">ชื่อ</label>
+              <input value={form.firstName} onChange={e => set('firstName', e.target.value)} required
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">นามสกุล</label>
+              <input value={form.lastName} onChange={e => set('lastName', e.target.value)} required
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">อายุ</label>
+              <input type="number" min={0} max={150} value={form.age} onChange={e => set('age', e.target.value)} required
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 block mb-1">เพศ</label>
+              <select value={form.sex} onChange={e => set('sex', e.target.value)}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                <option>Male</option>
+                <option>Female</option>
+                <option>Other</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">สัญชาติ</label>
+            <input value={form.nationality} onChange={e => set('nationality', e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500 block mb-1">Location</label>
+            <input value={form.location} onChange={e => set('location', e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose}
+              className="flex-1 border border-slate-300 text-slate-600 py-2 rounded-lg text-sm hover:bg-slate-50 transition-colors">
+              ยกเลิก
+            </button>
+            <button type="submit" disabled={saving}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-2 rounded-lg text-sm font-semibold transition-colors">
+              {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export default function PatientPage() {
   const { id } = useParams<{ id: string }>()
+  const router = useRouter()
+  const isAdmin = useIsAdmin()
   const [patient, setPatient] = useState<Patient | null>(null)
   const [screenings, setScreenings] = useState<Screening[]>([])
   const [outcomes, setOutcomes] = useState<OutcomeMeasurement[]>([])
   const [loading, setLoading] = useState(true)
+  const [editOpen, setEditOpen] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -121,6 +212,19 @@ export default function PatientPage() {
       setLoading(false)
     })
   }, [id])
+
+  const handleDeletePatient = async () => {
+    if (!patient) return
+    if (!window.confirm(`ลบผู้ป่วย "${patient.firstName} ${patient.lastName}" และข้อมูลทั้งหมด?\nการกระทำนี้ไม่สามารถกู้คืนได้`)) return
+    await deletePatient(id)
+    router.push('/')
+  }
+
+  const handleDeleteScreening = async (s: Screening) => {
+    if (!window.confirm(`ลบการประเมินวันที่ ${s.assessedAt instanceof Date ? s.assessedAt.toLocaleDateString('th-TH') : '?'} ?`)) return
+    await deleteScreening(s.id!)
+    setScreenings(prev => prev.filter(x => x.id !== s.id))
+  }
 
   if (loading) return <div className="text-center py-16 text-slate-400">กำลังโหลด...</div>
   if (!patient) return <div className="text-center py-16 text-slate-400">ไม่พบผู้ป่วย</div>
@@ -137,7 +241,15 @@ export default function PatientPage() {
       <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm mb-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-xl font-bold text-slate-800">{patient.firstName} {patient.lastName}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-slate-800">{patient.firstName} {patient.lastName}</h2>
+              {isAdmin && (
+                <button onClick={() => setEditOpen(true)}
+                  className="text-xs text-slate-400 hover:text-blue-600 border border-slate-200 hover:border-blue-400 px-2 py-0.5 rounded transition-colors">
+                  Edit
+                </button>
+              )}
+            </div>
             <p className="text-slate-500 text-sm mt-0.5 font-mono">HN: {patient.hn}</p>
           </div>
           <div className="flex flex-col gap-2 shrink-0">
@@ -149,6 +261,12 @@ export default function PatientPage() {
               className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-center whitespace-nowrap">
               + Outcome
             </Link>
+            {isAdmin && (
+              <button onClick={handleDeletePatient}
+                className="border border-red-300 text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-center whitespace-nowrap">
+                ลบผู้ป่วย
+              </button>
+            )}
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-sm">
@@ -180,28 +298,37 @@ export default function PatientPage() {
       ) : (
         <div className="space-y-3 mb-6">
           {screenings.map(s => (
-            <Link key={s.id} href={`/screenings/${s.id}`}
-              className="block bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:border-blue-300 transition-colors">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm text-slate-500 mb-1">
-                    {s.assessedAt instanceof Date
-                      ? s.assessedAt.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                      : 'ไม่ทราบวันที่'}
-                    {s.assessedBy && <span className="ml-2">โดย {s.assessedBy}</span>}
+            <div key={s.id} className="relative">
+              <Link href={`/screenings/${s.id}`}
+                className="block bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:border-blue-300 transition-colors">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm text-slate-500 mb-1">
+                      {s.assessedAt instanceof Date
+                        ? s.assessedAt.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : 'ไม่ทราบวันที่'}
+                      {s.assessedBy && <span className="ml-2">โดย {s.assessedBy}</span>}
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                      <span>CFS: {s.cfsScore}</span>
+                      <span>F{s.fLevel} / R{s.rLevel}</span>
+                      <span className={s.programType === 'Standard' ? 'text-green-700' : 'text-orange-700'}>
+                        {s.programType}
+                      </span>
+                      <span className="text-slate-400">{s.driver}</span>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-                    <span>CFS: {s.cfsScore}</span>
-                    <span>F{s.fLevel} / R{s.rLevel}</span>
-                    <span className={s.programType === 'Standard' ? 'text-green-700' : 'text-orange-700'}>
-                      {s.programType}
-                    </span>
-                    <span className="text-slate-400">{s.driver}</span>
-                  </div>
+                  <SeverityBadge level={s.overallLevel} />
                 </div>
-                <SeverityBadge level={s.overallLevel} />
-              </div>
-            </Link>
+              </Link>
+              {isAdmin && (
+                <button
+                  onClick={e => { e.preventDefault(); handleDeleteScreening(s) }}
+                  className="absolute top-2 right-2 text-xs text-slate-400 hover:text-red-600 px-1.5 py-0.5 rounded transition-colors bg-white border border-transparent hover:border-red-200">
+                  ลบ
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}
@@ -230,6 +357,14 @@ export default function PatientPage() {
             บันทึก Initial →
           </Link>
         </div>
+      )}
+
+      {editOpen && patient && (
+        <EditPatientModal
+          patient={patient}
+          onSave={updated => { setPatient(updated); setEditOpen(false) }}
+          onClose={() => setEditOpen(false)}
+        />
       )}
     </div>
   )

@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { getAllPatients, getAllScreenings, getAllOutcomes } from '@/lib/localstore'
 import { SESSION_SHORT } from '@/lib/outcomeItems'
+import { AUTH_KEY, ADMIN_PASSWORD } from '@/lib/useIsAdmin'
 import type { Patient, Screening, OutcomeMeasurement, OverallLevel, OutcomeSession } from '@/types'
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -410,8 +411,6 @@ function PatientModal({ row, onClose }: { row: PatientRow; onClose: () => void }
 }
 
 // ── Password Gate ─────────────────────────────────────────────────────────────
-const AUTH_KEY = 'cpt_admin_auth'
-const ADMIN_PASSWORD = '2813'
 
 function PasswordGate({ onAuth }: { onAuth: () => void }) {
   const [input, setInput] = useState('')

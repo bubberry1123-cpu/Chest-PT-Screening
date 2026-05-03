@@ -2,8 +2,9 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { getPatientById, getScreeningsByPatient, saveOutcome, getOutcomesByPatient } from '@/lib/localstore'
+import { getPatientById, getScreeningsByPatient, saveOutcome, getOutcomesByPatient, deleteOutcomeSession } from '@/lib/localstore'
 import { OUTCOME_GROUPS, OUTCOME_SESSIONS, SESSION_SHORT, getFlatItems } from '@/lib/outcomeItems'
+import { useIsAdmin } from '@/lib/useIsAdmin'
 import type { Patient, Screening, OutcomeMeasurement, OutcomeSession, OverallLevel } from '@/types'
 
 export default function OutcomePage() {
@@ -14,6 +15,7 @@ export default function OutcomePage() {
   const [session, setSession] = useState<OutcomeSession>('Initial')
   const [values, setValues] = useState<Record<string, string>>({})
   const [notes, setNotes] = useState<Record<string, string>>({})
+  const isAdmin = useIsAdmin()
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
@@ -132,7 +134,21 @@ export default function OutcomePage() {
           })}
         </div>
         {hasDataForSession && (
-          <p className="text-xs text-emerald-600 mt-2">✓ Has existing data — editing will overwrite</p>
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-xs text-emerald-600">✓ Has existing data — editing will overwrite</p>
+            {isAdmin && (
+              <button
+                onClick={async () => {
+                  if (!window.confirm(`ลบข้อมูล ${SESSION_SHORT[session]} ทั้งหมด?`)) return
+                  await deleteOutcomeSession(id, session)
+                  const updated = await getOutcomesByPatient(id)
+                  setOutcomes(updated)
+                }}
+                className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-2 py-0.5 rounded transition-colors">
+                ลบ session นี้
+              </button>
+            )}
+          </div>
         )}
       </div>
 

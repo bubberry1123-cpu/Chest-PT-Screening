@@ -110,3 +110,21 @@ export async function getAllOutcomes(): Promise<OutcomeMeasurement[]> {
   return load<OutcomeMeasurement>(OUTCOMES_KEY)
     .map(o => ({ ...o, recordedAt: o.recordedAt ? new Date(o.recordedAt) : undefined }))
 }
+
+// --- Delete ---
+
+export async function deletePatient(id: string): Promise<void> {
+  save(PATIENTS_KEY, load<Patient>(PATIENTS_KEY).filter(p => p.id !== id))
+  save(SCREENINGS_KEY, load<Screening>(SCREENINGS_KEY).filter(s => s.patientId !== id))
+  save(OUTCOMES_KEY, load<OutcomeMeasurement>(OUTCOMES_KEY).filter(o => o.patientId !== id))
+}
+
+export async function deleteScreening(id: string): Promise<void> {
+  save(SCREENINGS_KEY, load<Screening>(SCREENINGS_KEY).filter(s => s.id !== id))
+}
+
+export async function deleteOutcomeSession(patientId: string, session: OutcomeSession): Promise<void> {
+  save(OUTCOMES_KEY, load<OutcomeMeasurement>(OUTCOMES_KEY).filter(
+    o => !(o.patientId === patientId && o.session === session)
+  ))
+}

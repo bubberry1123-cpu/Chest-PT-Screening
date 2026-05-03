@@ -1,9 +1,10 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getScreeningById } from '@/lib/localstore'
+import { getScreeningById, deleteScreening } from '@/lib/localstore'
 import { RED_FLAGS } from '@/lib/scoring'
+import { useIsAdmin } from '@/lib/useIsAdmin'
 import type { Screening } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
 
@@ -28,6 +29,8 @@ const DRIVER_LABELS: Record<string, string> = {
 
 export default function ScreeningDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const router = useRouter()
+  const isAdmin = useIsAdmin()
   const [screening, setScreening] = useState<Screening | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -38,6 +41,13 @@ export default function ScreeningDetailPage() {
     })
   }, [id])
 
+  const handleDelete = async () => {
+    if (!screening) return
+    if (!window.confirm('ลบการประเมินนี้?')) return
+    await deleteScreening(id)
+    router.push(`/patients/${screening.patientId}`)
+  }
+
   if (loading) return <div className="text-center py-16 text-slate-400">กำลังโหลด...</div>
   if (!screening) return <div className="text-center py-16 text-slate-400">ไม่พบข้อมูลการประเมิน</div>
 
@@ -47,8 +57,14 @@ export default function ScreeningDetailPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="flex items-center gap-2 mb-5">
+      <div className="flex items-center justify-between gap-2 mb-5">
         <Link href={`/patients/${screening.patientId}`} className="text-slate-400 hover:text-slate-600 text-sm">← กลับ</Link>
+        {isAdmin && (
+          <button onClick={handleDelete}
+            className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-lg transition-colors">
+            ลบการประเมินนี้
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4 shadow-sm text-sm text-slate-600">
