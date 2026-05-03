@@ -6,6 +6,7 @@ import { SESSION_SHORT } from '@/lib/outcomeItems'
 import { AUTH_KEY, ADMIN_PASSWORD } from '@/lib/useIsAdmin'
 import type { Patient, Screening, OutcomeMeasurement, OverallLevel, OutcomeSession } from '@/types'
 import { exportPatientList, exportOutcomeData, exportMonthlySummary, exportChartsPDF } from '@/lib/exportUtils'
+import { WARDS } from '@/lib/wards'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const REASSESS_DAYS = 14
@@ -472,6 +473,7 @@ export default function AdminPage() {
   const [selectedRow, setSelectedRow] = useState<PatientRow | null>(null)
   const [levelFilter, setLevelFilter] = useState<number | 'all'>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'overdue' | 'due-soon' | 'ok'>('all')
+  const [locationFilter, setLocationFilter] = useState<string>('all')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [exportOpen, setExportOpen] = useState(false)
   const [exportDateFrom, setExportDateFrom] = useState('')
@@ -579,13 +581,14 @@ export default function AdminPage() {
     let r = [...rows]
     if (levelFilter !== 'all') r = r.filter(row => row.latestScreening?.overallLevel === levelFilter)
     if (statusFilter !== 'all') r = r.filter(row => row.dueStatus === statusFilter)
+    if (locationFilter !== 'all') r = r.filter(row => row.patient.location === locationFilter)
     r.sort((a, b) => {
       const aV = a.latestScreening ? a.daysUntilDue : 9999
       const bV = b.latestScreening ? b.daysUntilDue : 9999
       return sortDir === 'asc' ? aV - bV : bV - aV
     })
     return r
-  }, [rows, levelFilter, statusFilter, sortDir])
+  }, [rows, levelFilter, statusFilter, locationFilter, sortDir])
 
   const dueRows   = rows.filter(r => r.dueStatus === 'overdue' || r.dueStatus === 'due-soon')
     .sort((a, b) => a.daysUntilDue - b.daysUntilDue)
@@ -876,6 +879,12 @@ export default function AdminPage() {
             <option value="overdue">Overdue</option>
             <option value="due-soon">Due Soon</option>
             <option value="ok">OK</option>
+          </select>
+          <select value={locationFilter}
+            onChange={e => setLocationFilter(e.target.value)}
+            className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:border-blue-400 max-w-[140px]">
+            <option value="all">All Locations</option>
+            {WARDS.map(w => <option key={w} value={w}>{w}</option>)}
           </select>
           <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
             className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-600 hover:bg-slate-50 transition-colors">

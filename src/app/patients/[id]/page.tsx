@@ -6,6 +6,7 @@ import { getPatientById, getScreeningsByPatient, getOutcomesByPatient, updatePat
 import { OUTCOME_GROUPS, OUTCOME_SESSIONS, SESSION_SHORT } from '@/lib/outcomeItems'
 import { useIsAdmin } from '@/lib/useIsAdmin'
 import type { Patient, Screening, OutcomeMeasurement, OverallLevel } from '@/types'
+import { WARDS } from '@/lib/wards'
 import SeverityBadge from '@/components/SeverityBadge'
 
 function trendSymbol(diff: number, lowerIsBetter?: boolean) {
@@ -171,8 +172,11 @@ function EditPatientModal({ patient, onSave, onClose }: EditModalProps) {
           </div>
           <div>
             <label className="text-xs text-slate-500 block mb-1">Location</label>
-            <input value={form.location} onChange={e => set('location', e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+            <select value={form.location} onChange={e => set('location', e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 bg-white">
+              <option value="">Select Ward</option>
+              {WARDS.map(w => <option key={w} value={w}>{w}</option>)}
+            </select>
           </div>
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose}

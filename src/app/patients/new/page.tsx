@@ -5,6 +5,7 @@ import { createPatient, getPatientByHn } from '@/lib/localstore'
 import { createScreening } from '@/lib/localstore'
 import { calculateScreening, CFS_DESCRIPTIONS, RED_FLAGS } from '@/lib/scoring'
 import type { O2Support, Cooperativeness, Sex, ScreeningInput } from '@/types'
+import { WARDS } from '@/lib/wards'
 import SeverityBadge from '@/components/SeverityBadge'
 
 type Step = 1 | 2 | 3
@@ -48,7 +49,7 @@ export default function NewPatientPage() {
     if (!patientForm.lastName.trim()) return 'กรุณากรอกนามสกุล'
     if (!patientForm.age || isNaN(Number(patientForm.age)) || Number(patientForm.age) <= 0) return 'กรุณากรอกอายุที่ถูกต้อง'
     if (!sex) return 'กรุณาเลือกเพศ'
-    if (!patientForm.location.trim()) return 'กรุณากรอก Location (Ward/ห้อง)'
+    if (!patientForm.location) return 'กรุณาเลือก Location (Ward)'
     return ''
   }
 
@@ -94,7 +95,7 @@ export default function NewPatientPage() {
           age: Number(patientForm.age),
           sex: sex as Sex,
           nationality: patientForm.nationality,
-          location: patientForm.location.trim(),
+          location: patientForm.location,
         })
       }
       setSavedPatientId(patientId)
@@ -108,7 +109,7 @@ export default function NewPatientPage() {
       const sid = await createScreening({
         patientId,
         patientHn: patientForm.hn.trim(),
-        location: patientForm.location.trim(),
+        location: patientForm.location,
         assessedBy: clinical.assessedBy || 'PT',
         notes: clinical.notes,
         ...input,
@@ -212,11 +213,13 @@ export default function NewPatientPage() {
               </div>
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Location (Ward / ห้อง) *</label>
-              <input type="text" value={patientForm.location}
+              <label className="block text-sm font-medium text-slate-700 mb-1">Location (Ward) *</label>
+              <select value={patientForm.location}
                 onChange={e => setPatientForm(f => ({ ...f, location: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                placeholder="เช่น ICU, Ward 5, CCU..." />
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-white">
+                <option value="">Select Ward</option>
+                {WARDS.map(w => <option key={w} value={w}>{w}</option>)}
+              </select>
             </div>
           </div>
           <div className="mt-6 flex justify-end">
