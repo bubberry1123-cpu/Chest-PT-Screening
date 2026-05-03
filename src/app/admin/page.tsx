@@ -1,10 +1,11 @@
 'use client'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { getAllPatients, getAllScreenings, getAllOutcomes } from '@/lib/localstore'
 import { SESSION_SHORT } from '@/lib/outcomeItems'
 import { AUTH_KEY, ADMIN_PASSWORD } from '@/lib/useIsAdmin'
 import type { Patient, Screening, OutcomeMeasurement, OverallLevel, OutcomeSession } from '@/types'
+import { exportPatientList, exportOutcomeData, exportMonthlySummary, exportChartsPDF } from '@/lib/exportUtils'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const REASSESS_DAYS = 14
@@ -472,6 +473,13 @@ export default function AdminPage() {
   const [levelFilter, setLevelFilter] = useState<number | 'all'>('all')
   const [statusFilter, setStatusFilter] = useState<'all' | 'overdue' | 'due-soon' | 'ok'>('all')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exportDateFrom, setExportDateFrom] = useState('')
+  const [exportDateTo, setExportDateTo] = useState('')
+  const [exportMonth, setExportMonth] = useState(new Date().getMonth())
+  const [exportYear, setExportYear] = useState(new Date().getFullYear())
+  const [exportLoading, setExportLoading] = useState(false)
+  const chartsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setAuthed(sessionStorage.getItem(AUTH_KEY) === '1')
@@ -491,6 +499,23 @@ export default function AdminPage() {
   const handleLogout = () => {
     sessionStorage.removeItem(AUTH_KEY)
     setAuthed(false)
+  }
+
+  const handleExport = async (type: 'patients' | 'outcomes' | 'monthly' | 'pdf') => {
+    setExportLoading(true)
+    setExportOpen(false)
+    try {
+      const from = exportDateFrom ? new Date(exportDateFrom) : null
+      const to = exportDateTo ? new Date(exportDateTo) : null
+      if (type === 'patients') await exportPatientList(patients, screenings, from, to)
+      else if (type === 'outcomes') await exportOutcomeData(patients, outcomes, from, to)
+      else if (type === 'monthly') await exportMonthlySummary(patients, screenings, exportYear, exportMonth)
+      else if (type === 'pdf' && chartsRef.current) {
+        await exportChartsPDF(chartsRef.current, { totalPatients: patients.length, weekAssessments, monthAssessments, levelCounts }, from, to)
+      }
+    } finally {
+      setExportLoading(false)
+    }
   }
 
   const rows = useMemo(
@@ -574,14 +599,93 @@ export default function AdminPage() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-slate-800">Admin Dashboard</h2>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-400">{now.toLocaleDateString('th-TH', { dateStyle: 'long' })}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400 hidden sm:block">{now.toLocaleDateString('th-TH', { dateStyle: 'long' })}</span>
+
+          {/* Export dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setExportOpen(o => !o)}
+              disabled={exportLoading}
+              className="text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white border border-blue-600 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+              {exportLoading ? (
+                <>
+                  <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3" />
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                  Generating...
+                </>
+              ) : (
+                <>Export ▾</>
+              )}
+            </button>
+            {exportOpen && (
+              <div className="absolute right-0 top-9 z-50 bg-white rounded-xl border border-slate-200 shadow-xl p-4 w-72">
+                {/* Date range */}
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Date Range</p>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  <div>
+                    <label className="text-[10px] text-slate-400 mb-1 block">From</label>
+                    <input type="date" value={exportDateFrom}
+                      onChange={e => setExportDateFrom(e.target.value)}
+                      className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-400" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 mb-1 block">To</label>
+                    <input type="date" value={exportDateTo}
+                      onChange={e => setExportDateTo(e.target.value)}
+                      className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-400" />
+                  </div>
+                </div>
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Export</p>
+                <div className="space-y-1.5">
+                  <button onClick={() => handleExport('patients')}
+                    className="w-full text-left px-3 py-2 text-xs rounded-lg border border-slate-200 hover:bg-blue-50 hover:border-blue-300 transition-colors flex items-center gap-2">
+                    <span>📋</span><span className="flex-1">Patient List <span className="text-slate-400">(.xlsx)</span></span>
+                  </button>
+                  <button onClick={() => handleExport('outcomes')}
+                    className="w-full text-left px-3 py-2 text-xs rounded-lg border border-slate-200 hover:bg-blue-50 hover:border-blue-300 transition-colors flex items-center gap-2">
+                    <span>📊</span><span className="flex-1">Outcome Data <span className="text-slate-400">(.xlsx)</span></span>
+                  </button>
+                  {/* Monthly summary with month/year picker */}
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <div className="px-3 py-1.5 bg-slate-50 border-b border-slate-200 flex items-center gap-1">
+                      <select value={exportMonth} onChange={e => setExportMonth(Number(e.target.value))}
+                        className="text-xs bg-transparent border-0 focus:outline-none flex-1 text-slate-600">
+                        {['January','February','March','April','May','June','July','August','September','October','November','December']
+                          .map((m, i) => <option key={i} value={i}>{m}</option>)}
+                      </select>
+                      <select value={exportYear} onChange={e => setExportYear(Number(e.target.value))}
+                        className="text-xs bg-transparent border-0 focus:outline-none text-slate-600">
+                        {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                    </div>
+                    <button onClick={() => handleExport('monthly')}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 transition-colors flex items-center gap-2">
+                      <span>📅</span><span className="flex-1">Monthly Summary <span className="text-slate-400">(.xlsx)</span></span>
+                    </button>
+                  </div>
+                  <button onClick={() => handleExport('pdf')}
+                    className="w-full text-left px-3 py-2 text-xs rounded-lg border border-slate-200 hover:bg-blue-50 hover:border-blue-300 transition-colors flex items-center gap-2">
+                    <span>🖨️</span><span className="flex-1">Dashboard Charts <span className="text-slate-400">(.pdf)</span></span>
+                  </button>
+                </div>
+                <button onClick={() => setExportOpen(false)}
+                  className="absolute top-2.5 right-3 text-slate-300 hover:text-slate-500 text-lg leading-none">×</button>
+              </div>
+            )}
+          </div>
+
           <button onClick={handleLogout}
             className="text-xs text-slate-500 hover:text-red-600 border border-slate-200 hover:border-red-300 px-3 py-1.5 rounded-lg transition-colors">
             Logout
           </button>
         </div>
       </div>
+
+      {/* ── Captured region for PDF export ── */}
+      <div ref={chartsRef}>
 
       {/* ── Overview Stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -650,6 +754,8 @@ export default function AdminPage() {
         <h3 className="text-sm font-semibold text-slate-700 mb-3">Outcome Trend — Initial vs Discharge (avg across all patients)</h3>
         <TrendChart data={trendData} />
       </div>
+
+      </div>{/* end chartsRef */}
 
       {/* ── Reassessment Due Alert ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
