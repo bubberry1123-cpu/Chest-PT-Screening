@@ -69,7 +69,7 @@ function single(key: string, label: string, unit: string, opts?: Partial<Outcome
   return { groupKey: key, label, items: [{ key, label, unit, ...opts }] }
 }
 
-const DYSPNEA = single('dyspneaScale', 'Dyspnea scale', '/10', { lowerIsBetter: true, min: 0, max: 10 })
+const DYSPNEA = single('dyspneaScale', 'Dyspnea scale', '/10', { min: 0, max: 10 })
 
 export const OUTCOME_GROUPS: Record<OverallLevel, OutcomeGroupDef[]> = {
   1: [
