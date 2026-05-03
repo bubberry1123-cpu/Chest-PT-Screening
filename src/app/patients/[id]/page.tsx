@@ -169,7 +169,7 @@ function EditPatientModal({ patient, onSave, onClose }: EditModalProps) {
             <label className="text-xs text-slate-500 block mb-1">สัญชาติ</label>
             <select value={form.nationality} onChange={e => set('nationality', e.target.value)}
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 bg-white">
-              {['Thai', 'Arab', 'Inter', 'CLMV (Cambodia,Laos,Myanmar,Vietnam)', 'Asia'].map(n => (
+              {['Thai', 'Arab', 'Inter', 'CLMV (Cambodia, Laos, Myanmar, Vietnam)', 'Asia'].map(n => (
                 <option key={n} value={n}>{n}</option>
               ))}
             </select>

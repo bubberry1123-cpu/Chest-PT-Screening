@@ -10,7 +10,7 @@ import SeverityBadge from '@/components/SeverityBadge'
 
 type Step = 1 | 2 | 3
 
-const NATIONALITIES = ['Thai', 'Arab', 'Inter', 'CLMV (Cambodia,Laos,Myanmar,Vietnam)', 'Asia']
+const NATIONALITIES = ['Thai', 'Arab', 'Inter', 'CLMV (Cambodia, Laos, Myanmar, Vietnam)', 'Asia']
 
 const DRIVER_LABELS: Record<string, string> = {
   Functional: 'Functional (F > R)',
