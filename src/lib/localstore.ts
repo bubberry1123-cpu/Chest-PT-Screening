@@ -100,3 +100,13 @@ export async function getOutcomesByPatient(patientId: string): Promise<OutcomeMe
     .filter(o => o.patientId === patientId)
     .map(o => ({ ...o, recordedAt: o.recordedAt ? new Date(o.recordedAt) : undefined }))
 }
+
+export async function getAllScreenings(): Promise<Screening[]> {
+  return load<Screening>(SCREENINGS_KEY)
+    .map(s => ({ ...s, assessedAt: s.assessedAt ? new Date(s.assessedAt) : undefined }))
+}
+
+export async function getAllOutcomes(): Promise<OutcomeMeasurement[]> {
+  return load<OutcomeMeasurement>(OUTCOMES_KEY)
+    .map(o => ({ ...o, recordedAt: o.recordedAt ? new Date(o.recordedAt) : undefined }))
+}
