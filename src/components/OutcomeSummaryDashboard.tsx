@@ -254,50 +254,10 @@ export default function OutcomeSummaryDashboard({
     },
   }), [compareMode, topLabels])
 
-  // ── Summary stats (always from latest session) ─────────────────────────────
+  // ── Outcome cards ──────────────────────────────────────────────────────────
 
   const latestO  = bySession[filledSessions[filledSessions.length - 1]]
   const initialO = bySession['Initial']
-
-  const latestNorms: number[] = []
-  const initNorms:   number[] = []
-
-  if (latestO) {
-    BRFA_PARTS.forEach(p => {
-      const v = latestO.items[p.key]?.value
-      if (v !== undefined) {
-        latestNorms.push(v)
-        const iv = initialO?.items[p.key]?.value
-        if (iv !== undefined) initNorms.push(iv)
-      }
-    })
-    AMPAC_PARTS.forEach(p => {
-      const v = latestO.items[p.key]?.value
-      if (v !== undefined) {
-        latestNorms.push(normPct(v, 24))
-        const iv = initialO?.items[p.key]?.value
-        if (iv !== undefined) initNorms.push(normPct(iv, 24))
-      }
-    })
-    OTHER_DEFS.forEach(d => {
-      const v = latestO.items[d.key]?.value
-      if (v !== undefined) {
-        const pct = normPct(v, d.maxRef, d.inverted)
-        latestNorms.push(pct)
-        const iv = initialO?.items[d.key]?.value
-        if (iv !== undefined) initNorms.push(normPct(iv, d.maxRef, d.inverted))
-      }
-    })
-  }
-
-  const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null
-  const avgPct   = avg(latestNorms)
-  const avgInit  = avg(initNorms)
-  const avgDelta = avgPct !== null && avgInit !== null && initNorms.length === latestNorms.length
-    ? avgPct - avgInit : null
-  const belowThreshold = latestNorms.filter(v => v < 60).length
-
-  // ── Outcome cards ──────────────────────────────────────────────────────────
 
   interface CardInfo { key: string; label: string; rawVal: number; unit: string; pct: number; initPct?: number }
   const cards: CardInfo[] = []
@@ -358,26 +318,6 @@ export default function OutcomeSummaryDashboard({
                 {label}
               </button>
             ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Summary stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-center">
-          <div className="text-xs text-blue-500 font-medium mb-0.5">Avg Score (ล่าสุด)</div>
-          <div className="text-2xl font-bold text-blue-700">{avgPct !== null ? `${avgPct.toFixed(0)}%` : '–'}</div>
-        </div>
-        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-center">
-          <div className="text-xs text-emerald-600 font-medium mb-0.5">พัฒนาการ vs Initial</div>
-          <div className={`text-2xl font-bold ${avgDelta === null ? 'text-slate-400' : avgDelta >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-            {avgDelta !== null ? `${avgDelta >= 0 ? '+' : ''}${avgDelta.toFixed(0)}%` : '–'}
-          </div>
-        </div>
-        <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-center">
-          <div className="text-xs text-red-500 font-medium mb-0.5">ต่ำกว่าเกณฑ์</div>
-          <div className="text-2xl font-bold text-red-600">
-            {belowThreshold}<span className="text-sm text-red-400">/{latestNorms.length}</span>
           </div>
         </div>
       </div>
