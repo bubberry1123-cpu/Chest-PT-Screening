@@ -5,7 +5,11 @@ import Link from 'next/link'
 import { getPatientById, getScreeningsByPatient, saveOutcome, getOutcomesByPatient, deleteOutcomeSession } from '@/lib/localstore'
 import { OUTCOME_GROUPS, OUTCOME_SESSIONS, SESSION_SHORT, getFlatItems } from '@/lib/outcomeItems'
 import { useIsAdmin } from '@/lib/useIsAdmin'
+import { useToast } from '@/lib/useToast'
+import Toast from '@/components/Toast'
 import type { Patient, Screening, OutcomeMeasurement, OutcomeSession, OverallLevel } from '@/types'
+
+type BtnState = 'idle' | 'saving' | 'saved'
 
 export default function OutcomePage() {
   const { id } = useParams<{ id: string }>()
@@ -16,10 +20,9 @@ export default function OutcomePage() {
   const [values, setValues] = useState<Record<string, string>>({})
   const [notes, setNotes] = useState<Record<string, string>>({})
   const isAdmin = useIsAdmin()
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [error, setError] = useState('')
+  const [btnState, setBtnState] = useState<BtnState>('idle')
   const [loading, setLoading] = useState(true)
+  const { toast, showToast } = useToast()
 
   useEffect(() => {
     Promise.all([getPatientById(id), getScreeningsByPatient(id), getOutcomesByPatient(id)])
@@ -46,8 +49,7 @@ export default function OutcomePage() {
       setValues({})
       setNotes({})
     }
-    setSaved(false)
-    setError('')
+    setBtnState('idle')
   }, [session, outcomes])
 
   const level = latestScreening?.overallLevel as OverallLevel | undefined
@@ -65,18 +67,21 @@ export default function OutcomePage() {
         hasAny = true
       }
     }
-    if (!hasAny) { setError('Please enter at least one value.'); return }
-    setError('')
-    setSaving(true)
+    if (!hasAny) {
+      showToast('Please fill in at least one field', 'error')
+      return
+    }
+    setBtnState('saving')
     try {
       await saveOutcome({ patientId: id, patientHn: patient.hn, session, level, items: filledItems })
       const updated = await getOutcomesByPatient(id)
       setOutcomes(updated)
-      setSaved(true)
+      setBtnState('saved')
+      showToast('Outcome saved successfully!', 'success')
+      setTimeout(() => setBtnState('idle'), 2000)
     } catch {
-      setError('Error saving. Please try again.')
-    } finally {
-      setSaving(false)
+      setBtnState('idle')
+      showToast('Failed to save. Please try again.', 'error')
     }
   }
 
@@ -93,6 +98,8 @@ export default function OutcomePage() {
 
   return (
     <div className="max-w-2xl mx-auto">
+      {toast && <Toast {...toast} />}
+
       <div className="flex items-center gap-2 mb-5">
         <Link href={`/patients/${id}`} className="text-slate-400 hover:text-slate-600 text-sm">← Back</Link>
       </div>
@@ -186,7 +193,6 @@ export default function OutcomePage() {
             )
           }
 
-          // Single-item group
           const item = group.items[0]
           return (
             <div key={group.groupKey} className="bg-white rounded-xl border border-slate-200 shadow-sm">
@@ -227,23 +233,28 @@ export default function OutcomePage() {
         })}
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-2.5 rounded-lg text-sm mb-4">⚠ {error}</div>
-      )}
-      {saved && (
-        <div className="bg-green-50 border border-green-300 text-green-700 px-4 py-2.5 rounded-lg text-sm mb-4">
-          ✓ {session} saved successfully
-        </div>
-      )}
-
       <div className="flex gap-3 justify-between">
         <Link href={`/patients/${id}`}
           className="px-5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors">
           ← Back
         </Link>
-        <button onClick={handleSave} disabled={saving}
-          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors">
-          {saving ? 'Saving...' : `Save ${SESSION_SHORT[session]}`}
+        <button
+          onClick={handleSave}
+          disabled={btnState === 'saving'}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+            btnState === 'saved'
+              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              : btnState === 'saving'
+                ? 'bg-blue-600 opacity-80 text-white cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+          }`}>
+          {btnState === 'saving' && (
+            <svg className="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3" />
+              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          )}
+          {btnState === 'saved' ? '✓ Saved' : btnState === 'saving' ? 'Saving...' : `Save ${SESSION_SHORT[session]}`}
         </button>
       </div>
     </div>

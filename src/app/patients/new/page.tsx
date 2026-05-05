@@ -6,6 +6,8 @@ import { createScreening } from '@/lib/localstore'
 import { calculateScreening, CFS_DESCRIPTIONS, RED_FLAGS } from '@/lib/scoring'
 import type { O2Support, Cooperativeness, Sex, ScreeningInput } from '@/types'
 import { WARDS } from '@/lib/wards'
+import { useToast } from '@/lib/useToast'
+import Toast from '@/components/Toast'
 import SeverityBadge from '@/components/SeverityBadge'
 
 type Step = 1 | 2 | 3
@@ -22,7 +24,10 @@ const DRIVER_LABELS: Record<string, string> = {
 export default function NewPatientPage() {
   const [step, setStep] = useState<Step>(1)
   const [saving, setSaving] = useState(false)
+  const [savedBtn, setSavedBtn] = useState(false)
   const [error, setError] = useState('')
+  const [step1Attempted, setStep1Attempted] = useState(false)
+  const { toast, showToast } = useToast()
 
   const [patientForm, setPatientForm] = useState({
     hn: '', firstName: '', lastName: '', age: '', nationality: 'Thai', location: '',
@@ -54,9 +59,11 @@ export default function NewPatientPage() {
   }
 
   const handleStep1Next = async () => {
+    setStep1Attempted(true)
     const err = validateStep1()
     if (err) { setError(err); return }
     setError('')
+    setStep1Attempted(false)
     const existing = await getPatientByHn(patientForm.hn.trim())
     if (existing) {
       setExistingPatientId(existing.id!)
@@ -116,9 +123,12 @@ export default function NewPatientPage() {
         ...res,
       })
       setScreeningId(sid)
+      setSavedBtn(true)
+      showToast('Assessment saved successfully!', 'success')
+      setTimeout(() => setSavedBtn(false), 2000)
       setStep(3)
     } catch (e) {
-      setError('เกิดข้อผิดพลาด กรุณาลองใหม่')
+      showToast('Failed to save. Please try again.', 'error')
       console.error(e)
     } finally {
       setSaving(false)
@@ -133,8 +143,16 @@ export default function NewPatientPage() {
       })
     : null
 
+  const fieldCls = (empty: boolean) =>
+    `w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+      step1Attempted && empty
+        ? 'border-red-400 bg-red-50 focus:border-red-500 focus:ring-red-100'
+        : 'border-slate-300 focus:border-blue-500 focus:ring-blue-100'
+    }`
+
   return (
     <div className="max-w-2xl mx-auto">
+      {toast && <Toast {...toast} />}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-2">
           <Link href="/" className="text-slate-400 hover:text-slate-600 text-sm">← กลับ</Link>
@@ -166,28 +184,28 @@ export default function NewPatientPage() {
               <label className="block text-sm font-medium text-slate-700 mb-1">HN (Hospital Number) *</label>
               <input type="text" value={patientForm.hn}
                 onChange={e => setPatientForm(f => ({ ...f, hn: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className={fieldCls(!patientForm.hn.trim())}
                 placeholder="เช่น 6500123" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">ชื่อ *</label>
               <input type="text" value={patientForm.firstName}
                 onChange={e => setPatientForm(f => ({ ...f, firstName: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className={fieldCls(!patientForm.firstName.trim())}
                 placeholder="ชื่อ" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">นามสกุล *</label>
               <input type="text" value={patientForm.lastName}
                 onChange={e => setPatientForm(f => ({ ...f, lastName: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className={fieldCls(!patientForm.lastName.trim())}
                 placeholder="นามสกุล" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">อายุ *</label>
               <input type="number" value={patientForm.age} min={0} max={150}
                 onChange={e => setPatientForm(f => ({ ...f, age: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                className={fieldCls(!patientForm.age || isNaN(Number(patientForm.age)) || Number(patientForm.age) <= 0)}
                 placeholder="ปี" />
             </div>
             <div>
@@ -200,7 +218,7 @@ export default function NewPatientPage() {
             </div>
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-2">เพศ *</label>
-              <div className="flex gap-2">
+              <div className={`flex gap-2 rounded-lg p-0.5 transition-all ${step1Attempted && !sex ? 'ring-2 ring-red-300' : ''}`}>
                 {(['Male', 'Female', 'Other'] as Sex[]).map(s => (
                   <button key={s} type="button"
                     onClick={() => setSex(s)}
@@ -216,7 +234,7 @@ export default function NewPatientPage() {
               <label className="block text-sm font-medium text-slate-700 mb-1">Location (Ward) *</label>
               <select value={patientForm.location}
                 onChange={e => setPatientForm(f => ({ ...f, location: e.target.value }))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 bg-white">
+                className={`${fieldCls(!patientForm.location)} bg-white`}>
                 <option value="">Select Ward</option>
                 {WARDS.map(w => <option key={w} value={w}>{w}</option>)}
               </select>
@@ -358,8 +376,20 @@ export default function NewPatientPage() {
               ← ย้อนกลับ
             </button>
             <button onClick={handleStep2Next} disabled={saving}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors">
-              {saving ? 'กำลังบันทึก...' : 'บันทึกและดูผลลัพธ์ →'}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+                savedBtn
+                  ? 'bg-emerald-600 text-white'
+                  : saving
+                    ? 'bg-blue-600 opacity-80 text-white cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}>
+              {saving && (
+                <svg className="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3" />
+                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+              )}
+              {savedBtn ? '✓ Saved' : saving ? 'กำลังบันทึก...' : 'บันทึกและดูผลลัพธ์ →'}
             </button>
           </div>
         </div>

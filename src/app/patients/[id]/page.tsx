@@ -7,6 +7,8 @@ import { OUTCOME_GROUPS, OUTCOME_SESSIONS, SESSION_SHORT } from '@/lib/outcomeIt
 import { useIsAdmin } from '@/lib/useIsAdmin'
 import type { Patient, Screening, OutcomeMeasurement, OverallLevel } from '@/types'
 import { WARDS } from '@/lib/wards'
+import { useToast } from '@/lib/useToast'
+import Toast from '@/components/Toast'
 import SeverityBadge from '@/components/SeverityBadge'
 
 function trendSymbol(diff: number, lowerIsBetter?: boolean) {
@@ -188,7 +190,13 @@ function EditPatientModal({ patient, onSave, onClose }: EditModalProps) {
               ยกเลิก
             </button>
             <button type="submit" disabled={saving}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-2 rounded-lg text-sm font-semibold transition-colors">
+              className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-2 rounded-lg text-sm font-semibold transition-colors">
+              {saving && (
+                <svg className="animate-spin w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3" />
+                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+              )}
               {saving ? 'กำลังบันทึก...' : 'บันทึก'}
             </button>
           </div>
@@ -207,6 +215,7 @@ export default function PatientPage() {
   const [outcomes, setOutcomes] = useState<OutcomeMeasurement[]>([])
   const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
+  const { toast, showToast } = useToast()
 
   useEffect(() => {
     Promise.all([
@@ -367,10 +376,16 @@ export default function PatientPage() {
         </div>
       )}
 
+      {toast && <Toast {...toast} />}
+
       {editOpen && patient && (
         <EditPatientModal
           patient={patient}
-          onSave={updated => { setPatient(updated); setEditOpen(false) }}
+          onSave={updated => {
+            setPatient(updated)
+            setEditOpen(false)
+            showToast('Patient updated successfully!', 'success')
+          }}
           onClose={() => setEditOpen(false)}
         />
       )}
