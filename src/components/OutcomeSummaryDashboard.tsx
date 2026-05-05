@@ -100,14 +100,16 @@ const BRFA_SVG_SEGS = [
 type SegTooltip = { text: string; segMidY: number }
 
 function BrfaSegmentBar({ o }: { o: OutcomeMeasurement | undefined }) {
-  const W = 72, H = 280
+  const W = 72, H = 320
   const BAR_L = 8, BAR_W = 56
   const TOP_PAD = 10, BOT_PAD = 22
-  const CHART_H = H - TOP_PAD - BOT_PAD
-  const N = BRFA_SVG_SEGS.length
-  const SEG_H = CHART_H / N
-  const LABEL_H = 11
-  const FILL_H = SEG_H - LABEL_H
+  const CHART_H = H - TOP_PAD - BOT_PAD   // 288
+  const N = BRFA_SVG_SEGS.length           // 4
+  const SEG_H = CHART_H / N               // 72 — satisfies ≥70px minimum
+  // Fixed layout zones per segment (no overlap possible)
+  const TEXT_ZONE = 16   // top of segment: score text at segTop+12
+  const LABEL_ZONE = 16  // bottom of segment: part label at segTop+SEG_H-4
+  const FILL_H = SEG_H - TEXT_ZONE - LABEL_ZONE  // 40px fill area in the middle
   const wrapRef = useRef<HTMLDivElement>(null)
   const [tooltip, setTooltip] = useState<SegTooltip | null>(null)
 
@@ -119,10 +121,10 @@ function BrfaSegmentBar({ o }: { o: OutcomeMeasurement | undefined }) {
           const hasVal = val !== undefined
           const v = val ?? 0
           const segTop = TOP_PAD + i * SEG_H
-          const fillAreaBot = segTop + FILL_H
-          const fillH = (v / 100) * FILL_H
-          const dashY = fillAreaBot - fillH
-          const segMidY = segTop + FILL_H / 2
+          const fillAreaTop = segTop + TEXT_ZONE
+          const fillAreaBot = fillAreaTop + FILL_H
+          const dashY = fillAreaBot - (v / 100) * FILL_H
+          const segMidY = segTop + SEG_H / 2
 
           return (
             <g key={p.key}
@@ -130,20 +132,20 @@ function BrfaSegmentBar({ o }: { o: OutcomeMeasurement | undefined }) {
               onMouseEnter={() => hasVal && setTooltip({ text: `${p.fullLabel}: ${v.toFixed(0)}%`, segMidY })}
             >
               {/* Background (light gray = 100% reference) */}
-              <rect x={BAR_L} y={segTop} width={BAR_W} height={FILL_H} fill="#f5f5f5" />
+              <rect x={BAR_L} y={fillAreaTop} width={BAR_W} height={FILL_H} fill="#f5f5f5" />
 
-              {/* Dashed line at score level */}
+              {/* Score text — fixed in TEXT_ZONE, never overlaps fill area */}
               {hasVal && (
-                <line x1={BAR_L} y1={dashY} x2={BAR_L + BAR_W} y2={dashY}
-                  stroke={p.color} strokeWidth={2.5} strokeDasharray="4,3" />
-              )}
-
-              {/* Score text above dashed line */}
-              {hasVal && (
-                <text x={BAR_L + BAR_W / 2} y={Math.max(segTop + 2, dashY - 3)}
+                <text x={BAR_L + BAR_W / 2} y={segTop + 12}
                   textAnchor="middle" fontSize="9.5" fill="#1a1a1a" fontWeight="600">
                   {v.toFixed(0)}%
                 </text>
+              )}
+
+              {/* Dashed line at score level within fill area */}
+              {hasVal && (
+                <line x1={BAR_L} y1={dashY} x2={BAR_L + BAR_W} y2={dashY}
+                  stroke={p.color} strokeWidth={2.5} strokeDasharray="4,3" />
               )}
 
               {/* Segment separator */}
@@ -152,8 +154,8 @@ function BrfaSegmentBar({ o }: { o: OutcomeMeasurement | undefined }) {
                   stroke="white" strokeWidth={2} />
               )}
 
-              {/* Part label */}
-              <text x={BAR_L + BAR_W / 2} y={segTop + SEG_H - 2}
+              {/* Part label — fixed in LABEL_ZONE, never overlaps fill area */}
+              <text x={BAR_L + BAR_W / 2} y={segTop + SEG_H - 4}
                 textAnchor="middle" fontSize="7.5" fill="#64748b">
                 {p.short}
               </text>
@@ -189,14 +191,15 @@ const AMPAC_SVG_SEGS = [
 ] as const
 
 function AmpacSegmentBar({ o }: { o: OutcomeMeasurement | undefined }) {
-  const W = 72, H = 280
+  const W = 72, H = 320
   const BAR_L = 8, BAR_W = 56
   const TOP_PAD = 10, BOT_PAD = 22
-  const CHART_H = H - TOP_PAD - BOT_PAD
-  const N = AMPAC_SVG_SEGS.length
-  const SEG_H = CHART_H / N
-  const LABEL_H = 11
-  const FILL_H = SEG_H - LABEL_H
+  const CHART_H = H - TOP_PAD - BOT_PAD   // 288
+  const N = AMPAC_SVG_SEGS.length          // 3
+  const SEG_H = CHART_H / N               // 96 — well above 70px minimum
+  const TEXT_ZONE = 16   // top of segment: score text at segTop+12
+  const LABEL_ZONE = 16  // bottom of segment: part label at segTop+SEG_H-4
+  const FILL_H = SEG_H - TEXT_ZONE - LABEL_ZONE  // 64px fill area
   const wrapRef = useRef<HTMLDivElement>(null)
   const [tooltip, setTooltip] = useState<SegTooltip | null>(null)
 
@@ -208,10 +211,10 @@ function AmpacSegmentBar({ o }: { o: OutcomeMeasurement | undefined }) {
           const hasVal = val !== undefined
           const v = val ?? 0
           const segTop = TOP_PAD + i * SEG_H
-          const fillAreaBot = segTop + FILL_H
-          const fillH = (v / 24) * FILL_H
-          const dashY = fillAreaBot - fillH
-          const segMidY = segTop + FILL_H / 2
+          const fillAreaTop = segTop + TEXT_ZONE
+          const fillAreaBot = fillAreaTop + FILL_H
+          const dashY = fillAreaBot - (v / 24) * FILL_H
+          const segMidY = segTop + SEG_H / 2
 
           return (
             <g key={p.key}
@@ -219,20 +222,20 @@ function AmpacSegmentBar({ o }: { o: OutcomeMeasurement | undefined }) {
               onMouseEnter={() => hasVal && setTooltip({ text: `${p.fullLabel}: ${v.toFixed(0)}/24`, segMidY })}
             >
               {/* Background (light gray = 24/24 reference) */}
-              <rect x={BAR_L} y={segTop} width={BAR_W} height={FILL_H} fill="#f5f5f5" />
+              <rect x={BAR_L} y={fillAreaTop} width={BAR_W} height={FILL_H} fill="#f5f5f5" />
 
-              {/* Dashed line at score level */}
+              {/* Score text — fixed in TEXT_ZONE, never overlaps fill area */}
               {hasVal && (
-                <line x1={BAR_L} y1={dashY} x2={BAR_L + BAR_W} y2={dashY}
-                  stroke={p.color} strokeWidth={2.5} strokeDasharray="4,3" />
-              )}
-
-              {/* Score text above dashed line */}
-              {hasVal && (
-                <text x={BAR_L + BAR_W / 2} y={Math.max(segTop + 2, dashY - 3)}
+                <text x={BAR_L + BAR_W / 2} y={segTop + 12}
                   textAnchor="middle" fontSize="9.5" fill="#1a1a1a" fontWeight="600">
                   {v.toFixed(0)}/24
                 </text>
+              )}
+
+              {/* Dashed line at score level within fill area */}
+              {hasVal && (
+                <line x1={BAR_L} y1={dashY} x2={BAR_L + BAR_W} y2={dashY}
+                  stroke={p.color} strokeWidth={2.5} strokeDasharray="4,3" />
               )}
 
               {/* Segment separator */}
@@ -241,8 +244,8 @@ function AmpacSegmentBar({ o }: { o: OutcomeMeasurement | undefined }) {
                   stroke="white" strokeWidth={2} />
               )}
 
-              {/* Part label */}
-              <text x={BAR_L + BAR_W / 2} y={segTop + SEG_H - 2}
+              {/* Part label — fixed in LABEL_ZONE, never overlaps fill area */}
+              <text x={BAR_L + BAR_W / 2} y={segTop + SEG_H - 4}
                 textAnchor="middle" fontSize="7.5" fill="#64748b">
                 {p.short}
               </text>
@@ -451,7 +454,7 @@ export default function OutcomeSummaryDashboard({
 
         {compareMode ? (
           // Compare mode: full-width Chart.js
-          <div style={{ height: 280 }}>
+          <div style={{ height: 320 }}>
             <Bar
               key="compare"
               data={{ labels: chartLabels, datasets: chartDatasets }}
@@ -460,7 +463,7 @@ export default function OutcomeSummaryDashboard({
           </div>
         ) : (
           // Single-session: custom SVG bars + Chart.js for others, same height row
-          <div className="flex items-stretch gap-1" style={{ height: 280 }}>
+          <div className="flex items-stretch gap-1" style={{ height: 320 }}>
             {showBrfaSvg  && <BrfaSegmentBar  o={selectedO} />}
             {showAmpacSvg && <AmpacSegmentBar o={selectedO} />}
             {chartDatasets.length > 0 && (
