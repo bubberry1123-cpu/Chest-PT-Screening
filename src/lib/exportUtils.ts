@@ -114,7 +114,7 @@ export async function exportOutcomeData(
     !dateFrom && !dateTo ? true : inRange(o.recordedAt as Date | undefined, dateFrom, dateTo)
   )
 
-  const SESSION_ORDER = ['Initial', 'Follow-up 1', 'Follow-up 2', 'Follow-up 3', 'Discharge']
+  const SESSION_ORDER = ['Initial','Follow-up 1','Follow-up 2','Follow-up 3','Follow-up 4','Follow-up 5','Follow-up 6','Follow-up 7','Follow-up 8','Follow-up 9','Follow-up 10','Discharge']
   pool.sort((a, b) => {
     const hna = patientById[a.patientId]?.hn ?? ''
     const hnb = patientById[b.patientId]?.hn ?? ''

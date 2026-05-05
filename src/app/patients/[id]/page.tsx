@@ -58,8 +58,8 @@ function OutcomeTable({ outcomes, level }: { outcomes: OutcomeMeasurement[]; lev
             <th className="text-left px-4 py-2.5 font-semibold text-slate-600 sticky left-0 bg-slate-50 min-w-[190px]">
               Outcome
             </th>
-            {OUTCOME_SESSIONS.map(s => (
-              <th key={s} className={`px-3 py-2.5 font-semibold text-center min-w-[72px] ${bySession[s] ? 'text-slate-700' : 'text-slate-300'}`}>
+            {filledSessions.map(s => (
+              <th key={s} className="px-3 py-2.5 font-semibold text-center min-w-[72px] text-slate-700">
                 {SESSION_SHORT[s]}
               </th>
             ))}
@@ -70,7 +70,7 @@ function OutcomeTable({ outcomes, level }: { outcomes: OutcomeMeasurement[]; lev
             if (row.type === 'header') {
               return (
                 <tr key={row.key} className="border-t border-slate-100">
-                  <td colSpan={6} className="px-4 pt-3 pb-1 text-xs font-bold text-slate-500 uppercase tracking-wider sticky left-0 bg-white">
+                  <td colSpan={filledSessions.length + 1} className="px-4 pt-3 pb-1 text-xs font-bold text-slate-500 uppercase tracking-wider sticky left-0 bg-white">
                     {row.label}
                   </td>
                 </tr>
@@ -83,7 +83,7 @@ function OutcomeTable({ outcomes, level }: { outcomes: OutcomeMeasurement[]; lev
                   <div className={indent ? 'text-slate-600 text-sm' : 'font-medium text-slate-700 text-sm'}>{label}</div>
                   <div className="text-xs text-slate-400">{unit}</div>
                 </td>
-                {OUTCOME_SESSIONS.map(s => {
+                {filledSessions.map(s => {
                   const entry = bySession[s]?.items[itemKey]
                   if (!entry) return <td key={s} className="px-3 py-2 text-center text-slate-300 text-sm">–</td>
                   const isInitial = s === 'Initial'

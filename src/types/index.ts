@@ -47,7 +47,11 @@ export interface Screening extends ScreeningInput, ScreeningResult {
   assessedAt?: Date
 }
 
-export type OutcomeSession = 'Initial' | 'Follow-up 1' | 'Follow-up 2' | 'Follow-up 3' | 'Discharge'
+export type OutcomeSession =
+  | 'Initial'
+  | 'Follow-up 1' | 'Follow-up 2' | 'Follow-up 3' | 'Follow-up 4' | 'Follow-up 5'
+  | 'Follow-up 6' | 'Follow-up 7' | 'Follow-up 8' | 'Follow-up 9' | 'Follow-up 10'
+  | 'Discharge'
 
 export interface OutcomeEntry {
   value: number

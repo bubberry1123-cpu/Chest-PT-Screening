@@ -1,9 +1,7 @@
 'use client'
 import { useState, useRef } from 'react'
 import type { OutcomeMeasurement, OverallLevel } from '@/types'
-
-const SESSIONS = ['Initial', 'Follow-up 1', 'Follow-up 2', 'Follow-up 3', 'Discharge'] as const
-const SESSION_LABELS = ['Initial', 'FU1', 'FU2', 'FU3', 'D/C']
+import { OUTCOME_SESSIONS, SESSION_SHORT } from '@/lib/outcomeItems'
 
 const LEVEL_COLOR: Record<number, string> = {
   1: '#22c55e',
@@ -109,21 +107,17 @@ function LineChartSVG({ chartDef, outcomes }: { chartDef: ChartDef; outcomes: Ou
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
 
-  const bySession: Partial<Record<typeof SESSIONS[number], OutcomeMeasurement>> = {}
-  outcomes.forEach(o => {
-    if (SESSIONS.includes(o.session as typeof SESSIONS[number])) {
-      bySession[o.session as typeof SESSIONS[number]] = o
-    }
-  })
+  const bySession: Record<string, OutcomeMeasurement> = {}
+  outcomes.forEach(o => { bySession[o.session] = o })
 
   const W = 520, H = 160, PL = 52, PR = 12, PT = 18, PB = 30
   const chartW = W - PL - PR
   const chartH = H - PT - PB
-  const n = SESSIONS.length
+  const n = OUTCOME_SESSIONS.length
 
   const series = chartDef.series.map(s => ({
     ...s,
-    points: SESSIONS.map((sess, i) => {
+    points: OUTCOME_SESSIONS.map((sess, i) => {
       const v = bySession[sess]?.items[s.key]?.value
       return { x: PL + (i / (n - 1)) * chartW, i, val: v !== undefined ? v : null }
     }),
@@ -158,10 +152,10 @@ function LineChartSVG({ chartDef, outcomes }: { chartDef: ChartDef; outcomes: Ou
     const rect = e.currentTarget.getBoundingClientRect()
     const svgX = ((e.clientX - rect.left) / rect.width) * W
     if (svgX < PL - 28 || svgX > W - PR + 28) { clear(); return }
-    const xs = SESSIONS.map((_, i) => PL + (i / (n - 1)) * chartW)
+    const xs = OUTCOME_SESSIONS.map((_, i) => PL + (i / (n - 1)) * chartW)
     const idx = xs.reduce((b, x, i) => Math.abs(x - svgX) < Math.abs(xs[b] - svgX) ? i : b, 0)
     setHoverIdx(idx)
-    const sess = SESSIONS[idx]
+    const sess = OUTCOME_SESSIONS[idx]
     const o = bySession[sess]
     const items = series
       .map(s => ({ label: s.label, val: s.points[idx].val, color: s.color, unit: s.unit ?? chartDef.unit }))
@@ -170,7 +164,7 @@ function LineChartSVG({ chartDef, outcomes }: { chartDef: ChartDef; outcomes: Ou
     const dateStr = o?.recordedAt
       ? new Date(o.recordedAt as Date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
       : null
-    setTooltip({ mouseX: e.clientX, mouseY: e.clientY, sessionLabel: SESSION_LABELS[idx], dateStr, items })
+    setTooltip({ mouseX: e.clientX, mouseY: e.clientY, sessionLabel: SESSION_SHORT[sess], dateStr, items })
   }
 
   const clear = () => { setTooltip(null); setHoverIdx(null) }
@@ -230,13 +224,13 @@ function LineChartSVG({ chartDef, outcomes }: { chartDef: ChartDef; outcomes: Ou
         })}
 
         {/* X labels */}
-        {SESSIONS.map((_, i) => {
+        {OUTCOME_SESSIONS.map((sess, i) => {
           const x = PL + (i / (n - 1)) * chartW
           const hasData = series.some(s => s.points[i].val !== null)
           return (
             <text key={i} x={x.toFixed(1)} y={H - 2} fontSize="9"
               fill={hasData ? '#64748b' : '#cbd5e1'} textAnchor="middle">
-              {SESSION_LABELS[i]}
+              {SESSION_SHORT[sess]}
             </text>
           )
         })}

@@ -119,27 +119,19 @@ export default function OutcomePage() {
       {/* Session selector */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm mb-5">
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Select Session</p>
-        <div className="flex flex-wrap gap-2">
+        <select
+          value={session}
+          onChange={e => setSession(e.target.value as OutcomeSession)}
+          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 bg-white text-slate-700">
           {OUTCOME_SESSIONS.map(s => {
             const hasDone = outcomes.some(o => o.session === s)
-            const active = session === s
             return (
-              <button key={s} type="button" onClick={() => setSession(s)}
-                className={`relative px-4 py-2 rounded-lg text-sm font-medium border-2 transition-all ${
-                  active
-                    ? 'bg-blue-600 border-blue-600 text-white'
-                    : hasDone
-                      ? 'bg-emerald-50 border-emerald-400 text-emerald-700'
-                      : 'bg-white border-slate-200 text-slate-600 hover:border-blue-400'
-                }`}>
-                {SESSION_SHORT[s]}
-                {hasDone && !active && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white" />
-                )}
-              </button>
+              <option key={s} value={s}>
+                {s}{hasDone ? ' ✓' : ''}
+              </option>
             )
           })}
-        </div>
+        </select>
         {hasDataForSession && (
           <div className="flex items-center justify-between mt-2">
             <p className="text-xs text-emerald-600">✓ Has existing data — editing will overwrite</p>

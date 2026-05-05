@@ -18,15 +18,20 @@ export interface OutcomeGroupDef {
 }
 
 export const OUTCOME_SESSIONS = [
-  'Initial', 'Follow-up 1', 'Follow-up 2', 'Follow-up 3', 'Discharge',
+  'Initial',
+  'Follow-up 1', 'Follow-up 2', 'Follow-up 3', 'Follow-up 4', 'Follow-up 5',
+  'Follow-up 6', 'Follow-up 7', 'Follow-up 8', 'Follow-up 9', 'Follow-up 10',
+  'Discharge',
 ] as const
 
 export const SESSION_SHORT: Record<string, string> = {
-  'Initial': 'Initial',
-  'Follow-up 1': 'FU 1',
-  'Follow-up 2': 'FU 2',
-  'Follow-up 3': 'FU 3',
-  'Discharge': 'D/C',
+  'Initial':     'Initial',
+  'Follow-up 1': 'FU 1',  'Follow-up 2': 'FU 2',
+  'Follow-up 3': 'FU 3',  'Follow-up 4': 'FU 4',
+  'Follow-up 5': 'FU 5',  'Follow-up 6': 'FU 6',
+  'Follow-up 7': 'FU 7',  'Follow-up 8': 'FU 8',
+  'Follow-up 9': 'FU 9',  'Follow-up 10': 'FU 10',
+  'Discharge':   'D/C',
 }
 
 const AMPAC_GROUP: OutcomeGroupDef = {
