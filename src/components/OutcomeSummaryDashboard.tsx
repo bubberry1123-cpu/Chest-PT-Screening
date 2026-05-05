@@ -315,9 +315,12 @@ export default function OutcomeSummaryDashboard({
       const datasets: ChartData<'bar'>['datasets'] = filledSessions.map((sess, si) => {
         const o = bySession[sess]
         const data: (number | null)[] = []
+        const rawVals: (number | null)[] = []
+        const units: string[] = []
         if (hasBrfa) {
           const vals = BRFA_PARTS.map(p => o?.items[p.key]?.value).filter((v): v is number => v !== undefined)
           data.push(vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null)
+          rawVals.push(null); units.push('%')
         }
         if (hasAmpac) {
           const vals = AMPAC_PARTS.map(p => {
@@ -325,10 +328,12 @@ export default function OutcomeSummaryDashboard({
             return r !== undefined ? normPct(r, 24) : undefined
           }).filter((v): v is number => v !== undefined)
           data.push(vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null)
+          rawVals.push(null); units.push('%')
         }
         presentOthers.forEach(d => {
           const r = o?.items[d.key]?.value
           data.push(r !== undefined ? normPct(r, d.maxRef, d.inverted) : null)
+          rawVals.push(r !== undefined ? r : null); units.push(d.unit)
         })
         return {
           label: SESSION_SHORT[sess] ?? sess,
@@ -336,7 +341,9 @@ export default function OutcomeSummaryDashboard({
           backgroundColor: COMPARE_PALETTE[si % COMPARE_PALETTE.length],
           barPercentage: 0.95,
           categoryPercentage: 0.85,
-        }
+          _rawVals: rawVals,
+          _units: units,
+        } as unknown as ChartData<'bar'>['datasets'][number]
       })
 
       return { chartLabels: colLabels, chartDatasets: datasets, topLabels: colLabels.map(() => '') }
@@ -361,7 +368,7 @@ export default function OutcomeSummaryDashboard({
       if (raw === undefined) return
       const data: (number | null)[] = Array(n).fill(null)
       data[ci] = normPct(raw, d.maxRef, d.inverted)
-      datasets.push({ label: d.label, data, backgroundColor: d.color, stack: d.key, barPercentage: 0.95, categoryPercentage: 0.85 })
+      datasets.push({ label: d.label, data, backgroundColor: d.color, stack: d.key, barPercentage: 0.95, categoryPercentage: 0.85, _rawVal: raw, _unit: d.unit } as unknown as ChartData<'bar'>['datasets'][number])
     })
 
     return { chartLabels: cols.map(c => c.label), chartDatasets: datasets, topLabels: tl }
@@ -377,8 +384,25 @@ export default function OutcomeSummaryDashboard({
       tooltip: {
         callbacks: {
           label: ctx => {
-            const val = typeof ctx.raw === 'number' ? ctx.raw.toFixed(1) : '–'
-            return ` ${ctx.dataset.label}: ${val}%`
+            const ds = ctx.dataset as unknown as Record<string, unknown>
+            if (compareMode) {
+              const rawVals = ds._rawVals as (number | null)[] | undefined
+              const units = ds._units as string[] | undefined
+              const raw = rawVals?.[ctx.dataIndex]
+              const unit = units?.[ctx.dataIndex]
+              if (raw !== null && raw !== undefined && unit && unit !== '%') {
+                return ` ${ctx.dataset.label}: ${raw} ${unit}`
+              }
+              const pct = typeof ctx.raw === 'number' ? ctx.raw.toFixed(1) : '–'
+              return ` ${ctx.dataset.label}: ${pct}%`
+            }
+            const raw = ds._rawVal as number | undefined
+            const unit = ds._unit as string | undefined
+            if (raw !== undefined && unit !== undefined) {
+              return ` ${ctx.dataset.label}: ${raw} ${unit}`
+            }
+            const pct = typeof ctx.raw === 'number' ? ctx.raw.toFixed(1) : '–'
+            return ` ${ctx.dataset.label}: ${pct}%`
           },
         },
       },
