@@ -4,7 +4,6 @@ import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip,
   type ChartData, type ChartOptions, type Plugin,
 } from 'chart.js'
-import annotationPlugin from 'chartjs-plugin-annotation'
 import { Bar } from 'react-chartjs-2'
 import type { OutcomeMeasurement, OverallLevel } from '@/types'
 import { OUTCOME_SESSIONS, SESSION_SHORT } from '@/lib/outcomeItems'
@@ -43,7 +42,7 @@ const barTopLabelPlugin: Plugin<'bar'> = {
   },
 }
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, annotationPlugin, barTopLabelPlugin)
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, barTopLabelPlugin)
 
 // ── Metric definitions ─────────────────────────────────────────────────────────
 
@@ -145,8 +144,8 @@ export default function OutcomeSummaryDashboard({
           label: SESSION_SHORT[sess] ?? sess,
           data,
           backgroundColor: COMPARE_PALETTE[si % COMPARE_PALETTE.length],
-          barPercentage: 0.7,
-          categoryPercentage: 0.8,
+          barPercentage: 0.95,
+          categoryPercentage: 0.85,
         }
       })
 
@@ -192,7 +191,7 @@ export default function OutcomeSummaryDashboard({
           if (raw === undefined) return
           const data: (number | null)[] = Array(n).fill(null)
           data[ci] = raw  // already %
-          datasets.push({ label: p.label, data, backgroundColor: p.color, stack: 'brfa', barPercentage: 0.65 })
+          datasets.push({ label: p.label, data, backgroundColor: p.color, stack: 'brfa', barPercentage: 0.95, categoryPercentage: 0.85 })
         })
       }
     }
@@ -205,7 +204,7 @@ export default function OutcomeSummaryDashboard({
           if (raw === undefined) return
           const data: (number | null)[] = Array(n).fill(null)
           data[ci] = normPct(raw, 24)
-          datasets.push({ label: p.label, data, backgroundColor: p.color, stack: 'ampac', barPercentage: 0.65 })
+          datasets.push({ label: p.label, data, backgroundColor: p.color, stack: 'ampac', barPercentage: 0.95, categoryPercentage: 0.85 })
         })
       }
     }
@@ -217,7 +216,7 @@ export default function OutcomeSummaryDashboard({
       if (raw === undefined) return
       const data: (number | null)[] = Array(n).fill(null)
       data[ci] = normPct(raw, d.maxRef, d.inverted)
-      datasets.push({ label: d.label, data, backgroundColor: d.color, stack: d.key, barPercentage: 0.65 })
+      datasets.push({ label: d.label, data, backgroundColor: d.color, stack: d.key, barPercentage: 0.95, categoryPercentage: 0.85 })
     })
 
     return { chartLabels: cols.map(c => c.label), chartDatasets: datasets, topLabels: tl }
@@ -238,27 +237,6 @@ export default function OutcomeSummaryDashboard({
           },
         },
       },
-      annotation: {
-        annotations: {
-          threshold: {
-            type: 'line',
-            scaleID: 'y',
-            value: 60,
-            borderColor: 'rgba(239,68,68,0.65)',
-            borderWidth: 1.5,
-            borderDash: [5, 4],
-            label: {
-              display: true,
-              content: '60%',
-              position: 'end',
-              backgroundColor: 'rgba(255,255,255,0.85)',
-              color: '#dc2626',
-              font: { size: 9 },
-              padding: { x: 4, y: 2 },
-            },
-          },
-        },
-      } as never,
       barTopLabel: { topLabels },
     } as ChartOptions<'bar'>['plugins'],
     scales: {
@@ -415,10 +393,6 @@ export default function OutcomeSummaryDashboard({
               <span className="text-[11px] text-slate-500">{item.label}</span>
             </div>
           ))}
-          <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3 ml-1">
-            <svg width="18" height="10"><line x1="0" y1="5" x2="18" y2="5" stroke="#ef4444" strokeWidth="1.5" strokeDasharray="4,3" /></svg>
-            <span className="text-[11px] text-red-500">60% threshold</span>
-          </div>
         </div>
 
         <div style={{ height: 280 }}>
