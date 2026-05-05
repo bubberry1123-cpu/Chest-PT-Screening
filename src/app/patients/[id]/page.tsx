@@ -10,6 +10,7 @@ import { WARDS } from '@/lib/wards'
 import { useToast } from '@/lib/useToast'
 import Toast from '@/components/Toast'
 import SeverityBadge from '@/components/SeverityBadge'
+import OutcomeCharts from '@/components/OutcomeCharts'
 
 function trendSymbol(diff: number, lowerIsBetter?: boolean) {
   if (diff === 0) return { symbol: '→', color: 'text-slate-400' }
@@ -363,6 +364,7 @@ export default function PatientPage() {
             </Link>
           </div>
           <OutcomeTable outcomes={outcomes} level={latestLevel} />
+          <OutcomeCharts outcomes={outcomes} level={latestLevel} isAdmin={isAdmin} />
         </div>
       )}
 
