@@ -252,37 +252,9 @@ export default function OutcomeSummaryDashboard({
     },
   }), [compareMode, topLabels])
 
-  // ── Outcome cards ──────────────────────────────────────────────────────────
-
-  const latestO  = bySession[filledSessions[filledSessions.length - 1]]
-  const initialO = bySession['Initial']
-
-  interface CardInfo { key: string; label: string; rawVal: number; unit: string; pct: number; initPct?: number }
-  const cards: CardInfo[] = []
-  if (latestO) {
-    BRFA_PARTS.forEach(p => {
-      const raw = latestO.items[p.key]?.value
-      if (raw === undefined) return
-      const iv = initialO?.items[p.key]?.value
-      cards.push({ key: p.key, label: p.label, rawVal: raw, unit: '%', pct: raw, initPct: iv })
-    })
-    AMPAC_PARTS.forEach(p => {
-      const raw = latestO.items[p.key]?.value
-      if (raw === undefined) return
-      const pct = normPct(raw, 24)
-      const iv = initialO?.items[p.key]?.value
-      cards.push({ key: p.key, label: p.label, rawVal: raw, unit: '/24', pct, initPct: iv !== undefined ? normPct(iv, 24) : undefined })
-    })
-    OTHER_DEFS.forEach(d => {
-      const raw = latestO.items[d.key]?.value
-      if (raw === undefined) return
-      const pct = normPct(raw, d.maxRef, d.inverted)
-      const iv = initialO?.items[d.key]?.value
-      cards.push({ key: d.key, label: d.label, rawVal: raw, unit: d.unit, pct, initPct: iv !== undefined ? normPct(iv, d.maxRef, d.inverted) : undefined })
-    })
-  }
-
   // ── Legend items ───────────────────────────────────────────────────────────
+
+  const latestO = bySession[filledSessions[filledSessions.length - 1]]
 
   interface LegendItem { key: string; label: string; color: string }
   const legendItems: LegendItem[] = compareMode
@@ -341,45 +313,6 @@ export default function OutcomeSummaryDashboard({
         </div>
       </div>
 
-      {/* Outcome detail cards */}
-      {cards.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
-            รายละเอียด — {filledSessions[filledSessions.length - 1]}
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {cards.map(card => {
-              const pass = card.pct >= 60
-              const delta = card.initPct !== undefined ? card.pct - card.initPct : null
-              return (
-                <div key={card.key} className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
-                  <div className="flex items-center justify-between gap-1 mb-1.5">
-                    <span className="text-xs font-semibold text-slate-600 truncate">{card.label}</span>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${pass ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                      {pass ? 'Pass' : 'Low'}
-                    </span>
-                  </div>
-                  <div className="flex items-end gap-1.5">
-                    <span className="text-xl font-bold text-slate-800 leading-none">
-                      {card.pct.toFixed(0)}<span className="text-xs font-normal text-slate-400">%</span>
-                    </span>
-                    {delta !== null && (
-                      <span className={`text-xs font-semibold mb-0.5 ${delta > 0 ? 'text-green-600' : delta < 0 ? 'text-red-500' : 'text-slate-400'}`}>
-                        {delta > 0 ? '+' : ''}{delta.toFixed(0)}%
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">{card.rawVal} {card.unit}</div>
-                  <div className="w-full bg-slate-100 rounded-full h-1.5 mt-1.5">
-                    <div className={`h-1.5 rounded-full transition-all ${pass ? 'bg-green-500' : 'bg-red-400'}`}
-                      style={{ width: `${Math.min(100, card.pct)}%` }} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
