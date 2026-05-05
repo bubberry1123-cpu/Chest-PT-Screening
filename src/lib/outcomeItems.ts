@@ -19,19 +19,25 @@ export interface OutcomeGroupDef {
 
 export const OUTCOME_SESSIONS = [
   'Initial',
-  'Follow-up 1', 'Follow-up 2', 'Follow-up 3', 'Follow-up 4', 'Follow-up 5',
-  'Follow-up 6', 'Follow-up 7', 'Follow-up 8', 'Follow-up 9', 'Follow-up 10',
+  'Reassessment 1', 'Reassessment 2', 'Reassessment 3', 'Reassessment 4', 'Reassessment 5',
+  'Reassessment 6', 'Reassessment 7', 'Reassessment 8', 'Reassessment 9', 'Reassessment 10',
   'Discharge',
 ] as const
 
 export const SESSION_SHORT: Record<string, string> = {
-  'Initial':     'Initial',
-  'Follow-up 1': 'FU 1',  'Follow-up 2': 'FU 2',
-  'Follow-up 3': 'FU 3',  'Follow-up 4': 'FU 4',
-  'Follow-up 5': 'FU 5',  'Follow-up 6': 'FU 6',
-  'Follow-up 7': 'FU 7',  'Follow-up 8': 'FU 8',
+  'Initial':          'Initial',
+  'Reassessment 1':   'RA 1',  'Reassessment 2':  'RA 2',
+  'Reassessment 3':   'RA 3',  'Reassessment 4':  'RA 4',
+  'Reassessment 5':   'RA 5',  'Reassessment 6':  'RA 6',
+  'Reassessment 7':   'RA 7',  'Reassessment 8':  'RA 8',
+  'Reassessment 9':   'RA 9',  'Reassessment 10': 'RA 10',
+  'Discharge':        'D/C',
+  // Legacy keys for existing localStorage records
+  'Follow-up 1': 'FU 1',  'Follow-up 2':  'FU 2',
+  'Follow-up 3': 'FU 3',  'Follow-up 4':  'FU 4',
+  'Follow-up 5': 'FU 5',  'Follow-up 6':  'FU 6',
+  'Follow-up 7': 'FU 7',  'Follow-up 8':  'FU 8',
   'Follow-up 9': 'FU 9',  'Follow-up 10': 'FU 10',
-  'Discharge':   'D/C',
 }
 
 const AMPAC_GROUP: OutcomeGroupDef = {

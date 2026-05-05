@@ -49,8 +49,8 @@ export interface Screening extends ScreeningInput, ScreeningResult {
 
 export type OutcomeSession =
   | 'Initial'
-  | 'Follow-up 1' | 'Follow-up 2' | 'Follow-up 3' | 'Follow-up 4' | 'Follow-up 5'
-  | 'Follow-up 6' | 'Follow-up 7' | 'Follow-up 8' | 'Follow-up 9' | 'Follow-up 10'
+  | 'Reassessment 1' | 'Reassessment 2' | 'Reassessment 3' | 'Reassessment 4' | 'Reassessment 5'
+  | 'Reassessment 6' | 'Reassessment 7' | 'Reassessment 8' | 'Reassessment 9' | 'Reassessment 10'
   | 'Discharge'
 
 export interface OutcomeEntry {

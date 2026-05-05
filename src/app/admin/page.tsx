@@ -10,6 +10,7 @@ import { WARDS } from '@/lib/wards'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const REASSESS_DAYS = 14
+const OUTCOME_REAS_DAYS = 15  // Outcome Reassessment interval
 const LEVEL_COLOR: Record<number, string> = { 1: '#22c55e', 2: '#3b82f6', 3: '#f97316', 4: '#ef4444' }
 const LEVEL_BG: Record<number, string> = {
   1: 'bg-green-100 text-green-700',
@@ -17,9 +18,11 @@ const LEVEL_BG: Record<number, string> = {
   3: 'bg-orange-100 text-orange-700',
   4: 'bg-red-100 text-red-700',
 }
-const ALL_SESSIONS: OutcomeSession[] = ['Initial','Follow-up 1','Follow-up 2','Follow-up 3','Follow-up 4','Follow-up 5','Follow-up 6','Follow-up 7','Follow-up 8','Follow-up 9','Follow-up 10','Discharge']
+const ALL_SESSIONS: OutcomeSession[] = ['Initial','Reassessment 1','Reassessment 2','Reassessment 3','Reassessment 4','Reassessment 5','Reassessment 6','Reassessment 7','Reassessment 8','Reassessment 9','Reassessment 10','Discharge']
 
 // ── Outcome schedule config ──────────────────────────────────────────────────
+// initDcOnly: true  = BRFA schedule (Initial + Discharge only, alert when no Discharge yet)
+// initDcOnly: false = every-15-days schedule (Initial + RA 1..N + Discharge)
 interface SchedGroup {
   groupKey: string
   label: string
@@ -29,18 +32,17 @@ interface SchedGroup {
 }
 
 const SCHED: SchedGroup[] = [
-  { groupKey: 'ampac',             label: 'AMPAC',                    checkKeys: ['ampac_part1'],                          initDcOnly: false, levels: [1,2,3,4] },
-  { groupKey: 'brfa',              label: 'BRFA',                     checkKeys: ['brfa_part1'],                           initDcOnly: true,  levels: [1,2,3,4] },
-  { groupKey: 'dyspneaScale',      label: 'Dyspnea scale',            checkKeys: ['dyspneaScale'],                         initDcOnly: false, levels: [1,2,3,4] },
-  { groupKey: 'peakCoughFlow',     label: 'Peak Cough Flow',          checkKeys: ['peakCoughFlow'],                        initDcOnly: false, levels: [1,2,3] },
-  { groupKey: 'wrightSpirometer',  label: 'Wright Spirometry',        checkKeys: ['wrightSpirometer'],                     initDcOnly: false, levels: [1,2,3] },
-  { groupKey: 'gripStrength',      label: 'Grip Strength',            checkKeys: ['gripStrength_left','gripStrength_right'], initDcOnly: false, levels: [1,2] },
-  { groupKey: 'cs30',              label: 'CS-30',                    checkKeys: ['cs30'],                                 initDcOnly: false, levels: [2] },
-  { groupKey: 'walkTest',          label: '6MWT / 2-min Marching',    checkKeys: ['sixMWT','twoMinMarching'],               initDcOnly: false, levels: [1] },
+  { groupKey: 'ampac',            label: 'AMPAC',            checkKeys: ['ampac_part1'],                           initDcOnly: false, levels: [1,2,3,4] },
+  { groupKey: 'brfa',             label: 'BRFA',             checkKeys: ['brfa_part1'],                            initDcOnly: true,  levels: [1,2,3,4] },
+  { groupKey: 'peakCoughFlow',    label: 'Peak Cough Flow',  checkKeys: ['peakCoughFlow'],                         initDcOnly: false, levels: [1,2,3] },
+  { groupKey: 'wrightSpirometer', label: 'Wright Spirometry',checkKeys: ['wrightSpirometer'],                      initDcOnly: false, levels: [1,2,3] },
+  { groupKey: 'gripStrength',     label: 'Grip Strength',    checkKeys: ['gripStrength_left','gripStrength_right'], initDcOnly: false, levels: [1,2] },
+  { groupKey: 'cs30',             label: 'CS-30',            checkKeys: ['cs30'],                                  initDcOnly: false, levels: [2] },
 ]
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type DueStatus = 'overdue' | 'due-soon' | 'ok' | 'none'
+type OutcomeAlertStatus = 'none' | 'overdue' | 'due-soon'
 
 interface MissingItem { groupLabel: string; session: OutcomeSession }
 
@@ -53,6 +55,9 @@ interface PatientRow {
   dueStatus: DueStatus
   missingItems: MissingItem[]
   outcomeStatus: 'none' | 'partial' | 'complete'
+  expectedReassCount: number
+  daysUntilNextReas: number | null
+  outcomeAlertStatus: OutcomeAlertStatus
 }
 
 // ── Data helpers ─────────────────────────────────────────────────────────────
@@ -68,36 +73,101 @@ function buildRow(p: Patient, allS: Screening[], allO: OutcomeMeasurement[]): Pa
   const latest = screenings[0] ?? null
   const level = latest?.overallLevel as OverallLevel | undefined
 
+  // ── Screening reassessment due (every 14 days from latest screening) ──────
   let daysUntilDue = 0
   let dueStatus: DueStatus = 'none'
   if (latest?.assessedAt) {
-    const dueDate = new Date(latest.assessedAt)
-    dueDate.setDate(dueDate.getDate() + REASSESS_DAYS)
-    daysUntilDue = daysBetween(new Date(), dueDate)
+    const dd = new Date(latest.assessedAt)
+    dd.setDate(dd.getDate() + REASSESS_DAYS)
+    daysUntilDue = daysBetween(new Date(), dd)
     dueStatus = daysUntilDue < 0 ? 'overdue' : daysUntilDue <= 3 ? 'due-soon' : 'ok'
   }
 
   const bySession: Record<string, OutcomeMeasurement> = {}
   outcomes.forEach(o => { bySession[o.session] = o })
-  const startedSessions = Object.keys(bySession) as OutcomeSession[]
+  const hasDischarge = !!bySession['Discharge']
 
+  // ── Expected Reassessment count (15-day intervals from Initial outcome or screening) ──
+  const refDate: Date | null = bySession['Initial']?.recordedAt
+    ? new Date(bySession['Initial'].recordedAt as Date)
+    : latest?.assessedAt ? new Date(latest.assessedAt) : null
+
+  const today = new Date()
+  let expectedReassCount = 0
+  let daysUntilNextReas: number | null = null
+
+  if (refDate) {
+    const daysSince = Math.floor((today.getTime() - refDate.getTime()) / 86400000)
+    expectedReassCount = Math.min(Math.max(0, Math.floor(daysSince / OUTCOME_REAS_DAYS)), 10)
+    if (expectedReassCount < 10) {
+      daysUntilNextReas = OUTCOME_REAS_DAYS - (daysSince % OUTCOME_REAS_DAYS)
+    }
+  }
+
+  // ── Missing items ─────────────────────────────────────────────────────────
   const missingItems: MissingItem[] = []
   if (level) {
     for (const grp of SCHED) {
       if (!grp.levels.includes(level)) continue
-      const required: OutcomeSession[] = grp.initDcOnly ? ['Initial', 'Discharge'] : ALL_SESSIONS
-      for (const sess of required) {
-        if (!startedSessions.includes(sess)) continue
-        const items = bySession[sess]?.items ?? {}
-        if (!grp.checkKeys.some(k => items[k] !== undefined)) {
-          missingItems.push({ groupLabel: grp.label, session: sess })
+
+      if (grp.initDcOnly) {
+        // BRFA: check Initial; alert Discharge only if Initial BRFA recorded but no Discharge yet
+        const initO = bySession['Initial']
+        if (initO && !grp.checkKeys.some(k => initO.items[k] !== undefined)) {
+          missingItems.push({ groupLabel: grp.label, session: 'Initial' })
+        }
+        if (hasDischarge) {
+          const dcO = bySession['Discharge']!
+          if (!grp.checkKeys.some(k => dcO.items[k] !== undefined)) {
+            missingItems.push({ groupLabel: grp.label, session: 'Discharge' })
+          }
+        } else if (initO && grp.checkKeys.some(k => initO.items[k] !== undefined)) {
+          // Initial BRFA done but no Discharge yet → flag
+          missingItems.push({ groupLabel: grp.label, session: 'Discharge' })
+        }
+      } else {
+        // Every-15-days: check Initial + expected Reassessments + Discharge (if exists)
+        const sessToCheck: OutcomeSession[] = ['Initial']
+        for (let i = 1; i <= expectedReassCount; i++) {
+          sessToCheck.push(`Reassessment ${i}` as OutcomeSession)
+        }
+        if (hasDischarge) sessToCheck.push('Discharge')
+
+        for (const sess of sessToCheck) {
+          const o = bySession[sess]
+          if (!o || !grp.checkKeys.some(k => o.items[k] !== undefined)) {
+            missingItems.push({ groupLabel: grp.label, session: sess })
+          }
         }
       }
     }
   }
 
+  // ── Outcome alert status ──────────────────────────────────────────────────
+  let outcomeAlertStatus: OutcomeAlertStatus = 'none'
+  if (level) {
+    const nonBrfaGroups = SCHED.filter(g => g.levels.includes(level) && !g.initDcOnly)
+    const overdueFound = nonBrfaGroups.some(grp => {
+      const sessToCheck: OutcomeSession[] = ['Initial']
+      for (let i = 1; i <= expectedReassCount; i++) sessToCheck.push(`Reassessment ${i}` as OutcomeSession)
+      return sessToCheck.some(sess => {
+        const o = bySession[sess]
+        return !o || !grp.checkKeys.some(k => o.items[k] !== undefined)
+      })
+    })
+    if (overdueFound) {
+      outcomeAlertStatus = 'overdue'
+    } else if (daysUntilNextReas !== null && daysUntilNextReas <= 3 && nonBrfaGroups.length > 0) {
+      outcomeAlertStatus = 'due-soon'
+    }
+  }
+
   const outcomeStatus = outcomes.length === 0 ? 'none' : missingItems.length > 0 ? 'partial' : 'complete'
-  return { patient: p, screenings, outcomes, latestScreening: latest, daysUntilDue, dueStatus, missingItems, outcomeStatus }
+  return {
+    patient: p, screenings, outcomes, latestScreening: latest,
+    daysUntilDue, dueStatus, missingItems, outcomeStatus,
+    expectedReassCount, daysUntilNextReas, outcomeAlertStatus,
+  }
 }
 
 function getWeeklyData(screenings: Screening[]): { label: string; value: number }[] {
@@ -293,12 +363,22 @@ function PatientModal({ row, onClose }: { row: PatientRow; onClose: () => void }
 
   const applicableGroups = level ? SCHED.filter(g => g.levels.includes(level)) : []
 
-  function cellStatus(grp: SchedGroup, sess: OutcomeSession): 'has' | 'missing' | 'skip' {
-    const required: OutcomeSession[] = grp.initDcOnly ? ['Initial', 'Discharge'] : ALL_SESSIONS
-    if (!required.includes(sess)) return 'skip'
-    if (!bySession[sess]) return 'skip'
-    const items = bySession[sess]?.items ?? {}
-    return grp.checkKeys.some(k => items[k] !== undefined) ? 'has' : 'missing'
+  function cellStatus(grp: SchedGroup, sess: OutcomeSession): 'has' | 'missing' | 'pending' | 'skip' {
+    if (grp.initDcOnly) {
+      // BRFA: only Initial + Discharge columns active
+      if (sess !== 'Initial' && sess !== 'Discharge') return 'skip'
+      if (sess === 'Discharge' && !bySession['Discharge']) return 'skip'
+    } else {
+      if (sess === 'Discharge' && !bySession['Discharge']) return 'skip'
+      if (sess !== 'Initial' && sess !== 'Discharge') {
+        const n = parseInt(sess.replace('Reassessment ', ''))
+        if (isNaN(n)) return 'skip'
+        if (n > row.expectedReassCount) return 'pending'
+      }
+    }
+    const o = bySession[sess]
+    if (!o) return 'missing'
+    return grp.checkKeys.some(k => o.items[k] !== undefined) ? 'has' : 'missing'
   }
 
   return (
@@ -367,6 +447,7 @@ function PatientModal({ row, onClose }: { row: PatientRow; onClose: () => void }
                           <td key={sess} className="px-2 py-2 text-center">
                             {status === 'has'     && <span className="text-emerald-500 font-bold">✓</span>}
                             {status === 'missing' && <span className="text-red-500 font-bold">✗</span>}
+                            {status === 'pending' && <span className="text-slate-300 text-xs">·</span>}
                             {status === 'skip'    && <span className="text-slate-200 text-xs">–</span>}
                           </td>
                         )
@@ -592,7 +673,12 @@ export default function AdminPage() {
 
   const dueRows   = rows.filter(r => r.dueStatus === 'overdue' || r.dueStatus === 'due-soon')
     .sort((a, b) => a.daysUntilDue - b.daysUntilDue)
-  const alertRows = rows.filter(r => r.missingItems.length > 0)
+  const alertRows = rows
+    .filter(r => r.missingItems.length > 0 || r.outcomeAlertStatus !== 'none')
+    .sort((a, b) => {
+      const rank = (s: OutcomeAlertStatus) => s === 'overdue' ? 0 : s === 'due-soon' ? 1 : 2
+      return rank(a.outcomeAlertStatus) - rank(b.outcomeAlertStatus)
+    })
 
   if (authed === null) return null
   if (!authed) return <PasswordGate onAuth={() => setAuthed(true)} />
@@ -818,41 +904,83 @@ export default function AdminPage() {
       {/* ── Outcome Alert ── */}
       {alertRows.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-red-100 bg-red-50 flex items-center justify-between">
-            <h3 className="font-semibold text-red-800 text-sm">Outcome Alert — Missing Items</h3>
-            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-red-100 text-red-700">
-              {alertRows.length} patients
-            </span>
+          <div className="px-5 py-3.5 border-b border-orange-100 bg-orange-50 flex items-center justify-between">
+            <h3 className="font-semibold text-orange-800 text-sm">Outcome Reassessment Alerts</h3>
+            <div className="flex items-center gap-2">
+              {alertRows.filter(r => r.outcomeAlertStatus === 'overdue').length > 0 && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                  {alertRows.filter(r => r.outcomeAlertStatus === 'overdue').length} overdue
+                </span>
+              )}
+              {alertRows.filter(r => r.outcomeAlertStatus === 'due-soon').length > 0 && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
+                  {alertRows.filter(r => r.outcomeAlertStatus === 'due-soon').length} due soon
+                </span>
+              )}
+            </div>
           </div>
           <div className="divide-y divide-slate-100">
-            {alertRows.map(row => (
-              <div key={row.patient.id}
-                className="flex items-center px-5 py-3 gap-3 cursor-pointer hover:bg-slate-50 transition-colors"
-                onClick={() => setSelectedRow(row)}>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-slate-800 text-sm">{row.patient.firstName} {row.patient.lastName}</div>
-                  <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                    <span className="font-mono">{row.patient.hn}</span>
-                    {row.latestScreening && (
-                      <span className={`px-1.5 rounded font-semibold ${LEVEL_BG[row.latestScreening.overallLevel]}`}>
-                        L{row.latestScreening.overallLevel}
-                      </span>
+            {alertRows.map(row => {
+              const isOverdue  = row.outcomeAlertStatus === 'overdue'
+              const isDueSoon  = row.outcomeAlertStatus === 'due-soon'
+              const borderCls  = isOverdue ? 'border-l-4 border-red-400' : isDueSoon ? 'border-l-4 border-yellow-400' : ''
+              // Non-BRFA missing items only for the badges
+              const nonBrfaMissing = row.missingItems.filter(m => m.groupLabel !== 'BRFA')
+              const brfaMissing    = row.missingItems.filter(m => m.groupLabel === 'BRFA')
+              return (
+                <div key={row.patient.id}
+                  className={`flex items-start px-5 py-3 gap-3 cursor-pointer hover:bg-slate-50 transition-colors ${borderCls}`}
+                  onClick={() => setSelectedRow(row)}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-slate-800 text-sm">{row.patient.firstName} {row.patient.lastName}</span>
+                      <span className="font-mono text-xs text-slate-400">{row.patient.hn}</span>
+                      {row.latestScreening && (
+                        <span className={`px-1.5 rounded text-xs font-semibold ${LEVEL_BG[row.latestScreening.overallLevel]}`}>
+                          L{row.latestScreening.overallLevel}
+                        </span>
+                      )}
+                    </div>
+                    {/* Status line */}
+                    <div className="text-xs mt-0.5">
+                      {isOverdue && (
+                        <span className="text-red-600 font-medium">
+                          Reassessment เกินกำหนด — {row.expectedReassCount > 0 ? `RA ${row.expectedReassCount} ยังไม่ครบ` : 'Initial ยังไม่มีข้อมูล'}
+                        </span>
+                      )}
+                      {isDueSoon && row.daysUntilNextReas !== null && (
+                        <span className="text-yellow-600 font-medium">
+                          Reassessment ถัดไปอีก {row.daysUntilNextReas} วัน
+                        </span>
+                      )}
+                    </div>
+                    {/* Missing item badges */}
+                    {nonBrfaMissing.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {nonBrfaMissing.slice(0, 6).map((m, i) => (
+                          <span key={i} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">
+                            {m.groupLabel} / {SESSION_SHORT[m.session] ?? m.session}
+                          </span>
+                        ))}
+                        {nonBrfaMissing.length > 6 && (
+                          <span className="text-xs text-slate-400">+{nonBrfaMissing.length - 6} more</span>
+                        )}
+                      </div>
+                    )}
+                    {brfaMissing.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {brfaMissing.map((m, i) => (
+                          <span key={i} className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full">
+                            BRFA {SESSION_SHORT[m.session] ?? m.session} ยังไม่บันทึก
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {row.missingItems.slice(0, 6).map((m, i) => (
-                      <span key={i} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">
-                        {m.groupLabel} / {SESSION_SHORT[m.session]}
-                      </span>
-                    ))}
-                    {row.missingItems.length > 6 && (
-                      <span className="text-xs text-slate-400">+{row.missingItems.length - 6} more</span>
-                    )}
-                  </div>
+                  <span className="text-slate-300 text-xl shrink-0 mt-0.5">›</span>
                 </div>
-                <span className="text-slate-300 text-xl shrink-0">›</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
