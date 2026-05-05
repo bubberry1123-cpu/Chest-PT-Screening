@@ -152,15 +152,14 @@ export default function OutcomeSummaryDashboard({
       return { chartLabels: colLabels, chartDatasets: datasets, topLabels: colLabels.map(() => '') }
     }
 
-    // Single session mode
+    // Single session mode — build cols from THIS session only (not across all sessions)
     const o = bySession[selectedSession]
 
-    // Columns: only those with data in this session
     type Col = { id: string; label: string }
     const cols: Col[] = []
-    if (hasBrfa  && BRFA_PARTS.some(p  => o?.items[p.key]?.value  !== undefined)) cols.push({ id: 'brfa',  label: 'BRFA'  })
-    if (hasAmpac && AMPAC_PARTS.some(p => o?.items[p.key]?.value !== undefined)) cols.push({ id: 'ampac', label: 'AMPAC' })
-    presentOthers.forEach(d => {
+    if (BRFA_PARTS.some(p  => o?.items[p.key]?.value !== undefined)) cols.push({ id: 'brfa',  label: 'BRFA'  })
+    if (AMPAC_PARTS.some(p => o?.items[p.key]?.value !== undefined)) cols.push({ id: 'ampac', label: 'AMPAC' })
+    OTHER_DEFS.forEach(d => {
       if (o?.items[d.key]?.value !== undefined) cols.push({ id: d.key, label: d.label })
     })
     const n = cols.length
@@ -183,7 +182,7 @@ export default function OutcomeSummaryDashboard({
     // Datasets
     const datasets: ChartData<'bar'>['datasets'] = []
 
-    if (hasBrfa) {
+    {
       const ci = cols.findIndex(c => c.id === 'brfa')
       if (ci >= 0) {
         BRFA_PARTS.forEach(p => {
@@ -196,7 +195,7 @@ export default function OutcomeSummaryDashboard({
       }
     }
 
-    if (hasAmpac) {
+    {
       const ci = cols.findIndex(c => c.id === 'ampac')
       if (ci >= 0) {
         AMPAC_PARTS.forEach(p => {
@@ -209,7 +208,7 @@ export default function OutcomeSummaryDashboard({
       }
     }
 
-    presentOthers.forEach(d => {
+    OTHER_DEFS.forEach(d => {
       const ci = cols.findIndex(c => c.id === d.key)
       if (ci < 0) return
       const raw = o?.items[d.key]?.value
@@ -397,6 +396,7 @@ export default function OutcomeSummaryDashboard({
 
         <div style={{ height: 280 }}>
           <Bar
+            key={compareMode ? 'compare' : selectedSession}
             data={{ labels: chartLabels, datasets: chartDatasets }}
             options={options}
           />
