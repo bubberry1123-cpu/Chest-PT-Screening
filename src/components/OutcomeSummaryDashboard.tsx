@@ -164,18 +164,9 @@ export default function OutcomeSummaryDashboard({
     })
     const n = cols.length
 
-    // Top labels
+    // Top labels — only "others" get a top label; BRFA and AMPAC are silent
     const tl: string[] = cols.map(col => {
-      if (!o) return ''
-      if (col.id === 'brfa') {
-        const sum = BRFA_PARTS.reduce((acc, p) => acc + (o.items[p.key]?.value ?? 0), 0)
-        return `${sum.toFixed(0)}%`
-      }
-      if (col.id === 'ampac') {
-        const sumRaw = AMPAC_PARTS.reduce((acc, p) => acc + (o.items[p.key]?.value ?? 0), 0)
-        return `${sumRaw.toFixed(0)}/${AMPAC_PARTS.length * 24}`
-      }
-      const def = OTHER_DEFS.find(d => d.key === col.id)!
+      if (!o || col.id === 'brfa' || col.id === 'ampac') return ''
       return `${o.items[col.id]?.value ?? ''}`
     })
 
@@ -203,7 +194,9 @@ export default function OutcomeSummaryDashboard({
           if (raw === undefined) return
           const data: (number | null)[] = Array(n).fill(null)
           data[ci] = normPct(raw, 24)
-          datasets.push({ label: p.label, data, backgroundColor: p.color, stack: 'ampac', barPercentage: 0.95, categoryPercentage: 0.85 })
+          const ds = { label: p.label, data, backgroundColor: p.color, stack: 'ampac', barPercentage: 0.95, categoryPercentage: 0.85 }
+          ;(ds as Record<string, unknown>)._rawVal = raw
+          datasets.push(ds)
         })
       }
     }
@@ -231,6 +224,10 @@ export default function OutcomeSummaryDashboard({
       tooltip: {
         callbacks: {
           label: ctx => {
+            const rawVal = (ctx.dataset as unknown as Record<string, unknown>)._rawVal
+            if (typeof rawVal === 'number') {
+              return ` ${ctx.dataset.label}: ${rawVal}/24`
+            }
             const val = typeof ctx.raw === 'number' ? ctx.raw.toFixed(1) : '–'
             return ` ${ctx.dataset.label}: ${val}%`
           },
