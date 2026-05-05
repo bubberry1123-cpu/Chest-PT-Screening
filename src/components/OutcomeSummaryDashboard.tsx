@@ -44,7 +44,7 @@ const barTopLabelPlugin: Plugin<'bar'> = {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, barTopLabelPlugin)
 
-// ── Metric definitions ─────────────────────────────────────────────────────────
+// ── Metric definitions ────────────────────────────────────────────────────────
 
 const BRFA_PARTS = [
   { key: 'brfa_part1', label: 'Part 1 Functional',  color: '#085041' },
@@ -64,15 +64,15 @@ interface OtherDef {
   color: string; maxRef: number; inverted?: boolean
 }
 const OTHER_DEFS: OtherDef[] = [
-  { key: 'dyspneaScale',      label: 'Dyspnea',    unit: '/10',   color: '#E85D04', maxRef: 10,  inverted: true },
-  { key: 'peakCoughFlow',     label: 'Cough Flow', unit: 'L/min', color: '#378ADD', maxRef: 600 },
-  { key: 'wrightSpirometer',  label: 'Wright',     unit: 'mL',    color: '#0F6E56', maxRef: 600 },
-  { key: 'gripStrength_left', label: 'Grip L',     unit: 'kg',    color: '#BA7517', maxRef: 60  },
-  { key: 'gripStrength_right',label: 'Grip R',     unit: 'kg',    color: '#EF9F27', maxRef: 60  },
+  { key: 'dyspneaScale',      label: 'Dyspnea',    unit: '/10',     color: '#E85D04', maxRef: 10,  inverted: true },
+  { key: 'peakCoughFlow',     label: 'Cough Flow', unit: 'L/min',   color: '#378ADD', maxRef: 600 },
+  { key: 'wrightSpirometer',  label: 'Wright',     unit: 'mL',      color: '#0F6E56', maxRef: 600 },
+  { key: 'gripStrength_left', label: 'Grip L',     unit: 'kg',      color: '#BA7517', maxRef: 60  },
+  { key: 'gripStrength_right',label: 'Grip R',     unit: 'kg',      color: '#EF9F27', maxRef: 60  },
   { key: 'cs30',              label: 'CS-30',      unit: 'ครั้ง',   color: '#639922', maxRef: 30  },
-  { key: 'twoMeterWalk',     label: '2mWT',       unit: 'seconds', color: '#0891B2', maxRef: 60, inverted: true },
+  { key: 'twoMeterWalk',      label: '2mWT',       unit: 'seconds', color: '#0891B2', maxRef: 60, inverted: true },
   { key: 'sixMWT',            label: '6MWT',       unit: 'm',       color: '#C77DFF', maxRef: 500 },
-  { key: 'twoMinMarching',    label: '2-min March',unit: 'ครั้ง', color: '#E63946', maxRef: 120 },
+  { key: 'twoMinMarching',    label: '2-min March',unit: 'ครั้ง',   color: '#E63946', maxRef: 120 },
 ]
 
 const COMPARE_PALETTE = ['#3b82f6','#10b981','#f97316','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f59e0b','#ef4444','#64748b','#14b8a6','#6366f1']
@@ -87,7 +87,168 @@ function getFilledSessions(outcomes: OutcomeMeasurement[]): string[] {
   return OUTCOME_SESSIONS.filter(s => set.has(s))
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Custom BRFA segmented bar ─────────────────────────────────────────────────
+// Segments top→bottom: Q21, Q20, Part2, Part1 (each represents one BRFA part, 0–100%)
+
+const BRFA_SVG_SEGS = [
+  { key: 'brfa_q21',   short: 'Q21', color: '#9FE1CB' },
+  { key: 'brfa_q20',   short: 'Q20', color: '#5DCAA5' },
+  { key: 'brfa_part2', short: 'P2',  color: '#1D9E75' },
+  { key: 'brfa_part1', short: 'P1',  color: '#085041' },
+] as const
+
+function BrfaSegmentBar({ o }: { o: OutcomeMeasurement | undefined }) {
+  const W = 72, H = 280
+  const BAR_L = 8, BAR_W = 56
+  const TOP_PAD = 10, BOT_PAD = 22
+  const CHART_H = H - TOP_PAD - BOT_PAD   // 248
+  const N = BRFA_SVG_SEGS.length           // 4
+  const SEG_H = CHART_H / N               // 62
+  const LABEL_H = 11
+  const FILL_H = SEG_H - LABEL_H          // 51
+
+  return (
+    <svg width={W} height={H} style={{ flexShrink: 0 }}>
+      {BRFA_SVG_SEGS.map((p, i) => {
+        const val = o?.items[p.key]?.value
+        const hasVal = val !== undefined
+        const v = val ?? 0
+        const segTop = TOP_PAD + i * SEG_H
+        const fillAreaBot = segTop + FILL_H
+        const fillH = (v / 100) * FILL_H
+        const fillTop = fillAreaBot - fillH
+        const dashY = fillTop
+
+        return (
+          <g key={p.key}>
+            {/* Background (100% reference) */}
+            <rect x={BAR_L} y={segTop} width={BAR_W} height={FILL_H}
+              fill={p.color} fillOpacity={0.18} />
+
+            {/* Fill from bottom = actual score */}
+            {hasVal && fillH > 0.5 && (
+              <rect x={BAR_L} y={fillTop} width={BAR_W} height={fillH}
+                fill={p.color} fillOpacity={0.82} />
+            )}
+
+            {/* Dashed line at score level */}
+            {hasVal && (
+              <line x1={BAR_L} y1={dashY} x2={BAR_L + BAR_W} y2={dashY}
+                stroke={p.color} strokeWidth={1.5} strokeDasharray="3,2" />
+            )}
+
+            {/* Score text above dashed line */}
+            {hasVal && (
+              <text x={BAR_L + BAR_W / 2} y={Math.max(segTop + 1, dashY - 2)}
+                textAnchor="middle" fontSize="8" fill={p.color} fontWeight="700">
+                {v.toFixed(0)}%
+              </text>
+            )}
+
+            {/* Segment separator */}
+            {i < N - 1 && (
+              <line x1={BAR_L} y1={segTop + SEG_H} x2={BAR_L + BAR_W} y2={segTop + SEG_H}
+                stroke="white" strokeWidth={1.5} />
+            )}
+
+            {/* Part label at bottom of segment */}
+            <text x={BAR_L + BAR_W / 2} y={segTop + SEG_H - 2}
+              textAnchor="middle" fontSize="7.5" fill="#64748b">
+              {p.short}
+            </text>
+          </g>
+        )
+      })}
+
+      {/* X-axis label */}
+      <text x={W / 2} y={H - 6} textAnchor="middle" fontSize="10" fill="#475569">
+        BRFA
+      </text>
+    </svg>
+  )
+}
+
+// ── Custom AMPAC segmented bar ────────────────────────────────────────────────
+// Segments top→bottom: P3, P2, P1 (each represents one AMPAC part, 0–24)
+
+const AMPAC_SVG_SEGS = [
+  { key: 'ampac_part3', short: 'P3', color: '#AFA9EC' },
+  { key: 'ampac_part2', short: 'P2', color: '#7F77DD' },
+  { key: 'ampac_part1', short: 'P1', color: '#3C3489' },
+] as const
+
+function AmpacSegmentBar({ o }: { o: OutcomeMeasurement | undefined }) {
+  const W = 72, H = 280
+  const BAR_L = 8, BAR_W = 56
+  const TOP_PAD = 10, BOT_PAD = 22
+  const CHART_H = H - TOP_PAD - BOT_PAD   // 248
+  const N = AMPAC_SVG_SEGS.length          // 3
+  const SEG_H = CHART_H / N               // ~82.67
+  const LABEL_H = 11
+  const FILL_H = SEG_H - LABEL_H          // ~71.67
+
+  return (
+    <svg width={W} height={H} style={{ flexShrink: 0 }}>
+      {AMPAC_SVG_SEGS.map((p, i) => {
+        const val = o?.items[p.key]?.value
+        const hasVal = val !== undefined
+        const v = val ?? 0
+        const segTop = TOP_PAD + i * SEG_H
+        const fillAreaBot = segTop + FILL_H
+        const fillH = (v / 24) * FILL_H
+        const fillTop = fillAreaBot - fillH
+        const dashY = fillTop
+
+        return (
+          <g key={p.key}>
+            {/* Background (24/24 reference) */}
+            <rect x={BAR_L} y={segTop} width={BAR_W} height={FILL_H}
+              fill={p.color} fillOpacity={0.18} />
+
+            {/* Fill from bottom = actual score/24 */}
+            {hasVal && fillH > 0.5 && (
+              <rect x={BAR_L} y={fillTop} width={BAR_W} height={fillH}
+                fill={p.color} fillOpacity={0.82} />
+            )}
+
+            {/* Dashed line at score level */}
+            {hasVal && (
+              <line x1={BAR_L} y1={dashY} x2={BAR_L + BAR_W} y2={dashY}
+                stroke={p.color} strokeWidth={1.5} strokeDasharray="3,2" />
+            )}
+
+            {/* Score text above dashed line */}
+            {hasVal && (
+              <text x={BAR_L + BAR_W / 2} y={Math.max(segTop + 1, dashY - 2)}
+                textAnchor="middle" fontSize="8" fill={p.color} fontWeight="700">
+                {v.toFixed(0)}/24
+              </text>
+            )}
+
+            {/* Segment separator */}
+            {i < N - 1 && (
+              <line x1={BAR_L} y1={segTop + SEG_H} x2={BAR_L + BAR_W} y2={segTop + SEG_H}
+                stroke="white" strokeWidth={1.5} />
+            )}
+
+            {/* Part label at bottom of segment */}
+            <text x={BAR_L + BAR_W / 2} y={segTop + SEG_H - 2}
+              textAnchor="middle" fontSize="7.5" fill="#64748b">
+              {p.short}
+            </text>
+          </g>
+        )
+      })}
+
+      {/* X-axis label */}
+      <text x={W / 2} y={H - 6} textAnchor="middle" fontSize="10" fill="#475569">
+        AMPAC
+      </text>
+    </svg>
+  )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export default function OutcomeSummaryDashboard({
   outcomes,
@@ -108,16 +269,21 @@ export default function OutcomeSummaryDashboard({
 
   if (filledSessions.length === 0) return null
 
-  // Which groups have any data at all
+  // Cross-session presence flags (used by compare mode and legend)
   const hasBrfa  = outcomes.some(o => BRFA_PARTS.some(p => o.items[p.key]?.value !== undefined))
   const hasAmpac = outcomes.some(o => AMPAC_PARTS.some(p => o.items[p.key]?.value !== undefined))
   const presentOthers = OTHER_DEFS.filter(d => outcomes.some(o => o.items[d.key]?.value !== undefined))
 
-  // ── Chart data ─────────────────────────────────────────────────────────────
+  // Selected session outcome (for custom SVG bars)
+  const selectedO = bySession[selectedSession]
+  const showBrfaSvg  = !compareMode && BRFA_PARTS.some(p  => selectedO?.items[p.key]?.value !== undefined)
+  const showAmpacSvg = !compareMode && AMPAC_PARTS.some(p => selectedO?.items[p.key]?.value !== undefined)
+
+  // ── Chart data ──────────────────────────────────────────────────────────────
 
   const { chartLabels, chartDatasets, topLabels } = useMemo(() => {
     if (compareMode) {
-      // X = metric names, datasets = sessions
+      // X = metric names, datasets = sessions (BRFA/AMPAC shown as avg %)
       const colLabels: string[] = []
       if (hasBrfa)  colLabels.push('BRFA')
       if (hasAmpac) colLabels.push('AMPAC')
@@ -153,55 +319,18 @@ export default function OutcomeSummaryDashboard({
       return { chartLabels: colLabels, chartDatasets: datasets, topLabels: colLabels.map(() => '') }
     }
 
-    // Single session mode — build cols from THIS session only (not across all sessions)
+    // Single-session mode — BRFA/AMPAC rendered as custom SVG; only "others" in Chart.js
     const o = bySession[selectedSession]
-
     type Col = { id: string; label: string }
     const cols: Col[] = []
-    if (BRFA_PARTS.some(p  => o?.items[p.key]?.value !== undefined)) cols.push({ id: 'brfa',  label: 'BRFA'  })
-    if (AMPAC_PARTS.some(p => o?.items[p.key]?.value !== undefined)) cols.push({ id: 'ampac', label: 'AMPAC' })
     OTHER_DEFS.forEach(d => {
       if (o?.items[d.key]?.value !== undefined) cols.push({ id: d.key, label: d.label })
     })
     const n = cols.length
 
-    // Top labels — only "others" get a top label; BRFA and AMPAC are silent
-    const tl: string[] = cols.map(col => {
-      if (!o || col.id === 'brfa' || col.id === 'ampac') return ''
-      return `${o.items[col.id]?.value ?? ''}`
-    })
+    const tl: string[] = cols.map(col => (o ? `${o.items[col.id]?.value ?? ''}` : ''))
 
-    // Datasets
     const datasets: ChartData<'bar'>['datasets'] = []
-
-    {
-      const ci = cols.findIndex(c => c.id === 'brfa')
-      if (ci >= 0) {
-        BRFA_PARTS.forEach(p => {
-          const raw = o?.items[p.key]?.value
-          if (raw === undefined) return
-          const data: (number | null)[] = Array(n).fill(null)
-          data[ci] = raw  // already %
-          datasets.push({ label: p.label, data, backgroundColor: p.color, stack: 'brfa', barPercentage: 0.95, categoryPercentage: 0.85 })
-        })
-      }
-    }
-
-    {
-      const ci = cols.findIndex(c => c.id === 'ampac')
-      if (ci >= 0) {
-        AMPAC_PARTS.forEach(p => {
-          const raw = o?.items[p.key]?.value
-          if (raw === undefined) return
-          const data: (number | null)[] = Array(n).fill(null)
-          data[ci] = normPct(raw, 24)
-          const ds = { label: p.label, data, backgroundColor: p.color, stack: 'ampac', barPercentage: 0.95, categoryPercentage: 0.85 }
-          ;(ds as Record<string, unknown>)._rawVal = raw
-          datasets.push(ds)
-        })
-      }
-    }
-
     OTHER_DEFS.forEach(d => {
       const ci = cols.findIndex(c => c.id === d.key)
       if (ci < 0) return
@@ -225,10 +354,6 @@ export default function OutcomeSummaryDashboard({
       tooltip: {
         callbacks: {
           label: ctx => {
-            const rawVal = (ctx.dataset as unknown as Record<string, unknown>)._rawVal
-            if (typeof rawVal === 'number') {
-              return ` ${ctx.dataset.label}: ${rawVal}/24`
-            }
             const val = typeof ctx.raw === 'number' ? ctx.raw.toFixed(1) : '–'
             return ` ${ctx.dataset.label}: ${val}%`
           },
@@ -252,18 +377,16 @@ export default function OutcomeSummaryDashboard({
     },
   }), [compareMode, topLabels])
 
-  // ── Legend items ───────────────────────────────────────────────────────────
+  // ── Legend ──────────────────────────────────────────────────────────────────
 
   const latestO = bySession[filledSessions[filledSessions.length - 1]]
 
   interface LegendItem { key: string; label: string; color: string }
   const legendItems: LegendItem[] = compareMode
     ? filledSessions.map((s, i) => ({ key: s, label: SESSION_SHORT[s] ?? s, color: COMPARE_PALETTE[i % COMPARE_PALETTE.length] }))
-    : [
-        ...(hasBrfa  ? BRFA_PARTS.filter(p => latestO?.items[p.key]?.value !== undefined) : []),
-        ...(hasAmpac ? AMPAC_PARTS.filter(p => latestO?.items[p.key]?.value !== undefined) : []),
-        ...presentOthers.filter(d => latestO?.items[d.key]?.value !== undefined),
-      ]
+    : presentOthers.filter(d => latestO?.items[d.key]?.value !== undefined)
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="mt-5 space-y-4">
@@ -294,25 +417,44 @@ export default function OutcomeSummaryDashboard({
 
       {/* Chart card */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-        {/* Custom HTML legend */}
-        <div className="flex flex-wrap gap-x-3 gap-y-1.5 mb-3 pb-3 border-b border-slate-100">
-          {legendItems.map(item => (
-            <div key={item.key} className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: item.color }} />
-              <span className="text-[11px] text-slate-500">{item.label}</span>
-            </div>
-          ))}
-        </div>
+        {/* Legend — others only in single-session; sessions in compare */}
+        {legendItems.length > 0 && (
+          <div className="flex flex-wrap gap-x-3 gap-y-1.5 mb-3 pb-3 border-b border-slate-100">
+            {legendItems.map(item => (
+              <div key={item.key} className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: item.color }} />
+                <span className="text-[11px] text-slate-500">{item.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
-        <div style={{ height: 280 }}>
-          <Bar
-            key={compareMode ? 'compare' : selectedSession}
-            data={{ labels: chartLabels, datasets: chartDatasets }}
-            options={options}
-          />
-        </div>
+        {compareMode ? (
+          // Compare mode: full-width Chart.js
+          <div style={{ height: 280 }}>
+            <Bar
+              key="compare"
+              data={{ labels: chartLabels, datasets: chartDatasets }}
+              options={options}
+            />
+          </div>
+        ) : (
+          // Single-session: custom SVG bars + Chart.js for others, same height row
+          <div className="flex items-stretch gap-1" style={{ height: 280 }}>
+            {showBrfaSvg  && <BrfaSegmentBar  o={selectedO} />}
+            {showAmpacSvg && <AmpacSegmentBar o={selectedO} />}
+            {chartDatasets.length > 0 && (
+              <div className="flex-1 min-w-0">
+                <Bar
+                  key={selectedSession}
+                  data={{ labels: chartLabels, datasets: chartDatasets }}
+                  options={options}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
-
     </div>
   )
 }
