@@ -191,9 +191,6 @@ export default function OutcomePage() {
               <div className="flex items-center px-5 py-3.5 gap-3">
                 <label className="flex-1 font-medium text-slate-700 text-sm">
                   {group.label}
-                  {item.lowerIsBetter && (
-                    <span className="ml-2 text-xs font-normal text-indigo-400">↓ better</span>
-                  )}
                 </label>
                 <div className="flex items-center gap-2 shrink-0">
                   <input
