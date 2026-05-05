@@ -89,7 +89,7 @@ function OutcomeTable({ outcomes, level }: { outcomes: OutcomeMeasurement[]; lev
                   if (!entry) return <td key={s} className="px-3 py-2 text-center text-slate-300 text-sm">–</td>
                   const isInitial = s === 'Initial'
                   const initVal = initial?.items[itemKey]?.value
-                  const trend = !isInitial && initVal !== undefined && itemKey !== 'dyspneaScale'
+                  const trend = !isInitial && initVal !== undefined && itemKey !== 'dyspneaScale' && itemKey !== 'twoMeterWalk'
                     ? trendSymbol(entry.value - initVal, lowerIsBetter)
                     : null
                   return (

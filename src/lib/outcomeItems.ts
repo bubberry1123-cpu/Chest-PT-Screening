@@ -99,6 +99,7 @@ export const OUTCOME_GROUPS: Record<OverallLevel, OutcomeGroupDef[]> = {
     single('peakCoughFlow',    'Peak Cough Flow',   'L/min'),
     single('wrightSpirometer', 'Wright Spirometer', 'mL'),
     single('cs30', '30-Second Chair Stand Test (CS-30)', 'stands', { showNotes: true }),
+    single('twoMeterWalk', '2-Meter Walk Test (2mWT)', 'seconds', { showNotes: true, lowerIsBetter: true }),
     GRIP_GROUP,
   ],
   3: [
