@@ -93,8 +93,8 @@ function OutcomeTable({ outcomes, level }: { outcomes: OutcomeMeasurement[]; lev
                     : null
                   return (
                     <td key={s} className="px-3 py-2 text-center">
-                      <div className="font-semibold text-slate-800">{entry.value}</div>
-                      {trend && <div className={`text-xs font-bold ${trend.color}`}>{trend.symbol}</div>}
+                      <span className="font-semibold text-slate-800">{entry.value}</span>
+                      {trend && <span className={`text-xs font-bold ml-1 ${trend.color}`}>{trend.symbol}</span>}
                     </td>
                   )
                 })}
