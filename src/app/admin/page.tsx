@@ -38,6 +38,7 @@ const SCHED: SchedGroup[] = [
   { groupKey: 'wrightSpirometer', label: 'Wright Spirometry',checkKeys: ['wrightSpirometer'],                      initDcOnly: false, levels: [1,2,3] },
   { groupKey: 'gripStrength',     label: 'Grip Strength',    checkKeys: ['gripStrength_left','gripStrength_right'], initDcOnly: false, levels: [1,2] },
   { groupKey: 'cs30',             label: 'CS-30',            checkKeys: ['cs30'],                                  initDcOnly: false, levels: [2] },
+  { groupKey: 'twoMeterWalk',     label: '2mWT',             checkKeys: ['twoMeterWalk'],                           initDcOnly: false, levels: [2] },
 ]
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -637,6 +638,7 @@ export default function AdminPage() {
       { label: 'Wright',   keys: ['wrightSpirometer'] },
       { label: 'Grip (R)', keys: ['gripStrength_right'] },
       { label: 'CS-30',    keys: ['cs30'] },
+      { label: '2mWT',     keys: ['twoMeterWalk'] },
     ]
     return METRICS.map(m => {
       const initVals: number[] = [], dcVals: number[] = []

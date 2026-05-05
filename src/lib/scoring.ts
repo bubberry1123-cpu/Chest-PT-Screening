@@ -36,7 +36,7 @@ const LEVEL_GOALS: Record<number, string> = {
 
 const OUTCOME_MEASUREMENTS: Record<number, string[]> = {
   1: ['AMPAC', 'BRFA', 'Dyspnea scale', 'Peak Cough Flow', 'Wright Spirometry', '6-Minute Walk Test or 2-Minute Marching Test', 'Grip Strength'],
-  2: ['AMPAC', 'BRFA', 'Dyspnea scale', 'Peak Cough Flow', 'Wright Spirometry', '30-Second Chair Stand Test (CS-30)', 'Grip Strength'],
+  2: ['AMPAC', 'BRFA', 'Dyspnea scale', 'Peak Cough Flow', 'Wright Spirometry', '30-Second Chair Stand Test (CS-30)', '2-Meter Walk Test (2mWT)', 'Grip Strength'],
   3: ['AMPAC', 'BRFA', 'Dyspnea scale', 'Peak Cough Flow', 'Wright Spirometry'],
   4: ['AMPAC', 'BRFA', 'Dyspnea scale'],
 }
