@@ -11,6 +11,7 @@ import { useToast } from '@/lib/useToast'
 import Toast from '@/components/Toast'
 import SeverityBadge from '@/components/SeverityBadge'
 import OutcomeCharts from '@/components/OutcomeCharts'
+import OutcomeSummaryDashboard from '@/components/OutcomeSummaryDashboard'
 
 function trendSymbol(diff: number, lowerIsBetter?: boolean) {
   if (diff === 0) return { symbol: '→', color: 'text-slate-400' }
@@ -365,6 +366,7 @@ export default function PatientPage() {
           </div>
           <OutcomeTable outcomes={outcomes} level={latestLevel} />
           <OutcomeCharts outcomes={outcomes} level={latestLevel} isAdmin={isAdmin} />
+          <OutcomeSummaryDashboard outcomes={outcomes} level={latestLevel} />
         </div>
       )}
 
