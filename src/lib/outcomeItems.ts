@@ -69,10 +69,10 @@ const GRIP_GROUP: OutcomeGroupDef = {
 
 const WALK_TEST_GROUP: OutcomeGroupDef = {
   groupKey: 'walkTest',
-  label: '6-Minute Walk Test or 2-Minute Marching Test',
+  label: '6-Minute Walk Test or 2-Minute Stepping Test (6MWT or 2MST)',
   items: [
-    { key: 'sixMWT',        label: '6-Minute Walk Test',      unit: 'meters' },
-    { key: 'twoMinMarching', label: '2-Minute Marching Test', unit: 'steps' },
+    { key: 'sixMWT',         label: '6-Minute Walk Test',      unit: 'meters' },
+    { key: 'twoMinMarching', label: '2-Minute Stepping Test',  unit: 'steps' },
   ],
 }
 
@@ -89,8 +89,9 @@ export const OUTCOME_GROUPS: Record<OverallLevel, OutcomeGroupDef[]> = {
     DYSPNEA,
     single('peakCoughFlow',    'Peak Cough Flow',   'L/min'),
     single('wrightSpirometer', 'Wright Spirometer', 'mL'),
-    WALK_TEST_GROUP,
+    single('cs30', '30-Second Chair Stand Test (CS-30)', 'stands', { showNotes: true }),
     GRIP_GROUP,
+    WALK_TEST_GROUP,
   ],
   2: [
     AMPAC_GROUP,
@@ -99,8 +100,8 @@ export const OUTCOME_GROUPS: Record<OverallLevel, OutcomeGroupDef[]> = {
     single('peakCoughFlow',    'Peak Cough Flow',   'L/min'),
     single('wrightSpirometer', 'Wright Spirometer', 'mL'),
     single('cs30', '30-Second Chair Stand Test (CS-30)', 'stands', { showNotes: true }),
-    single('twoMeterWalk', '2-Minute Walk Test (2MWT)', 'seconds', { showNotes: true, lowerIsBetter: true }),
     GRIP_GROUP,
+    single('twoMeterWalk', '2-Minute Walk Test (2MWT)', 'seconds', { showNotes: true, lowerIsBetter: true }),
   ],
   3: [
     AMPAC_GROUP,

@@ -72,7 +72,7 @@ const OTHER_DEFS: OtherDef[] = [
   { key: 'cs30',              label: 'CS-30',      unit: 'ครั้ง',   color: '#639922', maxRef: 30  },
   { key: 'twoMeterWalk',      label: '2MWT',       unit: 'seconds', color: '#0891B2', maxRef: 60, inverted: true },
   { key: 'sixMWT',            label: '6MWT',       unit: 'm',       color: '#C77DFF', maxRef: 500 },
-  { key: 'twoMinMarching',    label: '2-min March',unit: 'ครั้ง',   color: '#E63946', maxRef: 120 },
+  { key: 'twoMinMarching',    label: '2MST',        unit: 'steps',   color: '#E63946', maxRef: 120 },
 ]
 
 const COMPARE_PALETTE = ['#3b82f6','#10b981','#f97316','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f59e0b','#ef4444','#64748b','#14b8a6','#6366f1']

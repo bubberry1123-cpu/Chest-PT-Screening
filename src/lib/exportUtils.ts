@@ -148,7 +148,7 @@ export async function exportOutcomeData(
       'CS-30 (stands)': v('cs30'),
       '2-Minute Walk Test (sec)': v('twoMeterWalk'),
       '6-Minute Walk Test (m)': v('sixMWT'),
-      '2-min Marching (steps)': v('twoMinMarching'),
+      '2-min Stepping (steps)': v('twoMinMarching'),
     }
   })
 

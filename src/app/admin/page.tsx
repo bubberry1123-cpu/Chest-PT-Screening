@@ -37,7 +37,8 @@ const SCHED: SchedGroup[] = [
   { groupKey: 'peakCoughFlow',    label: 'Peak Cough Flow',  checkKeys: ['peakCoughFlow'],                         initDcOnly: false, levels: [1,2,3] },
   { groupKey: 'wrightSpirometer', label: 'Wright Spirometry',checkKeys: ['wrightSpirometer'],                      initDcOnly: false, levels: [1,2,3] },
   { groupKey: 'gripStrength',     label: 'Grip Strength',    checkKeys: ['gripStrength_left','gripStrength_right'], initDcOnly: false, levels: [1,2] },
-  { groupKey: 'cs30',             label: 'CS-30',            checkKeys: ['cs30'],                                  initDcOnly: false, levels: [2] },
+  { groupKey: 'cs30',             label: 'CS-30',            checkKeys: ['cs30'],                                  initDcOnly: false, levels: [1,2] },
+  { groupKey: 'walkTest',         label: '6MWT or 2MST',     checkKeys: ['sixMWT','twoMinMarching'],                initDcOnly: false, levels: [1] },
   { groupKey: 'twoMeterWalk',     label: '2MWT',             checkKeys: ['twoMeterWalk'],                           initDcOnly: false, levels: [2] },
 ]
 
@@ -638,6 +639,8 @@ export default function AdminPage() {
       { label: 'Wright',   keys: ['wrightSpirometer'] },
       { label: 'Grip (R)', keys: ['gripStrength_right'] },
       { label: 'CS-30',    keys: ['cs30'] },
+      { label: '6MWT',     keys: ['sixMWT'] },
+      { label: '2MST',     keys: ['twoMinMarching'] },
       { label: '2MWT',     keys: ['twoMeterWalk'] },
     ]
     return METRICS.map(m => {
