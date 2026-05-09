@@ -328,8 +328,6 @@ export default function OutcomeSummaryDashboard({
   const { chartLabels, chartDatasets, topLabels } = useMemo(() => {
     if (!isSingle) {
       const colLabels: string[] = []
-      if (hasBrfa)  colLabels.push('BRFA')
-      if (hasAmpac) colLabels.push('AMPAC')
       presentOthers.forEach(d => colLabels.push(d.label))
 
       const datasets: ChartData<'bar'>['datasets'] = selectedSessions.map(sess => {
@@ -338,19 +336,6 @@ export default function OutcomeSummaryDashboard({
         const data: (number | null)[] = []
         const rawVals: (number | null)[] = []
         const units: string[] = []
-        if (hasBrfa) {
-          const vals = BRFA_PARTS.map(p => o?.items[p.key]?.value).filter((v): v is number => v !== undefined)
-          data.push(vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null)
-          rawVals.push(null); units.push('%')
-        }
-        if (hasAmpac) {
-          const vals = AMPAC_PARTS.map(p => {
-            const r = o?.items[p.key]?.value
-            return r !== undefined ? normPct(r, 24) : undefined
-          }).filter((v): v is number => v !== undefined)
-          data.push(vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null)
-          rawVals.push(null); units.push('%')
-        }
         presentOthers.forEach(d => {
           const r = o?.items[d.key]?.value
           data.push(r !== undefined ? normPct(r, d.maxRef, d.inverted) : null)
