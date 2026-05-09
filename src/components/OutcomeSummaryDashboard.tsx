@@ -70,8 +70,8 @@ const OTHER_DEFS: OtherDef[] = [
   { key: 'gripStrength_left', label: 'Grip L',     unit: 'kg',      color: '#BA7517', maxRef: 60  },
   { key: 'gripStrength_right',label: 'Grip R',     unit: 'kg',      color: '#EF9F27', maxRef: 60  },
   { key: 'cs30',              label: 'CS-30',      unit: 'ครั้ง',   color: '#639922', maxRef: 30  },
-  { key: 'twoMeterWalk',      label: '2MWT',       unit: 'meters',  color: '#0891B2', maxRef: 200 },
-  { key: 'sixMWT',            label: '6MWT',       unit: 'm',       color: '#C77DFF', maxRef: 500 },
+  { key: 'twoMeterWalk',      label: '2MWT',       unit: 'meters',  color: '#0891B2', maxRef: 500 },
+  { key: 'sixMWT',            label: '6MWT',       unit: 'm',       color: '#C77DFF', maxRef: 600 },
   { key: 'twoMinMarching',    label: '2MST',        unit: 'steps',   color: '#E63946', maxRef: 120 },
 ]
 
@@ -358,7 +358,14 @@ export default function OutcomeSummaryDashboard({
     })
     const n = cols.length
 
-    const tl: string[] = cols.map(col => (o ? `${o.items[col.id]?.value ?? ''}` : ''))
+    const tl: string[] = cols.map(col => {
+      if (!o) return ''
+      const val = o.items[col.id]?.value
+      if (val === undefined) return ''
+      const def = OTHER_DEFS.find(d => d.key === col.id)
+      const unit = def?.unit ?? ''
+      return unit.startsWith('/') ? `${val}${unit}` : `${val} ${unit}`
+    })
 
     const datasets: ChartData<'bar'>['datasets'] = []
     OTHER_DEFS.forEach(d => {
@@ -419,7 +426,7 @@ export default function OutcomeSummaryDashboard({
         stacked: !compareMode,
         display: false,
         beginAtZero: true,
-        max: compareMode ? 100 : undefined,
+        max: 100,
       },
     },
   }), [compareMode, topLabels])
