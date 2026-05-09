@@ -1,48 +1,32 @@
 'use client'
 import { useMemo, useState } from 'react'
-import {
-  Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip,
-  type ChartData, type ChartOptions, type Plugin,
-} from 'chart.js'
-import { Bar } from 'react-chartjs-2'
-import type { OutcomeMeasurement, OverallLevel } from '@/types'
+import type { OutcomeMeasurement, OverallLevel, OutcomeSession } from '@/types'
 import { OUTCOME_SESSIONS, SESSION_SHORT } from '@/lib/outcomeItems'
 
-// ── Custom top-of-bar label plugin ────────────────────────────────────────────
-const barTopLabelPlugin: Plugin<'bar'> = {
-  id: 'barTopLabel',
-  afterDraw(chart) {
-    const pluginOpts = (chart.options.plugins as Record<string, { topLabels?: string[] } | undefined>)?.barTopLabel
-    const topLabels = pluginOpts?.topLabels
-    if (!topLabels?.length) return
-    const { ctx } = chart
-    const nCols = chart.data.labels?.length ?? 0
-    for (let ci = 0; ci < nCols; ci++) {
-      const text = topLabels[ci]
-      if (!text) continue
-      let minY = Infinity
-      let barX: number | null = null
-      for (let di = 0; di < chart.data.datasets.length; di++) {
-        const meta = chart.getDatasetMeta(di)
-        if (!meta.visible) continue
-        const el = meta.data[ci]
-        if (!el) continue
-        const props = el.getProps(['x', 'y'], true) as { x: number; y: number }
-        if (props.y < minY) { minY = props.y; barX = props.x }
-      }
-      if (barX === null || minY === Infinity) continue
-      ctx.save()
-      ctx.font = 'bold 10px system-ui, sans-serif'
-      ctx.fillStyle = '#1e293b'
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'bottom'
-      ctx.fillText(text, barX, minY - 3)
-      ctx.restore()
-    }
-  },
+// ── Session gradient palette: Initial (idx 0) = lightest, Discharge (idx 11) = darkest
+const SHADE_FILLS = [
+  '#EFF6FF', '#DBEAFE', '#BFDBFE', '#93C5FD',
+  '#60A5FA', '#3B82F6', '#2563EB', '#1D4ED8',
+  '#1E40AF', '#1E3A8A', '#172554', '#0F172A',
+]
+const SHADE_STROKES = [
+  '#BFDBFE', '#93C5FD', '#60A5FA', '#3B82F6',
+  '#2563EB', '#1D4ED8', '#1E40AF', '#1E3A8A',
+  '#172554', '#0F172A', '#060A13', '#2D3748',
+]
+
+function getShade(session: string): { fill: string; stroke: string } {
+  const i = OUTCOME_SESSIONS.indexOf(session as OutcomeSession)
+  return {
+    fill:   SHADE_FILLS[i  >= 0 ? i : 0] ?? '#93C5FD',
+    stroke: SHADE_STROKES[i >= 0 ? i : 0] ?? '#3B82F6',
+  }
 }
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, barTopLabelPlugin)
+function fmtVal(val: number, unit: string): string {
+  const n = val % 1 === 0 ? String(val) : val.toFixed(1)
+  return unit.startsWith('/') ? `${n}${unit}` : `${n} ${unit}`
+}
 
 // ── Metric definitions ────────────────────────────────────────────────────────
 
@@ -61,29 +45,24 @@ const AMPAC_PARTS = [
 
 interface OtherDef {
   key: string; label: string; unit: string
-  color: string; maxRef: number; inverted?: boolean
+  color: string; maxRef: number
 }
 const OTHER_DEFS: OtherDef[] = [
-  { key: 'dyspneaScale',      label: 'mMRC',       unit: '/4',      color: '#E85D04', maxRef: 4,   inverted: true },
-  { key: 'peakCoughFlow',     label: 'Cough Flow', unit: 'L/min',   color: '#378ADD', maxRef: 600 },
-  { key: 'wrightSpirometer',  label: 'Wright',     unit: 'mL',      color: '#0F6E56', maxRef: 600 },
-  { key: 'gripStrength_left', label: 'Grip L',     unit: 'kg',      color: '#BA7517', maxRef: 60  },
-  { key: 'gripStrength_right',label: 'Grip R',     unit: 'kg',      color: '#EF9F27', maxRef: 60  },
-  { key: 'cs30',              label: 'CS-30',      unit: 'ครั้ง',   color: '#639922', maxRef: 30  },
-  { key: 'twoMeterWalk',      label: '2MWT',       unit: 'meters',  color: '#0891B2', maxRef: 500 },
-  { key: 'sixMWT',            label: '6MWT',       unit: 'm',       color: '#C77DFF', maxRef: 600 },
-  { key: 'twoMinMarching',    label: '2MST',       unit: 'steps',   color: '#E63946', maxRef: 120 },
+  { key: 'dyspneaScale',       label: 'mMRC',       unit: '/4',     color: '#E85D04', maxRef: 4   },
+  { key: 'peakCoughFlow',      label: 'Cough Flow', unit: 'L/min',  color: '#378ADD', maxRef: 600 },
+  { key: 'wrightSpirometer',   label: 'Wright',     unit: 'mL',     color: '#0F6E56', maxRef: 600 },
+  { key: 'gripStrength_left',  label: 'Grip L',     unit: 'kg',     color: '#BA7517', maxRef: 60  },
+  { key: 'gripStrength_right', label: 'Grip R',     unit: 'kg',     color: '#EF9F27', maxRef: 60  },
+  { key: 'cs30',               label: 'CS-30',      unit: 'ครั้ง',  color: '#639922', maxRef: 30  },
+  { key: 'twoMeterWalk',       label: '2MWT',       unit: 'meters', color: '#0891B2', maxRef: 500 },
+  { key: 'sixMWT',             label: '6MWT',       unit: 'm',      color: '#C77DFF', maxRef: 600 },
+  { key: 'twoMinMarching',     label: '2MST',       unit: 'steps',  color: '#E63946', maxRef: 120 },
 ]
 
 const SESSION_PALETTE = [
   '#3b82f6','#10b981','#f97316','#8b5cf6','#ec4899',
   '#06b6d4','#84cc16','#f59e0b','#ef4444','#64748b','#14b8a6','#6366f1',
 ]
-
-function normPct(raw: number, maxRef: number, inverted?: boolean): number {
-  const p = inverted ? ((maxRef - raw) / maxRef) * 100 : (raw / maxRef) * 100
-  return Math.min(100, Math.max(0, p))
-}
 
 function getFilledSessions(outcomes: OutcomeMeasurement[]): string[] {
   const set = new Set(outcomes.map(o => o.session))
@@ -286,6 +265,85 @@ function AmpacSegmentBar({ sessions }: { sessions: SessionDatum[] }) {
   )
 }
 
+// ── Custom SVG bar chart ──────────────────────────────────────────────────────
+
+const MAX_H = 200
+const MIN_H = 8
+const VAL_PAD = 84  // keeps total height = 320 to align with BRFA/AMPAC
+const LBL_PAD = 36
+const SIDE_PAD = 8
+const GAP_WITHIN = 2
+const GAP_BETWEEN = 14
+
+function CustomBarChart({ defs, sessions }: { defs: OtherDef[]; sessions: SessionDatum[] }) {
+  const N = sessions.length
+  const BAR_W = Math.min(40, Math.max(14, Math.floor(64 / N)))
+  const groupW = N * BAR_W + Math.max(0, N - 1) * GAP_WITHIN
+  const svgW = SIDE_PAD * 2 + defs.length * groupW + Math.max(0, defs.length - 1) * GAP_BETWEEN
+  const svgH = VAL_PAD + MAX_H + LBL_PAD
+
+  return (
+    <div style={{ overflowX: 'auto', flex: 1, minWidth: 0 }}>
+      <svg width={Math.max(svgW, 100)} height={svgH} style={{ display: 'block' }}>
+        {defs.map((def, gi) => {
+          const groupX = SIDE_PAD + gi * (groupW + GAP_BETWEEN)
+          const groupCenterX = groupX + groupW / 2
+
+          return (
+            <g key={def.key}>
+              {sessions.map((sd) => {
+                const val = sd.o?.items[def.key]?.value
+                if (val === undefined) return null
+
+                const si = sessions.indexOf(sd)
+                const barH = Math.max(MIN_H, (val / def.maxRef) * MAX_H)
+                const barX = groupX + si * (BAR_W + GAP_WITHIN)
+                const barY = VAL_PAD + MAX_H - barH
+                const { fill, stroke } = getShade(sd.session)
+
+                return (
+                  <g key={sd.session}>
+                    <rect
+                      x={barX} y={barY}
+                      width={BAR_W} height={barH}
+                      fill={fill} stroke={stroke} strokeWidth={1}
+                      rx={2}
+                    />
+                    <text
+                      transform={`translate(${barX + BAR_W / 2},${barY - 4}) rotate(-90)`}
+                      textAnchor="start"
+                      fontSize="8.5"
+                      fill="#334155"
+                      fontWeight="600"
+                    >
+                      {fmtVal(val, def.unit)}
+                    </text>
+                  </g>
+                )
+              })}
+
+              <text
+                x={groupCenterX} y={VAL_PAD + MAX_H + 16}
+                textAnchor="middle" fontSize="10"
+                fill="#475569" fontWeight="600"
+              >
+                {def.label}
+              </text>
+              <text
+                x={groupCenterX} y={VAL_PAD + MAX_H + 28}
+                textAnchor="middle" fontSize="8.5"
+                fill="#94a3b8"
+              >
+                {def.unit}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function OutcomeSummaryDashboard({
@@ -310,11 +368,10 @@ export default function OutcomeSummaryDashboard({
     return m
   }, [filledSessions])
 
-  const hasBrfa  = useMemo(() => outcomes.some(o => BRFA_PARTS.some(p => o.items[p.key]?.value !== undefined)), [outcomes])
-  const hasAmpac = useMemo(() => outcomes.some(o => AMPAC_PARTS.some(p => o.items[p.key]?.value !== undefined)), [outcomes])
-  const presentOthers = useMemo(() => OTHER_DEFS.filter(d => outcomes.some(o => o.items[d.key]?.value !== undefined)), [outcomes])
-
-  const isSingle = selectedSessions.length === 1
+  const presentOthers = useMemo(
+    () => OTHER_DEFS.filter(d => outcomes.some(o => o.items[d.key]?.value !== undefined)),
+    [outcomes]
+  )
 
   const selectedSessionData: SessionDatum[] = useMemo(() =>
     selectedSessions.map(s => ({
@@ -324,69 +381,6 @@ export default function OutcomeSummaryDashboard({
       o: bySession[s],
     }))
   , [selectedSessions, sessionColorMap, bySession])
-
-  const { chartLabels, chartDatasets, topLabels } = useMemo(() => {
-    if (!isSingle) {
-      const colLabels: string[] = []
-      presentOthers.forEach(d => colLabels.push(d.label))
-
-      const datasets: ChartData<'bar'>['datasets'] = selectedSessions.map(sess => {
-        const o = bySession[sess]
-        const color = sessionColorMap[sess] ?? '#94a3b8'
-        const data: (number | null)[] = []
-        const rawVals: (number | null)[] = []
-        const units: string[] = []
-        presentOthers.forEach(d => {
-          const r = o?.items[d.key]?.value
-          data.push(r !== undefined ? normPct(r, d.maxRef, d.inverted) : null)
-          rawVals.push(r !== undefined ? r : null); units.push(d.unit)
-        })
-        return {
-          label: SESSION_SHORT[sess] ?? sess,
-          data,
-          backgroundColor: color,
-          barPercentage: 0.8,
-          categoryPercentage: 0.85,
-          _rawVals: rawVals,
-          _units: units,
-        } as unknown as ChartData<'bar'>['datasets'][number]
-      })
-
-      return { chartLabels: colLabels, chartDatasets: datasets, topLabels: [] as string[] }
-    }
-
-    // Single session
-    const sess = selectedSessions[0]
-    const o = bySession[sess]
-    type Col = { id: string; label: string }
-    const cols: Col[] = []
-    OTHER_DEFS.forEach(d => {
-      if (o?.items[d.key]?.value !== undefined) cols.push({ id: d.key, label: d.label })
-    })
-    const n = cols.length
-
-    const tl: string[] = cols.map(col => {
-      if (!o) return ''
-      const val = o.items[col.id]?.value
-      if (val === undefined) return ''
-      const def = OTHER_DEFS.find(d => d.key === col.id)
-      const unit = def?.unit ?? ''
-      return unit.startsWith('/') ? `${val}${unit}` : `${val} ${unit}`
-    })
-
-    const datasets: ChartData<'bar'>['datasets'] = []
-    OTHER_DEFS.forEach(d => {
-      const ci = cols.findIndex(c => c.id === d.key)
-      if (ci < 0) return
-      const raw = o?.items[d.key]?.value
-      if (raw === undefined) return
-      const data: (number | null)[] = Array(n).fill(null)
-      data[ci] = normPct(raw, d.maxRef, d.inverted)
-      datasets.push({ label: d.label, data, backgroundColor: d.color, stack: d.key, barPercentage: 0.95, categoryPercentage: 0.85, _rawVal: raw, _unit: d.unit } as unknown as ChartData<'bar'>['datasets'][number])
-    })
-
-    return { chartLabels: cols.map(c => c.label), chartDatasets: datasets, topLabels: tl }
-  }, [selectedSessions, isSingle, bySession, hasBrfa, hasAmpac, presentOthers, sessionColorMap])
 
   const los = useMemo(() => {
     if (selectedSessions.length < 2) return null
@@ -398,58 +392,8 @@ export default function OutcomeSummaryDashboard({
     return Math.round((Math.max(...dates) - Math.min(...dates)) / 86_400_000)
   }, [selectedSessions, bySession])
 
-  const options = useMemo((): ChartOptions<'bar'> => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: { duration: 300 },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        callbacks: {
-          label: ctx => {
-            const ds = ctx.dataset as unknown as Record<string, unknown>
-            if (!isSingle) {
-              const rawVals = ds._rawVals as (number | null)[] | undefined
-              const units = ds._units as string[] | undefined
-              const raw = rawVals?.[ctx.dataIndex]
-              const unit = units?.[ctx.dataIndex]
-              if (raw !== null && raw !== undefined && unit && unit !== '%') {
-                return ` ${ctx.dataset.label}: ${raw} ${unit}`
-              }
-              const pct = typeof ctx.raw === 'number' ? ctx.raw.toFixed(1) : '–'
-              return ` ${ctx.dataset.label}: ${pct}%`
-            }
-            const raw = ds._rawVal as number | undefined
-            const unit = ds._unit as string | undefined
-            if (raw !== undefined && unit !== undefined) {
-              return ` ${ctx.dataset.label}: ${raw} ${unit}`
-            }
-            const pct = typeof ctx.raw === 'number' ? ctx.raw.toFixed(1) : '–'
-            return ` ${ctx.dataset.label}: ${pct}%`
-          },
-        },
-      },
-      barTopLabel: { topLabels },
-    } as ChartOptions<'bar'>['plugins'],
-    scales: {
-      x: {
-        stacked: isSingle,
-        grid: { display: false },
-        border: { display: false },
-        ticks: { font: { size: 10 }, color: '#475569' },
-      },
-      y: {
-        stacked: isSingle,
-        display: false,
-        beginAtZero: true,
-        max: 100,
-      },
-    },
-  }), [isSingle, topLabels])
-
   if (filledSessions.length === 0) return null
 
-  // Derived display values (non-hooks)
   const toggleSession = (s: string) => {
     setSelectedSessions(prev => {
       if (prev.includes(s)) {
@@ -462,16 +406,12 @@ export default function OutcomeSummaryDashboard({
 
   const showBrfaSvg  = selectedSessionData.some(sd => BRFA_PARTS.some(p => sd.o?.items[p.key]?.value !== undefined))
   const showAmpacSvg = selectedSessionData.some(sd => AMPAC_PARTS.some(p => sd.o?.items[p.key]?.value !== undefined))
+  const showChart    = presentOthers.some(d => selectedSessionData.some(sd => sd.o?.items[d.key]?.value !== undefined))
 
-  const legendItems = isSingle
-    ? presentOthers
-        .filter(d => bySession[selectedSessions[0]]?.items[d.key]?.value !== undefined)
-        .map(d => ({ key: d.key, label: d.label, color: d.color }))
-    : selectedSessions.map(s => ({
-        key: s,
-        label: SESSION_SHORT[s] ?? s,
-        color: sessionColorMap[s] ?? '#94a3b8',
-      }))
+  const legendItems = selectedSessions.map(s => {
+    const { stroke } = getShade(s)
+    return { key: s, label: SESSION_SHORT[s] ?? s, color: stroke }
+  })
 
   return (
     <div className="mt-5 space-y-4">
@@ -520,7 +460,7 @@ export default function OutcomeSummaryDashboard({
 
       {/* Chart card */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-        {/* Legend */}
+        {/* Legend — session gradient colors */}
         {legendItems.length > 0 && (
           <div className="flex flex-wrap gap-x-3 gap-y-1.5 mb-3 pb-3 border-b border-slate-100">
             {legendItems.map(item => (
@@ -532,17 +472,11 @@ export default function OutcomeSummaryDashboard({
           </div>
         )}
 
-        <div className="flex items-stretch gap-1" style={{ height: 320 }}>
+        <div className="flex items-end gap-1">
           {showBrfaSvg  && <BrfaSegmentBar  sessions={selectedSessionData} />}
           {showAmpacSvg && <AmpacSegmentBar sessions={selectedSessionData} />}
-          {chartDatasets.length > 0 && (
-            <div className="flex-1 min-w-0">
-              <Bar
-                key={selectedSessions.join(',')}
-                data={{ labels: chartLabels, datasets: chartDatasets }}
-                options={options}
-              />
-            </div>
+          {showChart && (
+            <CustomBarChart defs={presentOthers} sessions={selectedSessionData} />
           )}
         </div>
       </div>
