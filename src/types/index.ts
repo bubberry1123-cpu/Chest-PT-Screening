@@ -66,4 +66,5 @@ export interface OutcomeMeasurement {
   level: OverallLevel
   items: Record<string, OutcomeEntry>
   recordedAt?: Date
+  assessmentDate?: string  // YYYY-MM-DD, user-editable, separate from recordedAt
 }

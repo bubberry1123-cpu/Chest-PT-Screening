@@ -621,6 +621,23 @@ export default function AdminPage() {
   const levelCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 }
   rows.forEach(r => { if (r.latestScreening) levelCounts[r.latestScreening.overallLevel]++ })
 
+  const avgLos = useMemo(() => {
+    const losList: number[] = []
+    rows.forEach(r => {
+      const byS: Record<string, OutcomeMeasurement> = {}
+      r.outcomes.forEach(o => { byS[o.session] = o })
+      const initDate = byS['Initial']?.assessmentDate
+      const dcDate = byS['Discharge']?.assessmentDate
+      if (initDate && dcDate) {
+        const days = Math.round((new Date(dcDate).getTime() - new Date(initDate).getTime()) / 86_400_000)
+        if (days >= 0) losList.push(days)
+      }
+    })
+    return losList.length > 0
+      ? Math.round(losList.reduce((a, b) => a + b, 0) / losList.length)
+      : null
+  }, [rows])
+
   // ── Chart data ─────────────────────────────────────────────────────────────
   const weeklyData = useMemo(() => getWeeklyData(screenings), [screenings])
 
@@ -794,6 +811,13 @@ export default function AdminPage() {
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
           <div className="text-xs text-slate-500 mb-1">Assessments this month</div>
           <div className="text-3xl font-bold text-blue-600">{monthAssessments}</div>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+          <div className="text-xs text-slate-500 mb-1">Avg LOS (Init → D/C)</div>
+          {avgLos !== null
+            ? <><span className="text-3xl font-bold text-violet-600">{avgLos}</span><span className="text-sm text-slate-400 ml-1">days</span></>
+            : <div className="text-slate-300 text-sm mt-1">No discharge data</div>
+          }
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
           <div className="text-xs text-slate-500 mb-2">Level Distribution</div>

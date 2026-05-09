@@ -19,6 +19,7 @@ export default function OutcomePage() {
   const [session, setSession] = useState<OutcomeSession>('Initial')
   const [values, setValues] = useState<Record<string, string>>({})
   const [notes, setNotes] = useState<Record<string, string>>({})
+  const [assessmentDate, setAssessmentDate] = useState<string>(() => new Date().toISOString().split('T')[0])
   const isAdmin = useIsAdmin()
   const [btnState, setBtnState] = useState<BtnState>('idle')
   const [loading, setLoading] = useState(true)
@@ -45,9 +46,11 @@ export default function OutcomePage() {
       })
       setValues(v)
       setNotes(n)
+      setAssessmentDate(existing.assessmentDate ?? new Date().toISOString().split('T')[0])
     } else {
       setValues({})
       setNotes({})
+      setAssessmentDate(new Date().toISOString().split('T')[0])
     }
     setBtnState('idle')
   }, [session, outcomes])
@@ -73,7 +76,7 @@ export default function OutcomePage() {
     }
     setBtnState('saving')
     try {
-      await saveOutcome({ patientId: id, patientHn: patient.hn, session, level, items: filledItems })
+      await saveOutcome({ patientId: id, patientHn: patient.hn, session, level, items: filledItems, assessmentDate })
       const updated = await getOutcomesByPatient(id)
       setOutcomes(updated)
       setBtnState('saved')
@@ -132,6 +135,18 @@ export default function OutcomePage() {
             )
           })}
         </select>
+        {/* Assessment Date */}
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100">
+          <label className="text-xs font-semibold text-slate-500 shrink-0">Assessment Date</label>
+          <input
+            type="date"
+            value={assessmentDate}
+            max={new Date().toISOString().split('T')[0]}
+            onChange={e => setAssessmentDate(e.target.value)}
+            className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 bg-white text-slate-700"
+          />
+        </div>
+
         {hasDataForSession && (
           <div className="flex items-center justify-between mt-2">
             <p className="text-xs text-emerald-600">✓ Has existing data — editing will overwrite</p>

@@ -60,8 +60,13 @@ function OutcomeTable({ outcomes, level }: { outcomes: OutcomeMeasurement[]; lev
               Outcome
             </th>
             {filledSessions.map(s => (
-              <th key={s} className="px-3 py-2.5 font-semibold text-center min-w-[72px] text-slate-700">
-                {SESSION_SHORT[s]}
+              <th key={s} className="px-3 py-2.5 font-semibold text-center min-w-[80px] text-slate-700">
+                <div>{SESSION_SHORT[s]}</div>
+                {bySession[s]?.assessmentDate && (
+                  <div className="text-[10px] font-normal text-slate-400 mt-0.5">
+                    {new Date(bySession[s].assessmentDate!).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
+                  </div>
+                )}
               </th>
             ))}
           </tr>

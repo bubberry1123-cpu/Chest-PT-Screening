@@ -403,6 +403,16 @@ export default function OutcomeSummaryDashboard({
     return { chartLabels: cols.map(c => c.label), chartDatasets: datasets, topLabels: tl }
   }, [selectedSessions, isSingle, bySession, hasBrfa, hasAmpac, presentOthers, sessionColorMap])
 
+  const los = useMemo(() => {
+    if (selectedSessions.length < 2) return null
+    const dates = selectedSessions
+      .map(s => bySession[s]?.assessmentDate)
+      .filter((d): d is string => !!d)
+      .map(d => new Date(d).getTime())
+    if (dates.length < 2) return null
+    return Math.round((Math.max(...dates) - Math.min(...dates)) / 86_400_000)
+  }, [selectedSessions, bySession])
+
   const options = useMemo((): ChartOptions<'bar'> => ({
     responsive: true,
     maintainAspectRatio: false,
@@ -510,6 +520,18 @@ export default function OutcomeSummaryDashboard({
           })}
         </div>
       </div>
+
+      {/* LOS badge */}
+      {los !== null && (
+        <div className="flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold px-3 py-1 rounded-full">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            LOS: {los} day{los !== 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
 
       {/* Chart card */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
