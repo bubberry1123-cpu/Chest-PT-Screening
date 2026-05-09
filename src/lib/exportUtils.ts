@@ -146,7 +146,7 @@ export async function exportOutcomeData(
       'Grip Left (kg)': v('gripStrength_left'),
       'Grip Right (kg)': v('gripStrength_right'),
       'CS-30 (stands)': v('cs30'),
-      '2-Minute Walk Test (sec)': v('twoMeterWalk'),
+      '2-Minute Walk Test (m)': v('twoMeterWalk'),
       '6-Minute Walk Test (m)': v('sixMWT'),
       '2-min Stepping (steps)': v('twoMinMarching'),
     }

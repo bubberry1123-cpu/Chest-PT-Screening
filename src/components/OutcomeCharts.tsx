@@ -76,7 +76,7 @@ const CHART_GROUPS: Record<GroupKey, GroupDef> = {
         ],
       },
       { title: 'CS-30', unit: 'stands', series: [{ key: 'cs30', label: 'CS-30' }] },
-      { title: '2-Minute Walk Test', unit: 'seconds', inverted: true, series: [{ key: 'twoMeterWalk', label: '2MWT' }] },
+      { title: '2-Minute Walk Test', unit: 'meters', series: [{ key: 'twoMeterWalk', label: '2MWT' }] },
       {
         title: '6MWT / 2-min Stepping',
         unit: '',

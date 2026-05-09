@@ -70,7 +70,7 @@ const OTHER_DEFS: OtherDef[] = [
   { key: 'gripStrength_left', label: 'Grip L',     unit: 'kg',      color: '#BA7517', maxRef: 60  },
   { key: 'gripStrength_right',label: 'Grip R',     unit: 'kg',      color: '#EF9F27', maxRef: 60  },
   { key: 'cs30',              label: 'CS-30',      unit: 'ครั้ง',   color: '#639922', maxRef: 30  },
-  { key: 'twoMeterWalk',      label: '2MWT',       unit: 'seconds', color: '#0891B2', maxRef: 60, inverted: true },
+  { key: 'twoMeterWalk',      label: '2MWT',       unit: 'meters',  color: '#0891B2', maxRef: 200 },
   { key: 'sixMWT',            label: '6MWT',       unit: 'm',       color: '#C77DFF', maxRef: 500 },
   { key: 'twoMinMarching',    label: '2MST',        unit: 'steps',   color: '#E63946', maxRef: 120 },
 ]

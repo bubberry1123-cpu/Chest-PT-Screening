@@ -101,7 +101,7 @@ export const OUTCOME_GROUPS: Record<OverallLevel, OutcomeGroupDef[]> = {
     single('wrightSpirometer', 'Wright Spirometer', 'mL'),
     single('cs30', '30-Second Chair Stand Test (CS-30)', 'stands', { showNotes: true }),
     GRIP_GROUP,
-    single('twoMeterWalk', '2-Minute Walk Test (2MWT)', 'seconds', { showNotes: true, lowerIsBetter: true }),
+    single('twoMeterWalk', '2-Minute Walk Test (2MWT)', 'meters', { showNotes: true }),
   ],
   3: [
     AMPAC_GROUP,
