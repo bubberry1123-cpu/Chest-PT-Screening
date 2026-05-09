@@ -64,7 +64,7 @@ interface OtherDef {
   color: string; maxRef: number; inverted?: boolean
 }
 const OTHER_DEFS: OtherDef[] = [
-  { key: 'dyspneaScale',      label: 'Dyspnea',    unit: '/10',     color: '#E85D04', maxRef: 10,  inverted: true },
+  { key: 'dyspneaScale',      label: 'mMRC',       unit: '/4',      color: '#E85D04', maxRef: 4,   inverted: true },
   { key: 'peakCoughFlow',     label: 'Cough Flow', unit: 'L/min',   color: '#378ADD', maxRef: 600 },
   { key: 'wrightSpirometer',  label: 'Wright',     unit: 'mL',      color: '#0F6E56', maxRef: 600 },
   { key: 'gripStrength_left', label: 'Grip L',     unit: 'kg',      color: '#BA7517', maxRef: 60  },

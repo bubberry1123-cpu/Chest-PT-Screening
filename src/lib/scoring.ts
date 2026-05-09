@@ -35,10 +35,10 @@ const LEVEL_GOALS: Record<number, string> = {
 }
 
 const OUTCOME_MEASUREMENTS: Record<number, string[]> = {
-  1: ['AMPAC', 'BRFA', 'Dyspnea scale', 'Peak Cough Flow', 'Wright Spirometry', '30-Second Chair Stand Test (CS-30)', 'Grip Strength', '6-Minute Walk Test or 2-Minute Stepping Test (6MWT or 2MST)'],
-  2: ['AMPAC', 'BRFA', 'Dyspnea scale', 'Peak Cough Flow', 'Wright Spirometry', '30-Second Chair Stand Test (CS-30)', 'Grip Strength', '2-Minute Walk Test (2MWT)'],
-  3: ['AMPAC', 'BRFA', 'Dyspnea scale', 'Peak Cough Flow', 'Wright Spirometry'],
-  4: ['AMPAC', 'BRFA', 'Dyspnea scale'],
+  1: ['AMPAC', 'BRFA', 'mMRC Dyspnea Scale', 'Peak Cough Flow', 'Wright Spirometry', '30-Second Chair Stand Test (CS-30)', 'Grip Strength', '6-Minute Walk Test or 2-Minute Stepping Test (6MWT or 2MST)'],
+  2: ['AMPAC', 'BRFA', 'mMRC Dyspnea Scale', 'Peak Cough Flow', 'Wright Spirometry', '30-Second Chair Stand Test (CS-30)', 'Grip Strength', '2-Minute Walk Test (2MWT)'],
+  3: ['AMPAC', 'BRFA', 'mMRC Dyspnea Scale', 'Peak Cough Flow', 'Wright Spirometry'],
+  4: ['AMPAC', 'BRFA', 'mMRC Dyspnea Scale'],
 }
 
 const REHAB_PROGRAMS: Record<number, string[]> = {

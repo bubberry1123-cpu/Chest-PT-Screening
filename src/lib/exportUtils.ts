@@ -140,7 +140,7 @@ export async function exportOutcomeData(
       'BRFA Part2 (%)': v('brfa_part2'),
       'BRFA Q20 (%)': v('brfa_q20'),
       'BRFA Q21 (%)': v('brfa_q21'),
-      'Dyspnea Scale (/10)': v('dyspneaScale'),
+      'mMRC Dyspnea Scale (/4)': v('dyspneaScale'),
       'Peak Cough Flow (L/min)': v('peakCoughFlow'),
       'Wright Spirometry (mL)': v('wrightSpirometer'),
       'Grip Left (kg)': v('gripStrength_left'),

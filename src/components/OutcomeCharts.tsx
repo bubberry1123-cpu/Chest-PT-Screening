@@ -61,7 +61,7 @@ const CHART_GROUPS: Record<GroupKey, GroupDef> = {
     charts: [
       { title: 'Peak Cough Flow',  unit: 'L/min', series: [{ key: 'peakCoughFlow',    label: 'PCF' }] },
       { title: 'Wright Spirometer', unit: 'mL',    series: [{ key: 'wrightSpirometer', label: 'Wright' }] },
-      { title: 'Dyspnea Scale',    unit: '/10', inverted: true, series: [{ key: 'dyspneaScale', label: 'Dyspnea' }] },
+      { title: 'mMRC Dyspnea Scale', unit: '/4', inverted: true, series: [{ key: 'dyspneaScale', label: 'mMRC' }] },
     ],
   },
   physical: {

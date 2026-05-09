@@ -206,6 +206,17 @@ export default function OutcomePage() {
                   <span className="text-sm text-slate-400 w-10 shrink-0">{item.unit}</span>
                 </div>
               </div>
+              {group.groupKey === 'dyspneaScale' && (
+                <div className="px-5 pb-3 border-t border-slate-100">
+                  <p className="text-[11px] font-medium text-slate-400 mt-2 mb-1">mMRC Grades</p>
+                  <div className="text-[11px] text-slate-500 space-y-0.5">
+                    <div><span className="inline-block w-5 font-semibold text-slate-600">0</span>หายใจหอบเฉพาะออกกำลังกายหนัก</div>
+                    <div><span className="inline-block w-5 font-semibold text-slate-600">1–2</span>หายใจหอบเมื่อรีบเดินหรือเดินช้ากว่าวัยเดียวกัน</div>
+                    <div><span className="inline-block w-5 font-semibold text-slate-600">3</span>หายใจหอบมาก ต้องหยุดพักเมื่อเดินได้ 100 เมตร</div>
+                    <div><span className="inline-block w-5 font-semibold text-slate-600">4</span>หายใจหอบแม้ขณะพัก</div>
+                  </div>
+                </div>
+              )}
               {item.showNotes && (
                 <div className="px-5 pb-3.5 -mt-1">
                   <input

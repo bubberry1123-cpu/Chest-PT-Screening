@@ -634,7 +634,7 @@ export default function AdminPage() {
     const METRICS = [
       { label: 'AMPAC',    keys: ['ampac_part1','ampac_part2','ampac_part3'] },
       { label: 'BRFA',     keys: ['brfa_part1','brfa_part2','brfa_q20','brfa_q21'] },
-      { label: 'Dyspnea',  keys: ['dyspneaScale'] },
+      { label: 'mMRC',     keys: ['dyspneaScale'] },
       { label: 'Peak CF',  keys: ['peakCoughFlow'] },
       { label: 'Wright',   keys: ['wrightSpirometer'] },
       { label: 'Grip (R)', keys: ['gripStrength_right'] },
