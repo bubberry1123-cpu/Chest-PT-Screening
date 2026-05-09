@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useState, useRef } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip,
   type ChartData, type ChartOptions, type Plugin,
@@ -72,10 +72,13 @@ const OTHER_DEFS: OtherDef[] = [
   { key: 'cs30',              label: 'CS-30',      unit: 'ครั้ง',   color: '#639922', maxRef: 30  },
   { key: 'twoMeterWalk',      label: '2MWT',       unit: 'meters',  color: '#0891B2', maxRef: 500 },
   { key: 'sixMWT',            label: '6MWT',       unit: 'm',       color: '#C77DFF', maxRef: 600 },
-  { key: 'twoMinMarching',    label: '2MST',        unit: 'steps',   color: '#E63946', maxRef: 120 },
+  { key: 'twoMinMarching',    label: '2MST',       unit: 'steps',   color: '#E63946', maxRef: 120 },
 ]
 
-const COMPARE_PALETTE = ['#3b82f6','#10b981','#f97316','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f59e0b','#ef4444','#64748b','#14b8a6','#6366f1']
+const SESSION_PALETTE = [
+  '#3b82f6','#10b981','#f97316','#8b5cf6','#ec4899',
+  '#06b6d4','#84cc16','#f59e0b','#ef4444','#64748b','#14b8a6','#6366f1',
+]
 
 function normPct(raw: number, maxRef: number, inverted?: boolean): number {
   const p = inverted ? ((maxRef - raw) / maxRef) * 100 : (raw / maxRef) * 100
@@ -87,82 +90,87 @@ function getFilledSessions(outcomes: OutcomeMeasurement[]): string[] {
   return OUTCOME_SESSIONS.filter(s => set.has(s))
 }
 
-// ── Custom BRFA segmented bar ─────────────────────────────────────────────────
-// Segments top→bottom: Q21, Q20, Part2, Part1 (each represents one BRFA part, 0–100%)
+// ── Session datum ─────────────────────────────────────────────────────────────
+
+interface SessionDatum {
+  session: string
+  label: string
+  color: string
+  o: OutcomeMeasurement | undefined
+}
+
+// ── BRFA segmented bar ────────────────────────────────────────────────────────
 
 const BRFA_SVG_SEGS = [
-  { key: 'brfa_q21',   short: 'Q21', fullLabel: 'Q21 Satisfaction',  color: '#9FE1CB' },
-  { key: 'brfa_q20',   short: 'Q20', fullLabel: 'Q20 Environment',   color: '#5DCAA5' },
-  { key: 'brfa_part2', short: 'P2',  fullLabel: 'Part 2 Confidence', color: '#1D9E75' },
-  { key: 'brfa_part1', short: 'P1',  fullLabel: 'Part 1 Functional', color: '#085041' },
+  { key: 'brfa_q21',   short: 'Q21', fullLabel: 'Q21 Satisfaction',  segColor: '#9FE1CB', maxVal: 100, unit: '%' },
+  { key: 'brfa_q20',   short: 'Q20', fullLabel: 'Q20 Environment',   segColor: '#5DCAA5', maxVal: 100, unit: '%' },
+  { key: 'brfa_part2', short: 'P2',  fullLabel: 'Part 2 Confidence', segColor: '#1D9E75', maxVal: 100, unit: '%' },
+  { key: 'brfa_part1', short: 'P1',  fullLabel: 'Part 1 Functional', segColor: '#085041', maxVal: 100, unit: '%' },
 ] as const
 
-type SegTooltip = { text: string; segMidY: number }
+type SegTooltip = {
+  fullLabel: string
+  entries: { label: string; value: string; color: string }[]
+  segMidY: number
+}
 
-function BrfaSegmentBar({ o }: { o: OutcomeMeasurement | undefined }) {
-  const W = 72, H = 320
-  const BAR_L = 8, BAR_W = 56
+function BrfaSegmentBar({ sessions }: { sessions: SessionDatum[] }) {
+  const W = 72, H = 320, BAR_L = 8, BAR_W = 56
   const TOP_PAD = 10, BOT_PAD = 22
-  const CHART_H = H - TOP_PAD - BOT_PAD   // 288
-  const N = BRFA_SVG_SEGS.length           // 4
-  const SEG_H = CHART_H / N               // 72 — satisfies ≥70px minimum
-  // Fixed layout zones per segment (no overlap possible)
-  const TEXT_ZONE = 16   // top of segment: score text at segTop+12
-  const LABEL_ZONE = 16  // bottom of segment: part label at segTop+SEG_H-4
-  const FILL_H = SEG_H - TEXT_ZONE - LABEL_ZONE  // 40px fill area in the middle
-  const wrapRef = useRef<HTMLDivElement>(null)
+  const CHART_H = H - TOP_PAD - BOT_PAD
+  const N = BRFA_SVG_SEGS.length
+  const SEG_H = CHART_H / N
+  const TEXT_ZONE = 16, LABEL_ZONE = 16
+  const FILL_H = SEG_H - TEXT_ZONE - LABEL_ZONE
+  const isSingle = sessions.length === 1
   const [tooltip, setTooltip] = useState<SegTooltip | null>(null)
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative', flexShrink: 0, width: W, height: H }}>
+    <div style={{ position: 'relative', flexShrink: 0, width: W, height: H }}>
       <svg width={W} height={H} onMouseLeave={() => setTooltip(null)}>
         {BRFA_SVG_SEGS.map((p, i) => {
-          const val = o?.items[p.key]?.value
-          const hasVal = val !== undefined
-          const v = val ?? 0
           const segTop = TOP_PAD + i * SEG_H
           const fillAreaTop = segTop + TEXT_ZONE
           const fillAreaBot = fillAreaTop + FILL_H
-          const dashY = fillAreaBot - (v / 100) * FILL_H
           const segMidY = segTop + SEG_H / 2
 
+          const sessionVals = sessions.map(s => ({
+            color: isSingle ? p.segColor : s.color,
+            label: s.label,
+            val: s.o?.items[p.key]?.value,
+          }))
+          const anyVal = sessionVals.some(sv => sv.val !== undefined)
+          const tooltipEntries = sessionVals
+            .filter(sv => sv.val !== undefined)
+            .map(sv => ({ label: sv.label, value: `${sv.val!.toFixed(0)}${p.unit}`, color: sv.color }))
+
           return (
-            <g key={p.key}
-              style={{ cursor: hasVal ? 'default' : undefined }}
-              onMouseEnter={() => hasVal && setTooltip({ text: `${p.fullLabel}: ${v.toFixed(0)}%`, segMidY })}
-            >
-              {/* Background (light gray = 100% reference) */}
+            <g key={p.key} onMouseEnter={() => anyVal && setTooltip({ fullLabel: p.fullLabel, entries: tooltipEntries, segMidY })}>
               <rect x={BAR_L} y={fillAreaTop} width={BAR_W} height={FILL_H} fill="#f5f5f5" />
 
-              {/* Score text — fixed in TEXT_ZONE, never overlaps fill area */}
-              {hasVal && (
+              {isSingle && sessionVals[0].val !== undefined && (
                 <text x={BAR_L + BAR_W / 2} y={segTop + 12}
                   textAnchor="middle" fontSize="9.5" fill="#1a1a1a" fontWeight="600">
-                  {v.toFixed(0)}%
+                  {sessionVals[0].val.toFixed(0)}%
                 </text>
               )}
 
-              {/* Dashed line at score level within fill area */}
-              {hasVal && (
-                <line x1={BAR_L} y1={dashY} x2={BAR_L + BAR_W} y2={dashY}
-                  stroke={p.color} strokeWidth={2.5} strokeDasharray="4,3" />
-              )}
+              {sessionVals.map((sv, si) => sv.val !== undefined ? (
+                <line key={si}
+                  x1={BAR_L} y1={fillAreaBot - (sv.val / 100) * FILL_H}
+                  x2={BAR_L + BAR_W} y2={fillAreaBot - (sv.val / 100) * FILL_H}
+                  stroke={sv.color} strokeWidth={2.5} strokeDasharray="4,3" />
+              ) : null)}
 
-              {/* Segment separator */}
               {i < N - 1 && (
                 <line x1={BAR_L} y1={segTop + SEG_H} x2={BAR_L + BAR_W} y2={segTop + SEG_H}
                   stroke="white" strokeWidth={2} />
               )}
-
-              {/* Part label — fixed in LABEL_ZONE, never overlaps fill area */}
               <text x={BAR_L + BAR_W / 2} y={segTop + SEG_H - 4}
-                textAnchor="middle" fontSize="7.5" fill="#64748b">
-                {p.short}
-              </text>
+                textAnchor="middle" fontSize="7.5" fill="#64748b">{p.short}</text>
             </g>
           )
         })}
-
         <text x={W / 2} y={H - 6} textAnchor="middle" fontSize="10" fill="#475569">BRFA</text>
       </svg>
 
@@ -170,89 +178,89 @@ function BrfaSegmentBar({ o }: { o: OutcomeMeasurement | undefined }) {
         <div style={{
           position: 'absolute', top: tooltip.segMidY - 14, left: W + 6,
           background: 'white', border: '1px solid #e2e8f0', borderRadius: 6,
-          padding: '3px 8px', fontSize: 11, color: '#1e293b',
+          padding: '4px 8px', fontSize: 11, color: '#1e293b',
           whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
           zIndex: 20, pointerEvents: 'none',
         }}>
-          {tooltip.text}
+          <div style={{ fontWeight: 600, marginBottom: 2, fontSize: 10, color: '#64748b' }}>{tooltip.fullLabel}</div>
+          {tooltip.entries.map((e, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: e.color, flexShrink: 0 }} />
+              <span style={{ color: '#64748b' }}>{e.label}:</span>
+              <span style={{ fontWeight: 700 }}>{e.value}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
   )
 }
 
-// ── Custom AMPAC segmented bar ────────────────────────────────────────────────
-// Segments top→bottom: P3, P2, P1 (each represents one AMPAC part, 0–24)
+// ── AMPAC segmented bar ───────────────────────────────────────────────────────
 
 const AMPAC_SVG_SEGS = [
-  { key: 'ampac_part3', short: 'P3', fullLabel: 'P3 Applied Cognitive', color: '#AFA9EC' },
-  { key: 'ampac_part2', short: 'P2', fullLabel: 'P2 Daily Activity',    color: '#7F77DD' },
-  { key: 'ampac_part1', short: 'P1', fullLabel: 'P1 Basic Mobility',    color: '#3C3489' },
+  { key: 'ampac_part3', short: 'P3', fullLabel: 'P3 Applied Cognitive', segColor: '#AFA9EC' },
+  { key: 'ampac_part2', short: 'P2', fullLabel: 'P2 Daily Activity',    segColor: '#7F77DD' },
+  { key: 'ampac_part1', short: 'P1', fullLabel: 'P1 Basic Mobility',    segColor: '#3C3489' },
 ] as const
 
-function AmpacSegmentBar({ o }: { o: OutcomeMeasurement | undefined }) {
-  const W = 72, H = 320
-  const BAR_L = 8, BAR_W = 56
+function AmpacSegmentBar({ sessions }: { sessions: SessionDatum[] }) {
+  const W = 72, H = 320, BAR_L = 8, BAR_W = 56
   const TOP_PAD = 10, BOT_PAD = 22
-  const CHART_H = H - TOP_PAD - BOT_PAD   // 288
-  const N = AMPAC_SVG_SEGS.length          // 3
-  const SEG_H = CHART_H / N               // 96 — well above 70px minimum
-  const TEXT_ZONE = 16   // top of segment: score text at segTop+12
-  const LABEL_ZONE = 16  // bottom of segment: part label at segTop+SEG_H-4
-  const FILL_H = SEG_H - TEXT_ZONE - LABEL_ZONE  // 64px fill area
-  const wrapRef = useRef<HTMLDivElement>(null)
+  const CHART_H = H - TOP_PAD - BOT_PAD
+  const N = AMPAC_SVG_SEGS.length
+  const SEG_H = CHART_H / N
+  const TEXT_ZONE = 16, LABEL_ZONE = 16
+  const FILL_H = SEG_H - TEXT_ZONE - LABEL_ZONE
+  const isSingle = sessions.length === 1
   const [tooltip, setTooltip] = useState<SegTooltip | null>(null)
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative', flexShrink: 0, width: W, height: H }}>
+    <div style={{ position: 'relative', flexShrink: 0, width: W, height: H }}>
       <svg width={W} height={H} onMouseLeave={() => setTooltip(null)}>
         {AMPAC_SVG_SEGS.map((p, i) => {
-          const val = o?.items[p.key]?.value
-          const hasVal = val !== undefined
-          const v = val ?? 0
           const segTop = TOP_PAD + i * SEG_H
           const fillAreaTop = segTop + TEXT_ZONE
           const fillAreaBot = fillAreaTop + FILL_H
-          const dashY = fillAreaBot - (v / 24) * FILL_H
           const segMidY = segTop + SEG_H / 2
 
+          const sessionVals = sessions.map(s => ({
+            color: isSingle ? p.segColor : s.color,
+            label: s.label,
+            val: s.o?.items[p.key]?.value,
+          }))
+          const anyVal = sessionVals.some(sv => sv.val !== undefined)
+          const tooltipEntries = sessionVals
+            .filter(sv => sv.val !== undefined)
+            .map(sv => ({ label: sv.label, value: `${sv.val!.toFixed(0)}/24`, color: sv.color }))
+
           return (
-            <g key={p.key}
-              style={{ cursor: hasVal ? 'default' : undefined }}
-              onMouseEnter={() => hasVal && setTooltip({ text: `${p.fullLabel}: ${v.toFixed(0)}/24`, segMidY })}
-            >
-              {/* Background (light gray = 24/24 reference) */}
+            <g key={p.key} onMouseEnter={() => anyVal && setTooltip({ fullLabel: p.fullLabel, entries: tooltipEntries, segMidY })}>
               <rect x={BAR_L} y={fillAreaTop} width={BAR_W} height={FILL_H} fill="#f5f5f5" />
 
-              {/* Score text — fixed in TEXT_ZONE, never overlaps fill area */}
-              {hasVal && (
+              {isSingle && sessionVals[0].val !== undefined && (
                 <text x={BAR_L + BAR_W / 2} y={segTop + 12}
                   textAnchor="middle" fontSize="9.5" fill="#1a1a1a" fontWeight="600">
-                  {v.toFixed(0)}/24
+                  {sessionVals[0].val.toFixed(0)}/24
                 </text>
               )}
 
-              {/* Dashed line at score level within fill area */}
-              {hasVal && (
-                <line x1={BAR_L} y1={dashY} x2={BAR_L + BAR_W} y2={dashY}
-                  stroke={p.color} strokeWidth={2.5} strokeDasharray="4,3" />
-              )}
+              {sessionVals.map((sv, si) => sv.val !== undefined ? (
+                <line key={si}
+                  x1={BAR_L} y1={fillAreaBot - (sv.val / 24) * FILL_H}
+                  x2={BAR_L + BAR_W} y2={fillAreaBot - (sv.val / 24) * FILL_H}
+                  stroke={sv.color} strokeWidth={2.5} strokeDasharray="4,3" />
+              ) : null)}
 
-              {/* Segment separator */}
               {i < N - 1 && (
                 <line x1={BAR_L} y1={segTop + SEG_H} x2={BAR_L + BAR_W} y2={segTop + SEG_H}
                   stroke="white" strokeWidth={2} />
               )}
-
-              {/* Part label — fixed in LABEL_ZONE, never overlaps fill area */}
               <text x={BAR_L + BAR_W / 2} y={segTop + SEG_H - 4}
-                textAnchor="middle" fontSize="7.5" fill="#64748b">
-                {p.short}
-              </text>
+                textAnchor="middle" fontSize="7.5" fill="#64748b">{p.short}</text>
             </g>
           )
         })}
-
         <text x={W / 2} y={H - 6} textAnchor="middle" fontSize="10" fill="#475569">AMPAC</text>
       </svg>
 
@@ -260,11 +268,18 @@ function AmpacSegmentBar({ o }: { o: OutcomeMeasurement | undefined }) {
         <div style={{
           position: 'absolute', top: tooltip.segMidY - 14, left: W + 6,
           background: 'white', border: '1px solid #e2e8f0', borderRadius: 6,
-          padding: '3px 8px', fontSize: 11, color: '#1e293b',
+          padding: '4px 8px', fontSize: 11, color: '#1e293b',
           whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
           zIndex: 20, pointerEvents: 'none',
         }}>
-          {tooltip.text}
+          <div style={{ fontWeight: 600, marginBottom: 2, fontSize: 10, color: '#64748b' }}>{tooltip.fullLabel}</div>
+          {tooltip.entries.map((e, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: e.color, flexShrink: 0 }} />
+              <span style={{ color: '#64748b' }}>{e.label}:</span>
+              <span style={{ fontWeight: 700 }}>{e.value}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -281,8 +296,7 @@ export default function OutcomeSummaryDashboard({
   level: OverallLevel
 }) {
   const filledSessions = useMemo(() => getFilledSessions(outcomes), [outcomes])
-  const [compareMode, setCompareMode] = useState(false)
-  const [selectedSession, setSelectedSession] = useState<string>(() => filledSessions[filledSessions.length - 1] ?? 'Initial')
+  const [selectedSessions, setSelectedSessions] = useState<string[]>(() => filledSessions.slice())
 
   const bySession = useMemo(() => {
     const m: Record<string, OutcomeMeasurement> = {}
@@ -290,30 +304,37 @@ export default function OutcomeSummaryDashboard({
     return m
   }, [outcomes])
 
-  if (filledSessions.length === 0) return null
+  const sessionColorMap = useMemo(() => {
+    const m: Record<string, string> = {}
+    filledSessions.forEach((s, i) => { m[s] = SESSION_PALETTE[i % SESSION_PALETTE.length] })
+    return m
+  }, [filledSessions])
 
-  // Cross-session presence flags (used by compare mode and legend)
-  const hasBrfa  = outcomes.some(o => BRFA_PARTS.some(p => o.items[p.key]?.value !== undefined))
-  const hasAmpac = outcomes.some(o => AMPAC_PARTS.some(p => o.items[p.key]?.value !== undefined))
-  const presentOthers = OTHER_DEFS.filter(d => outcomes.some(o => o.items[d.key]?.value !== undefined))
+  const hasBrfa  = useMemo(() => outcomes.some(o => BRFA_PARTS.some(p => o.items[p.key]?.value !== undefined)), [outcomes])
+  const hasAmpac = useMemo(() => outcomes.some(o => AMPAC_PARTS.some(p => o.items[p.key]?.value !== undefined)), [outcomes])
+  const presentOthers = useMemo(() => OTHER_DEFS.filter(d => outcomes.some(o => o.items[d.key]?.value !== undefined)), [outcomes])
 
-  // Selected session outcome (for custom SVG bars)
-  const selectedO = bySession[selectedSession]
-  const showBrfaSvg  = !compareMode && BRFA_PARTS.some(p  => selectedO?.items[p.key]?.value !== undefined)
-  const showAmpacSvg = !compareMode && AMPAC_PARTS.some(p => selectedO?.items[p.key]?.value !== undefined)
+  const isSingle = selectedSessions.length === 1
 
-  // ── Chart data ──────────────────────────────────────────────────────────────
+  const selectedSessionData: SessionDatum[] = useMemo(() =>
+    selectedSessions.map(s => ({
+      session: s,
+      label: SESSION_SHORT[s] ?? s,
+      color: sessionColorMap[s] ?? '#94a3b8',
+      o: bySession[s],
+    }))
+  , [selectedSessions, sessionColorMap, bySession])
 
   const { chartLabels, chartDatasets, topLabels } = useMemo(() => {
-    if (compareMode) {
-      // X = metric names, datasets = sessions (BRFA/AMPAC shown as avg %)
+    if (!isSingle) {
       const colLabels: string[] = []
       if (hasBrfa)  colLabels.push('BRFA')
       if (hasAmpac) colLabels.push('AMPAC')
       presentOthers.forEach(d => colLabels.push(d.label))
 
-      const datasets: ChartData<'bar'>['datasets'] = filledSessions.map((sess, si) => {
+      const datasets: ChartData<'bar'>['datasets'] = selectedSessions.map(sess => {
         const o = bySession[sess]
+        const color = sessionColorMap[sess] ?? '#94a3b8'
         const data: (number | null)[] = []
         const rawVals: (number | null)[] = []
         const units: string[] = []
@@ -338,19 +359,20 @@ export default function OutcomeSummaryDashboard({
         return {
           label: SESSION_SHORT[sess] ?? sess,
           data,
-          backgroundColor: COMPARE_PALETTE[si % COMPARE_PALETTE.length],
-          barPercentage: 0.95,
+          backgroundColor: color,
+          barPercentage: 0.8,
           categoryPercentage: 0.85,
           _rawVals: rawVals,
           _units: units,
         } as unknown as ChartData<'bar'>['datasets'][number]
       })
 
-      return { chartLabels: colLabels, chartDatasets: datasets, topLabels: colLabels.map(() => '') }
+      return { chartLabels: colLabels, chartDatasets: datasets, topLabels: [] as string[] }
     }
 
-    // Single-session mode — BRFA/AMPAC rendered as custom SVG; only "others" in Chart.js
-    const o = bySession[selectedSession]
+    // Single session
+    const sess = selectedSessions[0]
+    const o = bySession[sess]
     type Col = { id: string; label: string }
     const cols: Col[] = []
     OTHER_DEFS.forEach(d => {
@@ -379,8 +401,7 @@ export default function OutcomeSummaryDashboard({
     })
 
     return { chartLabels: cols.map(c => c.label), chartDatasets: datasets, topLabels: tl }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compareMode, selectedSession, outcomes])
+  }, [selectedSessions, isSingle, bySession, hasBrfa, hasAmpac, presentOthers, sessionColorMap])
 
   const options = useMemo((): ChartOptions<'bar'> => ({
     responsive: true,
@@ -392,7 +413,7 @@ export default function OutcomeSummaryDashboard({
         callbacks: {
           label: ctx => {
             const ds = ctx.dataset as unknown as Record<string, unknown>
-            if (compareMode) {
+            if (!isSingle) {
               const rawVals = ds._rawVals as (number | null)[] | undefined
               const units = ds._units as string[] | undefined
               const raw = rawVals?.[ctx.dataIndex]
@@ -417,61 +438,82 @@ export default function OutcomeSummaryDashboard({
     } as ChartOptions<'bar'>['plugins'],
     scales: {
       x: {
-        stacked: !compareMode,
+        stacked: isSingle,
         grid: { display: false },
         border: { display: false },
         ticks: { font: { size: 10 }, color: '#475569' },
       },
       y: {
-        stacked: !compareMode,
+        stacked: isSingle,
         display: false,
         beginAtZero: true,
         max: 100,
       },
     },
-  }), [compareMode, topLabels])
+  }), [isSingle, topLabels])
 
-  // ── Legend ──────────────────────────────────────────────────────────────────
+  if (filledSessions.length === 0) return null
 
-  const latestO = bySession[filledSessions[filledSessions.length - 1]]
+  // Derived display values (non-hooks)
+  const toggleSession = (s: string) => {
+    setSelectedSessions(prev => {
+      if (prev.includes(s)) {
+        if (prev.length <= 1) return prev
+        return prev.filter(x => x !== s)
+      }
+      return filledSessions.filter(fs => prev.includes(fs) || fs === s)
+    })
+  }
 
-  interface LegendItem { key: string; label: string; color: string }
-  const legendItems: LegendItem[] = compareMode
-    ? filledSessions.map((s, i) => ({ key: s, label: SESSION_SHORT[s] ?? s, color: COMPARE_PALETTE[i % COMPARE_PALETTE.length] }))
-    : presentOthers.filter(d => latestO?.items[d.key]?.value !== undefined)
+  const showBrfaSvg  = selectedSessionData.some(sd => BRFA_PARTS.some(p => sd.o?.items[p.key]?.value !== undefined))
+  const showAmpacSvg = selectedSessionData.some(sd => AMPAC_PARTS.some(p => sd.o?.items[p.key]?.value !== undefined))
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  const legendItems = isSingle
+    ? presentOthers
+        .filter(d => bySession[selectedSessions[0]]?.items[d.key]?.value !== undefined)
+        .map(d => ({ key: d.key, label: d.label, color: d.color }))
+    : selectedSessions.map(s => ({
+        key: s,
+        label: SESSION_SHORT[s] ?? s,
+        color: sessionColorMap[s] ?? '#94a3b8',
+      }))
 
   return (
     <div className="mt-5 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <h3 className="font-semibold text-slate-700">Outcome Summary</h3>
-        <div className="flex items-center gap-2 flex-wrap">
-          {!compareMode && (
-            <select
-              value={selectedSession}
-              onChange={e => setSelectedSession(e.target.value)}
-              className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white text-slate-600 focus:outline-none focus:border-blue-400">
-              {filledSessions.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          )}
-          <div className="flex bg-slate-100 rounded-lg p-0.5 text-xs">
-            {(['ล่าสุด', 'เปรียบทุก session'] as const).map((label, i) => (
-              <button key={label} onClick={() => setCompareMode(i === 1)}
-                className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                  compareMode === (i === 1) ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'
-                }`}>
-                {label}
-              </button>
-            ))}
-          </div>
+      {/* Header + checkbox row */}
+      <div className="flex items-start justify-between flex-wrap gap-2">
+        <h3 className="font-semibold text-slate-700 pt-0.5">Outcome Summary</h3>
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+          {filledSessions.map(s => {
+            const checked = selectedSessions.includes(s)
+            const isLast = checked && selectedSessions.length === 1
+            return (
+              <label
+                key={s}
+                className={`flex items-center gap-1.5 select-none ${isLast ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={isLast}
+                  onChange={() => toggleSession(s)}
+                  className="w-3.5 h-3.5 rounded accent-blue-500 shrink-0"
+                />
+                <span
+                  className="text-xs font-medium"
+                  style={{ color: checked ? (sessionColorMap[s] ?? '#475569') : '#94a3b8' }}
+                >
+                  {SESSION_SHORT[s] ?? s}
+                </span>
+              </label>
+            )
+          })}
         </div>
       </div>
 
       {/* Chart card */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-        {/* Legend — others only in single-session; sessions in compare */}
+        {/* Legend */}
         {legendItems.length > 0 && (
           <div className="flex flex-wrap gap-x-3 gap-y-1.5 mb-3 pb-3 border-b border-slate-100">
             {legendItems.map(item => (
@@ -483,31 +525,19 @@ export default function OutcomeSummaryDashboard({
           </div>
         )}
 
-        {compareMode ? (
-          // Compare mode: full-width Chart.js
-          <div style={{ height: 320 }}>
-            <Bar
-              key="compare"
-              data={{ labels: chartLabels, datasets: chartDatasets }}
-              options={options}
-            />
-          </div>
-        ) : (
-          // Single-session: custom SVG bars + Chart.js for others, same height row
-          <div className="flex items-stretch gap-1" style={{ height: 320 }}>
-            {showBrfaSvg  && <BrfaSegmentBar  o={selectedO} />}
-            {showAmpacSvg && <AmpacSegmentBar o={selectedO} />}
-            {chartDatasets.length > 0 && (
-              <div className="flex-1 min-w-0">
-                <Bar
-                  key={selectedSession}
-                  data={{ labels: chartLabels, datasets: chartDatasets }}
-                  options={options}
-                />
-              </div>
-            )}
-          </div>
-        )}
+        <div className="flex items-stretch gap-1" style={{ height: 320 }}>
+          {showBrfaSvg  && <BrfaSegmentBar  sessions={selectedSessionData} />}
+          {showAmpacSvg && <AmpacSegmentBar sessions={selectedSessionData} />}
+          {chartDatasets.length > 0 && (
+            <div className="flex-1 min-w-0">
+              <Bar
+                key={selectedSessions.join(',')}
+                data={{ labels: chartLabels, datasets: chartDatasets }}
+                options={options}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
