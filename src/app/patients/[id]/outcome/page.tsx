@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getPatientById, getScreeningsByPatient, saveOutcome, getOutcomesByPatient, deleteOutcomeSession } from '@/lib/localstore'
 import { OUTCOME_GROUPS, OUTCOME_SESSIONS, SESSION_SHORT, getFlatItems } from '@/lib/outcomeItems'
@@ -13,6 +13,7 @@ type BtnState = 'idle' | 'saving' | 'saved'
 
 export default function OutcomePage() {
   const { id } = useParams<{ id: string }>()
+  const router = useRouter()
   const [patient, setPatient] = useState<Patient | null>(null)
   const [latestScreening, setLatestScreening] = useState<Screening | null>(null)
   const [outcomes, setOutcomes] = useState<OutcomeMeasurement[]>([])
@@ -78,7 +79,7 @@ export default function OutcomePage() {
       setOutcomes(updated)
       setBtnState('saved')
       showToast('Outcome saved successfully!', 'success')
-      setTimeout(() => setBtnState('idle'), 2000)
+      setTimeout(() => router.push(`/patients/${id}`), 800)
     } catch (err) {
       console.error('saveOutcome failed:', err)
       setBtnState('idle')
