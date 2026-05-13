@@ -1,7 +1,7 @@
 'use client'
 import {
   collection, doc, addDoc, setDoc, getDoc, getDocs,
-  query, where, orderBy, deleteDoc, serverTimestamp, Timestamp,
+  query, where, orderBy, deleteDoc, serverTimestamp, Timestamp, writeBatch,
 } from 'firebase/firestore'
 import { db } from './firebase'
 import type { Patient, Screening, OutcomeMeasurement, OutcomeSession } from '@/types'
@@ -99,23 +99,11 @@ export async function getAllScreenings(): Promise<Screening[]> {
 // ── OUTCOMES ──────────────────────────────────────────────────────────────────
 
 export async function saveOutcome(data: Omit<OutcomeMeasurement, 'id' | 'recordedAt'>): Promise<string> {
-  const existing = await getDocs(
-    query(
-      collection(db, 'outcomes'),
-      where('patientId', '==', data.patientId),
-      where('session', '==', data.session)
-    )
-  )
-  if (!existing.empty) {
-    const ref = existing.docs[0].ref
-    await setDoc(ref, { ...data, recordedAt: serverTimestamp() }, { merge: true })
-    return ref.id
-  }
-  const ref = await addDoc(collection(db, 'outcomes'), {
-    ...data,
-    recordedAt: serverTimestamp(),
-  })
-  return ref.id
+  // Deterministic doc ID eliminates read-before-write race condition
+  const docId = `${data.patientId}_${data.session.replace(/\s+/g, '_')}`
+  const ref = doc(db, 'outcomes', docId)
+  await setDoc(ref, { ...data, recordedAt: serverTimestamp() }, { merge: true })
+  return docId
 }
 
 export async function getOutcomesByPatient(patientId: string): Promise<OutcomeMeasurement[]> {
@@ -144,11 +132,11 @@ export async function deletePatient(id: string): Promise<void> {
     getDocs(query(collection(db, 'screenings'), where('patientId', '==', id))),
     getDocs(query(collection(db, 'outcomes'),   where('patientId', '==', id))),
   ])
-  await Promise.all([
-    ...screeningsSnap.docs.map(d => deleteDoc(d.ref)),
-    ...outcomesSnap.docs.map(d => deleteDoc(d.ref)),
-    deleteDoc(doc(db, 'patients', id)),
-  ])
+  const batch = writeBatch(db)
+  screeningsSnap.docs.forEach(d => batch.delete(d.ref))
+  outcomesSnap.docs.forEach(d => batch.delete(d.ref))
+  batch.delete(doc(db, 'patients', id))
+  await batch.commit()
 }
 
 export async function deleteScreening(id: string): Promise<void> {

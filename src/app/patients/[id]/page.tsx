@@ -126,16 +126,21 @@ function EditPatientModal({ patient, onSave, onClose }: EditModalProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
-    await updatePatient(patient.id!, {
-      firstName: form.firstName,
-      lastName: form.lastName,
-      age: Number(form.age),
-      sex: form.sex,
-      nationality: form.nationality,
-      location: form.location,
-    })
-    onSave({ ...patient, ...form, age: Number(form.age) })
-    setSaving(false)
+    try {
+      await updatePatient(patient.id!, {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        age: Number(form.age),
+        sex: form.sex,
+        nationality: form.nationality,
+        location: form.location,
+      })
+      onSave({ ...patient, ...form, age: Number(form.age) })
+    } catch {
+      alert('บันทึกไม่สำเร็จ กรุณาลองใหม่')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -229,25 +234,30 @@ export default function PatientPage() {
       getPatientById(id),
       getScreeningsByPatient(id),
       getOutcomesByPatient(id),
-    ]).then(([p, s, o]) => {
-      setPatient(p)
-      setScreenings(s)
-      setOutcomes(o)
-      setLoading(false)
-    })
+    ])
+      .then(([p, s, o]) => { setPatient(p); setScreenings(s); setOutcomes(o); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [id])
 
   const handleDeletePatient = async () => {
     if (!patient) return
     if (!window.confirm(`ลบผู้ป่วย "${patient.firstName} ${patient.lastName}" และข้อมูลทั้งหมด?\nการกระทำนี้ไม่สามารถกู้คืนได้`)) return
-    await deletePatient(id)
-    router.push('/')
+    try {
+      await deletePatient(id)
+      router.push('/')
+    } catch {
+      showToast('ลบไม่สำเร็จ กรุณาลองใหม่', 'error')
+    }
   }
 
   const handleDeleteScreening = async (s: Screening) => {
     if (!window.confirm(`ลบการประเมินวันที่ ${s.assessedAt instanceof Date ? s.assessedAt.toLocaleDateString('th-TH') : '?'} ?`)) return
-    await deleteScreening(s.id!)
-    setScreenings(prev => prev.filter(x => x.id !== s.id))
+    try {
+      await deleteScreening(s.id!)
+      setScreenings(prev => prev.filter(x => x.id !== s.id))
+    } catch {
+      showToast('ลบไม่สำเร็จ กรุณาลองใหม่', 'error')
+    }
   }
 
   if (loading) return <div className="text-center py-16 text-slate-400">กำลังโหลด...</div>

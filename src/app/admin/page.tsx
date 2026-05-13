@@ -573,12 +573,8 @@ export default function AdminPage() {
   useEffect(() => {
     if (!authed) return
     Promise.all([getAllPatients(), getAllScreenings(), getAllOutcomes()])
-      .then(([p, s, o]) => {
-        setPatients(p)
-        setScreenings(s)
-        setOutcomes(o)
-        setLoading(false)
-      })
+      .then(([p, s, o]) => { setPatients(p); setScreenings(s); setOutcomes(o); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [authed])
 
   const handleLogout = () => {

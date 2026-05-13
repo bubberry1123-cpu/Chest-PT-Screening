@@ -33,7 +33,7 @@ export default function NewScreeningPage() {
   })
 
   useEffect(() => {
-    getPatientById(id).then(setPatient)
+    getPatientById(id).then(setPatient).catch(() => setPatient(null))
   }, [id])
 
   const result = clinical.cooperativeness && clinical.cfsScore !== null && clinical.o2Support

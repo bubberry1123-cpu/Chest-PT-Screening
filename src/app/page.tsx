@@ -12,27 +12,27 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getAllPatients().then(data => {
-      setPatients(data)
-      setLoading(false)
-    })
+    getAllPatients()
+      .then(data => { setPatients(data); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [])
 
   const handleSearch = async (term: string) => {
     setSearch(term)
-    if (term.trim() === '') {
-      const data = await getAllPatients()
+    try {
+      const data = term.trim() === '' ? await getAllPatients() : await searchPatients(term)
       setPatients(data)
-    } else {
-      const data = await searchPatients(term)
-      setPatients(data)
-    }
+    } catch { /* ค้นหาไม่ได้ แสดงผลเดิม */ }
   }
 
   const handleDelete = async (p: Patient) => {
     if (!window.confirm(`ลบผู้ป่วย "${p.firstName} ${p.lastName}" (HN: ${p.hn}) และข้อมูลทั้งหมด?`)) return
-    await deletePatient(p.id!)
-    setPatients(prev => prev.filter(x => x.id !== p.id))
+    try {
+      await deletePatient(p.id!)
+      setPatients(prev => prev.filter(x => x.id !== p.id))
+    } catch {
+      alert('ลบไม่สำเร็จ กรุณาลองใหม่')
+    }
   }
 
   return (

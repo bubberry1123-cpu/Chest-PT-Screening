@@ -35,17 +35,20 @@ export default function ScreeningDetailPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getScreeningById(id).then(s => {
-      setScreening(s)
-      setLoading(false)
-    })
+    getScreeningById(id)
+      .then(s => { setScreening(s); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [id])
 
   const handleDelete = async () => {
     if (!screening) return
     if (!window.confirm('ลบการประเมินนี้?')) return
-    await deleteScreening(id)
-    router.push(`/patients/${screening.patientId}`)
+    try {
+      await deleteScreening(id)
+      router.push(`/patients/${screening.patientId}`)
+    } catch {
+      alert('ลบไม่สำเร็จ กรุณาลองใหม่')
+    }
   }
 
   if (loading) return <div className="text-center py-16 text-slate-400">กำลังโหลด...</div>

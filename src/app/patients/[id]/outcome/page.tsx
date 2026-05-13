@@ -27,12 +27,8 @@ export default function OutcomePage() {
 
   useEffect(() => {
     Promise.all([getPatientById(id), getScreeningsByPatient(id), getOutcomesByPatient(id)])
-      .then(([p, s, o]) => {
-        setPatient(p)
-        setLatestScreening(s[0] ?? null)
-        setOutcomes(o)
-        setLoading(false)
-      })
+      .then(([p, s, o]) => { setPatient(p); setLatestScreening(s[0] ?? null); setOutcomes(o); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [id])
 
   useEffect(() => {
@@ -154,9 +150,13 @@ export default function OutcomePage() {
               <button
                 onClick={async () => {
                   if (!window.confirm(`ลบข้อมูล ${SESSION_SHORT[session]} ทั้งหมด?`)) return
-                  await deleteOutcomeSession(id, session)
-                  const updated = await getOutcomesByPatient(id)
-                  setOutcomes(updated)
+                  try {
+                    await deleteOutcomeSession(id, session)
+                    const updated = await getOutcomesByPatient(id)
+                    setOutcomes(updated)
+                  } catch {
+                    showToast('ลบไม่สำเร็จ กรุณาลองใหม่', 'error')
+                  }
                 }}
                 className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-2 py-0.5 rounded transition-colors">
                 ลบ session นี้
