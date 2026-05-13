@@ -1,3 +1,4 @@
+'use client'
 import {
   collection, doc, addDoc, setDoc, getDoc, getDocs,
   query, where, orderBy, deleteDoc, serverTimestamp, Timestamp,
@@ -107,7 +108,7 @@ export async function saveOutcome(data: Omit<OutcomeMeasurement, 'id' | 'recorde
   )
   if (!existing.empty) {
     const ref = existing.docs[0].ref
-    await setDoc(ref, { ...data, recordedAt: serverTimestamp() })
+    await setDoc(ref, { ...data, recordedAt: serverTimestamp() }, { merge: true })
     return ref.id
   }
   const ref = await addDoc(collection(db, 'outcomes'), {

@@ -45,6 +45,7 @@ export default function NewPatientPage() {
     cooperativeness: null, cfsScore: null, o2Support: null, assessedBy: '', notes: '',
   })
 
+  const [step1Loading, setStep1Loading] = useState(false)
   const [screeningId, setScreeningId] = useState<string | null>(null)
   const [savedPatientId, setSavedPatientId] = useState<string | null>(null)
 
@@ -64,20 +65,28 @@ export default function NewPatientPage() {
     if (err) { setError(err); return }
     setError('')
     setStep1Attempted(false)
-    const existing = await getPatientByHn(patientForm.hn.trim())
-    if (existing) {
-      setExistingPatientId(existing.id!)
-      setPatientForm({
-        hn: existing.hn,
-        firstName: existing.firstName,
-        lastName: existing.lastName,
-        age: String(existing.age),
-        nationality: existing.nationality,
-        location: existing.location,
-      })
-      setSex(existing.sex)
+    setStep1Loading(true)
+    try {
+      const existing = await getPatientByHn(patientForm.hn.trim())
+      if (existing) {
+        setExistingPatientId(existing.id!)
+        setPatientForm({
+          hn: existing.hn,
+          firstName: existing.firstName,
+          lastName: existing.lastName,
+          age: String(existing.age),
+          nationality: existing.nationality,
+          location: existing.location,
+        })
+        setSex(existing.sex)
+      }
+      setStep(2)
+    } catch (e) {
+      setError('ไม่สามารถเชื่อมต่อฐานข้อมูลได้ กรุณาลองใหม่')
+      console.error(e)
+    } finally {
+      setStep1Loading(false)
     }
-    setStep(2)
   }
 
   const validateStep2 = () => {
@@ -241,9 +250,9 @@ export default function NewPatientPage() {
             </div>
           </div>
           <div className="mt-6 flex justify-end">
-            <button onClick={handleStep1Next}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors">
-              ถัดไป: Clinical Assessment →
+            <button onClick={handleStep1Next} disabled={step1Loading}
+              className={`bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors ${step1Loading ? 'opacity-70 cursor-not-allowed' : ''}`}>
+              {step1Loading ? 'กำลังตรวจสอบ...' : 'ถัดไป: Clinical Assessment →'}
             </button>
           </div>
         </div>
