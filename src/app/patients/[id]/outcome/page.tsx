@@ -62,7 +62,8 @@ export default function OutcomePage() {
     for (const item of allItems) {
       const raw = values[item.key]
       if (raw !== undefined && raw !== '') {
-        filledItems[item.key] = { value: Number(raw), note: notes[item.key]?.trim() || undefined }
+        const trimmedNote = notes[item.key]?.trim()
+        filledItems[item.key] = trimmedNote ? { value: Number(raw), note: trimmedNote } : { value: Number(raw) }
         hasAny = true
       }
     }
@@ -78,7 +79,8 @@ export default function OutcomePage() {
       setBtnState('saved')
       showToast('Outcome saved successfully!', 'success')
       setTimeout(() => setBtnState('idle'), 2000)
-    } catch {
+    } catch (err) {
+      console.error('saveOutcome failed:', err)
       setBtnState('idle')
       showToast('Failed to save. Please try again.', 'error')
     }

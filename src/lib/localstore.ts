@@ -99,10 +99,11 @@ export async function getAllScreenings(): Promise<Screening[]> {
 // ── OUTCOMES ──────────────────────────────────────────────────────────────────
 
 export async function saveOutcome(data: Omit<OutcomeMeasurement, 'id' | 'recordedAt'>): Promise<string> {
-  // Deterministic doc ID eliminates read-before-write race condition
   const docId = `${data.patientId}_${data.session.replace(/\s+/g, '_')}`
   const ref = doc(db, 'outcomes', docId)
+  console.log('[saveOutcome] writing to:', ref.path, 'data:', JSON.stringify(data))
   await setDoc(ref, { ...data, recordedAt: serverTimestamp() }, { merge: true })
+  console.log('[saveOutcome] success:', docId)
   return docId
 }
 
