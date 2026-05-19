@@ -403,9 +403,9 @@ function PatientModal({ row, onClose }: { row: PatientRow; onClose: () => void }
             { label: 'Location', value: patient.location },
             { label: 'สัญชาติ', value: patient.nationality },
           ].map((item, i) => (
-            <div key={i} className="bg-slate-50 rounded-lg p-2.5">
-              <div className="text-xs text-slate-500">{item.label}</div>
-              <div className="font-semibold text-slate-800 text-sm">{item.value}</div>
+            <div key={i} className="bg-[#F8FAFC] rounded-[10px] p-2.5">
+              <div className="text-[10px] uppercase text-slate-400 tracking-wide">{item.label}</div>
+              <div className="text-sm font-medium text-slate-700">{item.value}</div>
             </div>
           ))}
         </div>
@@ -480,12 +480,12 @@ function PatientModal({ row, onClose }: { row: PatientRow; onClose: () => void }
         {/* Action Buttons */}
         <div className="px-5 pb-5 flex gap-3">
           <Link href={`/patients/${patient.id}/screening/new`}
-            className="flex-1 text-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+            className="flex-1 text-center bg-[#0C447C] hover:bg-[#185FA5] text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors"
             onClick={onClose}>
             Go to Assessment
           </Link>
           <Link href={`/patients/${patient.id}/outcome`}
-            className="flex-1 text-center bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors"
+            className="flex-1 text-center bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors"
             onClick={onClose}>
             Record Outcome
           </Link>
@@ -530,14 +530,14 @@ function PasswordGate({ onAuth }: { onAuth: () => void }) {
             className={`w-full border rounded-lg px-4 py-2.5 text-sm text-center tracking-widest focus:outline-none focus:ring-2 ${
               error
                 ? 'border-red-400 focus:ring-red-200 bg-red-50'
-                : 'border-slate-300 focus:ring-blue-200 focus:border-blue-500'
+                : 'border-slate-300 focus:ring-blue-200 focus:border-[#185FA5]'
             }`}
           />
           {error && (
             <p className="text-red-600 text-sm text-center font-medium">Incorrect password</p>
           )}
           <button type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-semibold text-sm transition-colors">
+            className="w-full bg-[#0C447C] hover:bg-[#185FA5] text-white py-2.5 rounded-xl font-semibold text-sm transition-colors">
             Enter
           </button>
         </form>
@@ -714,7 +714,7 @@ export default function AdminPage() {
             <button
               onClick={() => setExportOpen(o => !o)}
               disabled={exportLoading}
-              className="text-xs bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white border border-blue-600 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+              className="text-xs bg-[#0C447C] hover:bg-[#185FA5] disabled:opacity-60 text-white border border-[#0C447C] px-3 py-1.5 rounded-xl transition-colors flex items-center gap-1.5">
               {exportLoading ? (
                 <>
                   <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
@@ -728,7 +728,7 @@ export default function AdminPage() {
               )}
             </button>
             {exportOpen && (
-              <div className="absolute right-0 top-9 z-50 bg-white rounded-xl border border-slate-200 shadow-xl p-4 w-72">
+              <div className="absolute right-0 top-9 z-50 bg-white rounded-2xl border border-slate-200 shadow-xl p-4 w-72">
                 {/* Date range */}
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Date Range</p>
                 <div className="grid grid-cols-2 gap-2 mb-4">
@@ -796,26 +796,26 @@ export default function AdminPage() {
 
       {/* ── Overview Stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
           <div className="text-xs text-slate-500 mb-1">Total Patients</div>
           <div className="text-3xl font-bold text-slate-800">{patients.length}</div>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
           <div className="text-xs text-slate-500 mb-1">Assessments this week</div>
           <div className="text-3xl font-bold text-blue-600">{weekAssessments}</div>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
           <div className="text-xs text-slate-500 mb-1">Assessments this month</div>
           <div className="text-3xl font-bold text-blue-600">{monthAssessments}</div>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
           <div className="text-xs text-slate-500 mb-1">Avg LOS (Init → D/C)</div>
           {avgLos !== null
             ? <><span className="text-3xl font-bold text-violet-600">{avgLos}</span><span className="text-sm text-slate-400 ml-1">days</span></>
             : <div className="text-slate-300 text-sm mt-1">No discharge data</div>
           }
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
           <div className="text-xs text-slate-500 mb-2">Level Distribution</div>
           <div className="space-y-1.5">
             {([1, 2, 3, 4] as const).map(l => (
@@ -839,7 +839,7 @@ export default function AdminPage() {
 
       {/* ── Charts Row 1 ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
           <h3 className="text-sm font-semibold text-slate-700 mb-4">Level Distribution</h3>
           <BarChart data={[
             { label: 'L1 Mild',        value: levelCounts[1], color: LEVEL_COLOR[1] },
@@ -848,7 +848,7 @@ export default function AdminPage() {
             { label: 'L4 Severe',      value: levelCounts[4], color: LEVEL_COLOR[4] },
           ]} />
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
           <h3 className="text-sm font-semibold text-slate-700 mb-4">Program Type</h3>
           <DonutChart segments={[
             { label: 'Standard',  value: programCounts.Standard,  color: '#22c55e' },
@@ -872,7 +872,7 @@ export default function AdminPage() {
       </div>{/* end chartsRef */}
 
       {/* ── Reassessment Due Alert ── */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-5 py-3.5 border-b border-amber-100 bg-amber-50 flex items-center justify-between">
           <h3 className="font-semibold text-amber-800 text-sm">Reassessment Due (every {REASSESS_DAYS} days)</h3>
           <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${dueRows.length > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -928,7 +928,7 @@ export default function AdminPage() {
 
       {/* ── Outcome Alert ── */}
       {alertRows.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="px-5 py-3.5 border-b border-orange-100 bg-orange-50 flex items-center justify-between">
             <h3 className="font-semibold text-orange-800 text-sm">Outcome Reassessment Alerts</h3>
             <div className="flex items-center gap-2">
@@ -1011,7 +1011,7 @@ export default function AdminPage() {
       )}
 
       {/* ── Patient List Table ── */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-5 py-3.5 border-b border-slate-100 flex flex-wrap items-center gap-2">
           <h3 className="font-semibold text-slate-700 text-sm flex-1 min-w-0">
             All Patients <span className="text-slate-400 font-normal">({filteredRows.length})</span>

@@ -134,3 +134,34 @@ export const LEVEL_CONFIG = {
   3: { label: 'Mild Severe', color: 'orange', th: 'ระดับค่อนข้างรุนแรง' },
   4: { label: 'Severe', color: 'red', th: 'ระดับรุนแรง' },
 } as const
+
+export const STEP_UP_CRITERIA: Record<number, string[]> = {
+  1: [
+    '6MWT > 400 เมตร หรือ 2MST > 90 ครั้ง',
+    'mMRC Dyspnea Scale ≤ 1',
+    'Grip Strength ≥ normative value ตาม age/sex',
+    'Independent ใน ADL ทั้งหมด',
+    'ออกกำลังกายที่ระดับ Moderate intensity ได้ต่อเนื่อง ≥ 20 นาที',
+  ],
+  2: [
+    'SpO₂ ≥ 95% on Room Air ขณะพักและออกกำลังกาย',
+    'O2 support ลดลงเป็น Room Air ได้',
+    'CFS Score ≤ 3',
+    'Borg dyspnea ≤ 3/10 ขณะทำกิจกรรม',
+    '2MWT > 100 เมตร',
+  ],
+  3: [
+    'O2 support ลดลงเป็น Low Flow (≤ 6 L/min) ได้',
+    'SpO₂ stable ≥ 92% on Low Flow',
+    'CFS Score ≤ 5',
+    'สามารถทำ AROM ได้อย่างอิสระ',
+    'Cooperative — ทำตามคำสั่งได้',
+  ],
+  4: [
+    'Wean จาก Ventilator ได้ หรือลด O2 เป็น High Flow',
+    'Cooperative — เริ่มตอบสนองต่อคำสั่งได้',
+    'SpO₂ stable ≥ 90% on High Flow O2',
+    'RR ≤ 28 ครั้ง/นาที ขณะพัก',
+    'Hemodynamic stable ไม่ต้องการ vasopressor เพิ่ม',
+  ],
+}

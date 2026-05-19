@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getScreeningById, deleteScreening } from '@/lib/localstore'
-import { RED_FLAGS } from '@/lib/scoring'
+import { STEP_UP_CRITERIA } from '@/lib/scoring'
 import { useIsAdmin } from '@/lib/useIsAdmin'
 import type { Screening } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
@@ -64,64 +64,62 @@ export default function ScreeningDetailPage() {
         <Link href={`/patients/${screening.patientId}`} className="text-slate-400 hover:text-slate-600 text-sm">← กลับ</Link>
         {isAdmin && (
           <button onClick={handleDelete}
-            className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-lg transition-colors">
+            className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-xl transition-colors">
             ลบการประเมินนี้
           </button>
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4 shadow-sm text-sm text-slate-600">
-        <div className="font-mono">HN: {screening.patientHn}</div>
-        <div className="mt-0.5">Location: {screening.location} • {date}</div>
-        {screening.assessedBy && <div className="mt-0.5">ผู้ประเมิน: {screening.assessedBy}</div>}
+      {/* Patient info banner */}
+      <div className="bg-[#F0F7FF] border border-[#BFDBFE] rounded-2xl p-4 mb-4 text-sm">
+        <div className="font-mono text-[#1D4ED8] font-semibold">HN: {screening.patientHn}</div>
+        <div className="mt-0.5 text-blue-600">Location: {screening.location} • {date}</div>
+        {screening.assessedBy && <div className="mt-0.5 text-blue-600">ผู้ประเมิน: {screening.assessedBy}</div>}
       </div>
 
+      {/* Severity badge */}
       <SeverityBadge level={screening.overallLevel} size="lg" />
 
-      {/* Level name + Goal */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 my-4 shadow-sm">
-        <div className="text-xs text-slate-500 mb-0.5">Level</div>
-        <div className="text-lg font-bold text-slate-800 mb-2">{screening.levelName}</div>
-        <div className="text-xs text-slate-500 mb-0.5">Goal</div>
-        <div className="text-sm text-slate-700">{screening.goal}</div>
-      </div>
-
-      {/* Scores */}
-      <div className="grid grid-cols-4 gap-3 mb-4 text-center text-sm">
-        <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
-          <div className="text-xs text-slate-500">CFS</div>
-          <div className="font-bold text-xl text-slate-800">{screening.cfsScore}</div>
+      {/* Info grid: Cooperative | CFS | Code F/R | Program Type */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">
+        <div className="bg-[#F8FAFC] rounded-[10px] p-2.5 text-center">
+          <div className="text-[10px] uppercase text-slate-400 tracking-wide">Cooperative</div>
+          <div className={`text-sm font-medium mt-0.5 ${screening.cooperativeness === 'non_cooperative' ? 'text-red-600' : 'text-green-700'}`}>
+            {COOP_LABELS[screening.cooperativeness]}
+          </div>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
-          <div className="text-xs text-slate-500">Code F / R</div>
-          <div className="font-bold text-base text-blue-700 mt-0.5">F{screening.fLevel} / R{screening.rLevel}</div>
+        <div className="bg-[#F8FAFC] rounded-[10px] p-2.5 text-center">
+          <div className="text-[10px] uppercase text-slate-400 tracking-wide">CFS</div>
+          <div className="text-sm font-medium text-slate-700 mt-0.5">{screening.cfsScore}</div>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
-          <div className="text-xs text-slate-500">Driver</div>
-          <div className="font-bold text-xs mt-1 text-slate-700 leading-tight">{DRIVER_LABELS[screening.driver]}</div>
+        <div className="bg-[#F8FAFC] rounded-[10px] p-2.5 text-center">
+          <div className="text-[10px] uppercase text-slate-400 tracking-wide">Code F / R</div>
+          <div className="text-sm font-medium text-[#0C447C] mt-0.5">F{screening.fLevel} / R{screening.rLevel}</div>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
-          <div className="text-xs text-slate-500">Program</div>
-          <div className={`font-bold text-sm mt-1 ${screening.programType === 'Standard' ? 'text-green-700' : 'text-orange-700'}`}>
+        <div className="bg-[#F8FAFC] rounded-[10px] p-2.5 text-center">
+          <div className="text-[10px] uppercase text-slate-400 tracking-wide">Program Type</div>
+          <div className={`text-sm font-medium mt-0.5 ${screening.programType === 'Standard' ? 'text-green-700' : 'text-orange-700'}`}>
             {screening.programType}
           </div>
         </div>
       </div>
 
-      {/* Clinical info */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm mb-4">
-        <h3 className="font-semibold text-slate-700 mb-3">ข้อมูล Clinical</h3>
-        <div className="space-y-0">
-          <div className="flex justify-between py-1.5 border-b border-slate-100 text-sm">
-            <span className="text-slate-500">Ability to Follow Commands</span>
-            <span className={`font-medium ${screening.cooperativeness === 'non_cooperative' ? 'text-red-600' : 'text-green-700'}`}>
-              {COOP_LABELS[screening.cooperativeness]}
-            </span>
-          </div>
-          <div className="flex justify-between py-1.5 text-sm">
-            <span className="text-slate-500">O2 Support</span>
-            <span className="font-medium">{O2_LABELS[screening.o2Support]}</span>
-          </div>
+      {/* Goal */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-4 shadow-sm">
+        <div className="text-[10px] uppercase text-slate-400 tracking-wide mb-1">Goal</div>
+        <div className="text-sm font-medium text-slate-700">{screening.goal}</div>
+      </div>
+
+      {/* O2 Support + Notes */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm mb-4">
+        <h3 className="font-semibold text-slate-700 mb-3 text-sm">ข้อมูล Clinical</h3>
+        <div className="flex justify-between py-1.5 border-b border-slate-100 text-sm">
+          <span className="text-slate-500">O2 Support</span>
+          <span className="font-medium text-slate-700">{O2_LABELS[screening.o2Support]}</span>
+        </div>
+        <div className="flex justify-between py-1.5 text-sm">
+          <span className="text-slate-500">Driver</span>
+          <span className="font-medium text-slate-700">{DRIVER_LABELS[screening.driver]}</span>
         </div>
         {screening.notes && (
           <div className="mt-3 pt-3 border-t border-slate-100 text-sm text-slate-600">
@@ -130,37 +128,40 @@ export default function ScreeningDetailPage() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm mb-4">
-        <h3 className="font-semibold text-slate-700 mb-3">Outcome Measurements</h3>
-        <ul className="space-y-1.5">
+      {/* Outcome Measurements as chips */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm mb-4">
+        <h3 className="font-semibold text-slate-700 mb-3 text-sm">Outcome Measurements</h3>
+        <div className="flex flex-wrap gap-2">
           {screening.outcomeMeasurements.map(m => (
-            <li key={m} className="flex items-center gap-2 text-sm text-slate-700">
-              <span className="text-green-500 font-bold">✓</span>{m}
+            <span key={m} className="bg-[#F0F7FF] text-[#1D4ED8] border border-[#BFDBFE] rounded-full px-3 py-1 text-xs font-medium">
+              ✓ {m}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Step-up Criteria */}
+      <div className="bg-[#F0FDF4] border border-[#BBF7D0] rounded-2xl p-5 mb-4">
+        <h3 className="text-[#166534] font-bold mb-3">Step-up Criteria</h3>
+        <ul className="space-y-2">
+          {STEP_UP_CRITERIA[screening.overallLevel]?.map(c => (
+            <li key={c} className="text-[#15803D] text-sm flex items-start gap-2">
+              <span className="shrink-0 mt-0.5">→</span>{c}
             </li>
           ))}
         </ul>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm mb-4">
-        <h3 className="font-semibold text-slate-700 mb-3">PT Program</h3>
-        <ul className="space-y-1.5">
-          {screening.rehabProgram.map(p => (
-            <li key={p} className="flex items-start gap-2 text-sm text-slate-700">
-              <span className="text-blue-500 mt-0.5">•</span>{p}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="bg-red-50 border-2 border-red-400 rounded-xl p-5">
-        <h3 className="font-bold text-red-700 mb-3">RED FLAG — หยุดทันที</h3>
-        <ul className="space-y-1.5">
-          {RED_FLAGS.map(f => (
-            <li key={f} className="flex items-start gap-2 text-sm text-red-800">
-              <span className="font-bold mt-0.5 shrink-0">!</span>{f}
-            </li>
-          ))}
-        </ul>
+      {/* Buttons */}
+      <div className="flex gap-3">
+        <Link href={`/patients/${screening.patientId}`}
+          className="flex-1 text-center border border-slate-300 text-slate-600 hover:bg-slate-50 px-5 py-2.5 rounded-xl font-semibold text-sm transition-colors">
+          ← Back
+        </Link>
+        <Link href={`/patients/${screening.patientId}/outcome`}
+          className="flex-1 text-center bg-[#0C447C] hover:bg-[#185FA5] text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition-colors">
+          Record Outcome →
+        </Link>
       </div>
     </div>
   )

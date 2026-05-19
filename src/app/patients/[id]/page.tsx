@@ -52,7 +52,7 @@ function OutcomeTable({ outcomes, level }: { outcomes: OutcomeMeasurement[]; lev
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+    <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-sm">
       <table className="w-full text-sm min-w-max">
         <thead className="bg-slate-50 border-b border-slate-200">
           <tr>
@@ -202,7 +202,7 @@ function EditPatientModal({ patient, onSave, onClose }: EditModalProps) {
               ยกเลิก
             </button>
             <button type="submit" disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-2 rounded-lg text-sm font-semibold transition-colors">
+              className="flex-1 flex items-center justify-center gap-2 bg-[#0C447C] hover:bg-[#185FA5] disabled:opacity-60 text-white py-2 rounded-xl text-sm font-semibold transition-colors">
               {saving && (
                 <svg className="animate-spin w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none">
                   <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3" />
@@ -272,14 +272,14 @@ export default function PatientPage() {
       </div>
 
       {/* Patient Info Card */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm mb-4">
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xl font-bold text-slate-800">{patient.firstName} {patient.lastName}</h2>
+              <h2 className="text-lg font-bold text-slate-800">{patient.firstName} {patient.lastName}</h2>
               {isAdmin && (
                 <button onClick={() => setEditOpen(true)}
-                  className="text-xs text-slate-400 hover:text-blue-600 border border-slate-200 hover:border-blue-400 px-2 py-0.5 rounded transition-colors">
+                  className="text-xs text-slate-400 hover:text-[#185FA5] border border-slate-200 hover:border-[#185FA5] px-2 py-0.5 rounded transition-colors">
                   Edit
                 </button>
               )}
@@ -288,37 +288,37 @@ export default function PatientPage() {
           </div>
           <div className="flex flex-col gap-2 shrink-0">
             <Link href={`/patients/${id}/screening/new`}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-center whitespace-nowrap">
+              className="bg-[#0C447C] hover:bg-[#185FA5] text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors text-center whitespace-nowrap">
               + ประเมินใหม่
             </Link>
             <Link href={`/patients/${id}/outcome`}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-center whitespace-nowrap">
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors text-center whitespace-nowrap">
               + Outcome
             </Link>
             {isAdmin && (
               <button onClick={handleDeletePatient}
-                className="border border-red-300 text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg text-sm font-semibold transition-colors text-center whitespace-nowrap">
+                className="border border-red-300 text-red-600 hover:bg-red-50 px-4 py-2 rounded-xl text-sm font-semibold transition-colors text-center whitespace-nowrap">
                 ลบผู้ป่วย
               </button>
             )}
           </div>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-sm">
-          <div className="bg-slate-50 rounded-lg p-2.5">
-            <div className="text-xs text-slate-500">อายุ</div>
-            <div className="font-semibold text-slate-800">{patient.age} ปี</div>
+          <div className="bg-[#F8FAFC] rounded-[10px] p-2.5">
+            <div className="text-[10px] uppercase text-slate-400 tracking-wide">อายุ</div>
+            <div className="text-sm font-medium text-slate-700">{patient.age} ปี</div>
           </div>
-          <div className="bg-slate-50 rounded-lg p-2.5">
-            <div className="text-xs text-slate-500">เพศ</div>
-            <div className="font-semibold text-slate-800">{patient.sex}</div>
+          <div className="bg-[#F8FAFC] rounded-[10px] p-2.5">
+            <div className="text-[10px] uppercase text-slate-400 tracking-wide">เพศ</div>
+            <div className="text-sm font-medium text-slate-700">{patient.sex}</div>
           </div>
-          <div className="bg-slate-50 rounded-lg p-2.5">
-            <div className="text-xs text-slate-500">สัญชาติ</div>
-            <div className="font-semibold text-slate-800">{patient.nationality}</div>
+          <div className="bg-[#F8FAFC] rounded-[10px] p-2.5">
+            <div className="text-[10px] uppercase text-slate-400 tracking-wide">สัญชาติ</div>
+            <div className="text-sm font-medium text-slate-700">{patient.nationality}</div>
           </div>
-          <div className="bg-slate-50 rounded-lg p-2.5">
-            <div className="text-xs text-slate-500">Location</div>
-            <div className="font-semibold text-slate-800">{patient.location}</div>
+          <div className="bg-[#F8FAFC] rounded-[10px] p-2.5">
+            <div className="text-[10px] uppercase text-slate-400 tracking-wide">Location</div>
+            <div className="text-sm font-medium text-slate-700">{patient.location}</div>
           </div>
         </div>
       </div>
@@ -326,7 +326,7 @@ export default function PatientPage() {
       {/* Screening History */}
       <h3 className="font-semibold text-slate-700 mb-3">ประวัติการประเมิน ({screenings.length} ครั้ง)</h3>
       {screenings.length === 0 ? (
-        <div className="text-center py-10 text-slate-400 bg-white rounded-xl border border-slate-200 mb-4">
+        <div className="text-center py-10 text-slate-400 bg-white rounded-2xl border border-slate-200 mb-4">
           ยังไม่มีประวัติการประเมิน
         </div>
       ) : (
@@ -334,7 +334,7 @@ export default function PatientPage() {
           {screenings.map(s => (
             <div key={s.id} className="relative">
               <Link href={`/screenings/${s.id}`}
-                className="block bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:border-blue-300 transition-colors">
+                className="block bg-white rounded-2xl border border-slate-200 p-4 shadow-sm hover:border-[#185FA5] transition-colors">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-sm text-slate-500 mb-1">
@@ -375,7 +375,7 @@ export default function PatientPage() {
               Outcome Measurements ({outcomes.length} session)
             </h3>
             <Link href={`/patients/${id}/outcome`}
-              className="text-xs text-emerald-600 hover:text-emerald-800 font-medium">
+              className="text-xs text-[#0C447C] hover:text-[#185FA5] font-medium">
               + เพิ่ม / แก้ไข →
             </Link>
           </div>
@@ -386,10 +386,10 @@ export default function PatientPage() {
       )}
 
       {latestLevel && outcomes.length === 0 && (
-        <div className="text-center py-8 bg-white rounded-xl border border-slate-200 border-dashed">
+        <div className="text-center py-8 bg-white rounded-2xl border border-slate-200 border-dashed">
           <p className="text-slate-400 text-sm mb-2">ยังไม่มีข้อมูล Outcome Measurement</p>
           <Link href={`/patients/${id}/outcome`}
-            className="text-sm text-emerald-600 hover:text-emerald-800 font-medium underline">
+            className="text-sm text-[#0C447C] hover:text-[#185FA5] font-medium underline">
             บันทึก Initial →
           </Link>
         </div>

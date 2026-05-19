@@ -18,7 +18,7 @@ export default function SeverityBadge({ level, size = 'sm' }: Props) {
 
   if (size === 'lg') {
     return (
-      <div className={`${c.bg} ${c.border} ${c.text} border-2 rounded-xl p-5 text-center`}>
+      <div className={`${c.bg} ${c.border} ${c.text} border-2 rounded-2xl p-5 text-center`}>
         <div className="flex items-center justify-center gap-2">
           <span className={`w-4 h-4 rounded-full ${c.dot} inline-block`} />
           <span className="text-2xl font-bold">Level {level} — {cfg.label}</span>
@@ -28,7 +28,7 @@ export default function SeverityBadge({ level, size = 'sm' }: Props) {
   }
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${c.bg} ${c.text} border ${c.border}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${c.bg} ${c.text} border ${c.border}`}>
       <span className={`w-2 h-2 rounded-full ${c.dot}`} />
       Level {level}
     </span>

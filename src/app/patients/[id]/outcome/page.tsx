@@ -106,12 +106,12 @@ export default function OutcomePage() {
         <Link href={`/patients/${id}`} className="text-slate-400 hover:text-slate-600 text-sm">← Back</Link>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-5 text-sm flex items-center justify-between">
+      <div className="bg-[#F0F7FF] border border-[#BFDBFE] rounded-2xl p-3 mb-5 text-sm flex items-center justify-between">
         <div>
-          <span className="font-semibold text-blue-800">{patient.firstName} {patient.lastName}</span>
+          <span className="font-semibold text-[#1D4ED8]">{patient.firstName} {patient.lastName}</span>
           <span className="text-blue-600 ml-2 font-mono">HN: {patient.hn}</span>
         </div>
-        <span className="text-blue-700 font-semibold text-xs px-2.5 py-1 bg-blue-100 rounded-full">
+        <span className="text-[#1D4ED8] font-semibold text-xs px-2.5 py-1 bg-[#F0F7FF] border border-[#BFDBFE] rounded-full">
           Level {latestScreening.overallLevel} — {latestScreening.levelName}
         </span>
       </div>
@@ -119,12 +119,12 @@ export default function OutcomePage() {
       <h2 className="text-lg font-bold text-slate-800 mb-4">Outcome Measurement</h2>
 
       {/* Session selector */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm mb-5">
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-5">
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Select Session</p>
         <select
           value={session}
           onChange={e => setSession(e.target.value as OutcomeSession)}
-          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 bg-white text-slate-700">
+          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#185FA5] bg-white text-slate-700">
           {OUTCOME_SESSIONS.map(s => {
             const hasDone = outcomes.some(o => o.session === s)
             return (
@@ -142,7 +142,7 @@ export default function OutcomePage() {
             value={assessmentDate}
             max={new Date().toISOString().split('T')[0]}
             onChange={e => setAssessmentDate(e.target.value)}
-            className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500 bg-white text-slate-700"
+            className="flex-1 border border-slate-200 rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:border-[#185FA5] bg-white text-slate-700"
           />
         </div>
 
@@ -175,7 +175,7 @@ export default function OutcomePage() {
           const isMulti = group.items.length > 1
           if (isMulti) {
             return (
-              <div key={group.groupKey} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div key={group.groupKey} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="px-5 py-3 bg-slate-50 border-b border-slate-200">
                   <h4 className="font-bold text-slate-800 text-sm">{group.label}</h4>
                 </div>
@@ -192,7 +192,7 @@ export default function OutcomePage() {
                           value={values[item.key] ?? ''}
                           onChange={e => setValues(v => ({ ...v, [item.key]: e.target.value }))}
                           placeholder="–"
-                          className="w-20 text-right border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
+                          className="w-20 text-right border border-slate-300 rounded-xl px-2 py-1.5 text-sm focus:outline-none focus:border-[#185FA5] focus:ring-1 focus:ring-blue-200"
                         />
                         <span className="text-sm text-slate-400 w-10 shrink-0">{item.unit}</span>
                       </div>
@@ -205,7 +205,7 @@ export default function OutcomePage() {
 
           const item = group.items[0]
           return (
-            <div key={group.groupKey} className="bg-white rounded-xl border border-slate-200 shadow-sm">
+            <div key={group.groupKey} className="bg-white rounded-2xl border border-slate-200 shadow-sm">
               <div className="flex items-center px-5 py-3.5 gap-3">
                 <label className="flex-1 font-medium text-slate-700 text-sm">
                   {group.label}
@@ -219,7 +219,7 @@ export default function OutcomePage() {
                     value={values[item.key] ?? ''}
                     onChange={e => setValues(v => ({ ...v, [item.key]: e.target.value }))}
                     placeholder="–"
-                    className="w-20 text-right border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200"
+                    className="w-20 text-right border border-slate-300 rounded-xl px-2 py-1.5 text-sm focus:outline-none focus:border-[#185FA5] focus:ring-1 focus:ring-blue-200"
                   />
                   <span className="text-sm text-slate-400 w-10 shrink-0">{item.unit}</span>
                 </div>
@@ -242,7 +242,7 @@ export default function OutcomePage() {
                     value={notes[item.key] ?? ''}
                     onChange={e => setNotes(n => ({ ...n, [item.key]: e.target.value }))}
                     placeholder="Notes (optional)"
-                    className="w-full text-xs border border-slate-200 rounded-lg px-3 py-1.5 text-slate-500 placeholder-slate-300 focus:outline-none focus:border-blue-400 bg-slate-50"
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-1.5 text-slate-500 placeholder-slate-300 focus:outline-none focus:border-[#185FA5] bg-slate-50"
                   />
                 </div>
               )}
@@ -253,18 +253,18 @@ export default function OutcomePage() {
 
       <div className="flex gap-3 justify-between">
         <Link href={`/patients/${id}`}
-          className="px-5 py-2.5 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition-colors">
+          className="px-5 py-2.5 border border-slate-300 rounded-xl text-sm text-slate-600 hover:bg-slate-50 transition-colors">
           ← Back
         </Link>
         <button
           onClick={handleSave}
           disabled={btnState === 'saving'}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold text-sm transition-all ${
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-sm transition-all ${
             btnState === 'saved'
               ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
               : btnState === 'saving'
-                ? 'bg-blue-600 opacity-80 text-white cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700 text-white'
+                ? 'bg-[#0C447C] opacity-80 text-white cursor-not-allowed'
+                : 'bg-[#0C447C] hover:bg-[#185FA5] text-white'
           }`}>
           {btnState === 'saving' && (
             <svg className="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">

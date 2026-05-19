@@ -12,6 +12,13 @@ export default function ClientNavBar() {
     setIsAdmin(sessionStorage.getItem(AUTH_KEY) === '1')
   }, [pathname])
 
+  const linkCls = (active: boolean) =>
+    `px-3 py-1.5 text-sm rounded-lg transition-colors whitespace-nowrap ${
+      active
+        ? 'text-white bg-[#185FA5]'
+        : 'text-blue-200 hover:text-white hover:bg-[#185FA5]'
+    }`
+
   return (
     <nav className="ml-auto flex items-center gap-1">
       {isAdmin && (
@@ -19,18 +26,23 @@ export default function ClientNavBar() {
           Admin Mode
         </span>
       )}
-      <Link href="/"
-        className="px-3 py-1.5 text-sm text-blue-200 hover:text-white hover:bg-blue-600 rounded-lg transition-colors whitespace-nowrap">
-        รายการผู้ป่วย
+      <Link href="/" className={linkCls(pathname === '/')}>
+        Patients
+      </Link>
+      <Link href="/" className={linkCls(false)}>
+        Outcomes
       </Link>
       {isAdmin ? (
         <Link href="/admin"
-          className="px-3 py-1.5 text-sm text-amber-300 hover:text-white hover:bg-blue-600 rounded-lg transition-colors font-semibold whitespace-nowrap">
-          ⚙ Admin
+          className={`px-3 py-1.5 text-sm rounded-lg transition-colors font-semibold whitespace-nowrap ${
+            pathname === '/admin'
+              ? 'text-white bg-[#185FA5]'
+              : 'text-amber-300 hover:text-white hover:bg-[#185FA5]'
+          }`}>
+          Admin
         </Link>
       ) : (
-        <Link href="/admin"
-          className="px-3 py-1.5 text-sm text-blue-200 hover:text-white hover:bg-blue-600 rounded-lg transition-colors whitespace-nowrap">
+        <Link href="/admin" className={linkCls(pathname === '/admin')}>
           Admin
         </Link>
       )}
