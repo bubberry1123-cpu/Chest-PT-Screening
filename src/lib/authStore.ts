@@ -31,17 +31,25 @@ export async function signUp(
   displayName: string,
   employeeId?: string
 ): Promise<string> {
+  console.log('[signUp] creating Firebase Auth user:', email)
   const cred = await createUserWithEmailAndPassword(auth, email, password)
   const uid = cred.user.uid
-  await setDoc(doc(db, 'users', uid), {
-    uid,
-    email,
-    displayName,
-    employeeId: employeeId || '',
-    role: 'staff',
-    status: 'pending',
-    createdAt: serverTimestamp(),
-  })
+  console.log('[signUp] Auth user created, writing Firestore profile:', uid)
+  try {
+    await setDoc(doc(db, 'users', uid), {
+      uid,
+      email,
+      displayName,
+      employeeId: employeeId || '',
+      role: 'staff',
+      status: 'pending',
+      createdAt: serverTimestamp(),
+    })
+    console.log('[signUp] Firestore profile saved successfully')
+  } catch (firestoreErr) {
+    console.error('[signUp] Firestore profile write failed:', firestoreErr)
+    throw firestoreErr
+  }
   return uid
 }
 

@@ -23,10 +23,17 @@ export default function RegisterPage() {
       await signOut()
       setDone(true)
     } catch (err: unknown) {
+      console.error('[Register] signUp error:', err)
       const code = (err as { code?: string })?.code
+      const msg = (err as { message?: string })?.message ?? ''
       if (code === 'auth/email-already-in-use') setError('This email is already registered.')
       else if (code === 'auth/invalid-email') setError('Invalid email address.')
-      else setError('Registration failed. Please try again.')
+      else if (code === 'auth/weak-password') setError('Password is too weak. Use at least 6 characters.')
+      else if (code === 'auth/operation-not-allowed') setError('Email/Password sign-in is not enabled. Please contact the administrator.')
+      else if (code === 'auth/network-request-failed') setError('Network error. Check your connection and try again.')
+      else if (code === 'auth/too-many-requests') setError('Too many attempts. Please wait a moment and try again.')
+      else if (code) setError(`Registration failed (${code}). Please try again.`)
+      else setError(`Registration failed: ${msg || 'Unknown error'}`)
     } finally {
       setLoading(false)
     }
