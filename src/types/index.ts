@@ -34,7 +34,6 @@ export interface ScreeningResult {
   levelName: string
   goal: string
   outcomeMeasurements: string[]
-  rehabProgram: string[]
 }
 
 export interface Screening extends ScreeningInput, ScreeningResult {

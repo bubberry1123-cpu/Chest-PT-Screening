@@ -41,46 +41,6 @@ const OUTCOME_MEASUREMENTS: Record<number, string[]> = {
   4: ['AMPAC', 'BRFA', 'mMRC Dyspnea Scale'],
 }
 
-const REHAB_PROGRAMS: Record<number, string[]> = {
-  1: [
-    'Circuit training (ACSM)',
-    'Work Hardening',
-    'Return to ADL',
-    'Motivational Interviewing',
-    'Educational Program',
-  ],
-  2: [
-    'Lung Expansion Exercise with IS training',
-    'Cough Training and IMT',
-    'AROM',
-    'Endurance training (Bicycle/Treadmill)',
-    'Self-Management with Energy Conservation',
-  ],
-  3: [
-    'Chest Program (Trilogy/Vibration/Suction)',
-    'Lung Expansion + IS',
-    'Incentive Muscle Training (IMT)',
-    'AAROM',
-    'Bed Mobility Training',
-    'Self-Management with Energy Conservation',
-  ],
-  4: [
-    'Positioning & Postural drainage',
-    'Chest Program (Trilogy/Vibration/Suction)',
-    'PROM/Stretching',
-    'Lung Expansion with Manual Hyperinflation',
-  ],
-}
-
-export const RED_FLAGS = [
-  'SpO₂ < 95% หรือลดลง > 2% จาก baseline',
-  'RR > 30 ครั้ง/นาที หรือใช้ accessory muscle เพิ่มขึ้น',
-  'HR > 120 หรือ < 50 bpm หรือ new arrhythmia',
-  'Borg dyspnea ≥ 7/10',
-  'BP systolic < 90 หรือ > 180 mmHg / MAP < 65 mmHg',
-  'Altered consciousness / Agitation (RASS ≤ -3 หรือ ≥ +2)',
-]
-
 export function calculateScreening(input: ScreeningInput): ScreeningResult {
   const fLevel = calculateFLevel(input.cfsScore)
   const rLevel = calculateRLevel(input.o2Support)
@@ -95,7 +55,6 @@ export function calculateScreening(input: ScreeningInput): ScreeningResult {
       levelName: LEVEL_NAMES[4],
       goal: LEVEL_GOALS[4],
       outcomeMeasurements: OUTCOME_MEASUREMENTS[4],
-      rehabProgram: REHAB_PROGRAMS[4],
     }
   }
 
@@ -112,7 +71,6 @@ export function calculateScreening(input: ScreeningInput): ScreeningResult {
     levelName: LEVEL_NAMES[overallLevel],
     goal: LEVEL_GOALS[overallLevel],
     outcomeMeasurements: OUTCOME_MEASUREMENTS[overallLevel],
-    rehabProgram: REHAB_PROGRAMS[overallLevel],
   }
 }
 
@@ -134,34 +92,3 @@ export const LEVEL_CONFIG = {
   3: { label: 'Mild Severe', color: 'orange', th: 'ระดับค่อนข้างรุนแรง' },
   4: { label: 'Severe', color: 'red', th: 'ระดับรุนแรง' },
 } as const
-
-export const STEP_UP_CRITERIA: Record<number, string[]> = {
-  1: [
-    '6MWT > 400 เมตร หรือ 2MST > 90 ครั้ง',
-    'mMRC Dyspnea Scale ≤ 1',
-    'Grip Strength ≥ normative value ตาม age/sex',
-    'Independent ใน ADL ทั้งหมด',
-    'ออกกำลังกายที่ระดับ Moderate intensity ได้ต่อเนื่อง ≥ 20 นาที',
-  ],
-  2: [
-    'SpO₂ ≥ 95% on Room Air ขณะพักและออกกำลังกาย',
-    'O2 support ลดลงเป็น Room Air ได้',
-    'CFS Score ≤ 3',
-    'Borg dyspnea ≤ 3/10 ขณะทำกิจกรรม',
-    '2MWT > 100 เมตร',
-  ],
-  3: [
-    'O2 support ลดลงเป็น Low Flow (≤ 6 L/min) ได้',
-    'SpO₂ stable ≥ 92% on Low Flow',
-    'CFS Score ≤ 5',
-    'สามารถทำ AROM ได้อย่างอิสระ',
-    'Cooperative — ทำตามคำสั่งได้',
-  ],
-  4: [
-    'Wean จาก Ventilator ได้ หรือลด O2 เป็น High Flow',
-    'Cooperative — เริ่มตอบสนองต่อคำสั่งได้',
-    'SpO₂ stable ≥ 90% on High Flow O2',
-    'RR ≤ 28 ครั้ง/นาที ขณะพัก',
-    'Hemodynamic stable ไม่ต้องการ vasopressor เพิ่ม',
-  ],
-}
