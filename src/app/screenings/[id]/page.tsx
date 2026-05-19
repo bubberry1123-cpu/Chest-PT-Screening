@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getScreeningById, deleteScreening } from '@/lib/localstore'
-import { STEP_UP_CRITERIA } from '@/lib/scoring'
 import { useIsAdmin } from '@/lib/useIsAdmin'
 import type { Screening } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
@@ -138,18 +137,6 @@ export default function ScreeningDetailPage() {
             </span>
           ))}
         </div>
-      </div>
-
-      {/* Step-up Criteria */}
-      <div className="bg-[#F0FDF4] border border-[#BBF7D0] rounded-2xl p-5 mb-4">
-        <h3 className="text-[#166534] font-bold mb-3">Step-up Criteria</h3>
-        <ul className="space-y-2">
-          {STEP_UP_CRITERIA[screening.overallLevel]?.map(c => (
-            <li key={c} className="text-[#15803D] text-sm flex items-start gap-2">
-              <span className="shrink-0 mt-0.5">→</span>{c}
-            </li>
-          ))}
-        </ul>
       </div>
 
       {/* Buttons */}

@@ -3,7 +3,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { createPatient, getPatientByHn } from '@/lib/localstore'
 import { createScreening } from '@/lib/localstore'
-import { calculateScreening, CFS_DESCRIPTIONS, STEP_UP_CRITERIA } from '@/lib/scoring'
+import { calculateScreening, CFS_DESCRIPTIONS } from '@/lib/scoring'
 import type { O2Support, Cooperativeness, Sex, ScreeningInput } from '@/types'
 import { WARDS } from '@/lib/wards'
 import { useToast } from '@/lib/useToast'
@@ -449,18 +449,6 @@ export default function NewPatientPage() {
                 </span>
               ))}
             </div>
-          </div>
-
-          {/* Step-up Criteria */}
-          <div className="bg-[#F0FDF4] border border-[#BBF7D0] rounded-2xl p-5">
-            <h3 className="text-[#166534] font-bold mb-3">Step-up Criteria</h3>
-            <ul className="space-y-2">
-              {STEP_UP_CRITERIA[result.overallLevel]?.map(c => (
-                <li key={c} className="text-[#15803D] text-sm flex items-start gap-2">
-                  <span className="shrink-0 mt-0.5">→</span>{c}
-                </li>
-              ))}
-            </ul>
           </div>
 
           <div className="flex gap-3">

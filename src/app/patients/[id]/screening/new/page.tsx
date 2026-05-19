@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getPatientById, createScreening } from '@/lib/localstore'
-import { calculateScreening, CFS_DESCRIPTIONS, STEP_UP_CRITERIA } from '@/lib/scoring'
+import { calculateScreening, CFS_DESCRIPTIONS } from '@/lib/scoring'
 import type { Patient, O2Support, Cooperativeness, ScreeningInput } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
 
@@ -271,18 +271,6 @@ export default function NewScreeningPage() {
                 </span>
               ))}
             </div>
-          </div>
-
-          {/* Step-up Criteria */}
-          <div className="bg-[#F0FDF4] border border-[#BBF7D0] rounded-2xl p-5">
-            <h4 className="text-[#166534] font-bold mb-3">Step-up Criteria</h4>
-            <ul className="space-y-2">
-              {STEP_UP_CRITERIA[result.overallLevel]?.map(c => (
-                <li key={c} className="text-[#15803D] text-sm flex items-start gap-2">
-                  <span className="shrink-0 mt-0.5">→</span>{c}
-                </li>
-              ))}
-            </ul>
           </div>
 
           {/* Buttons */}
