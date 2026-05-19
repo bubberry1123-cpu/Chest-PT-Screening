@@ -3,8 +3,10 @@ import { useEffect, useState, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { getAllPatients, getAllScreenings, getAllOutcomes } from '@/lib/localstore'
 import { SESSION_SHORT } from '@/lib/outcomeItems'
-import { AUTH_KEY, ADMIN_PASSWORD } from '@/lib/useIsAdmin'
+import { useAuth } from '@/lib/auth-context'
+import { getAllUsers, approveUser, rejectUser, changeUserRole, deactivateUser, getActivityLogs } from '@/lib/authStore'
 import type { Patient, Screening, OutcomeMeasurement, OverallLevel, OutcomeSession } from '@/types'
+import type { UserProfile, ActivityLog } from '@/types'
 import { exportPatientList, exportOutcomeData, exportMonthlySummary, exportChartsPDF } from '@/lib/exportUtils'
 import { WARDS } from '@/lib/wards'
 
@@ -495,52 +497,136 @@ function PatientModal({ row, onClose }: { row: PatientRow; onClose: () => void }
   )
 }
 
-// ── Password Gate ─────────────────────────────────────────────────────────────
+// ── User Management Sub-component ─────────────────────────────────────────────
+function UserManagement() {
+  const [users, setUsers] = useState<UserProfile[]>([])
+  const [loading, setLoading] = useState(true)
 
-function PasswordGate({ onAuth }: { onAuth: () => void }) {
-  const [input, setInput] = useState('')
-  const [error, setError] = useState(false)
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (input === ADMIN_PASSWORD) {
-      sessionStorage.setItem(AUTH_KEY, '1')
-      onAuth()
-    } else {
-      setError(true)
-      setInput('')
-    }
+  const load = async () => {
+    setLoading(true)
+    try { setUsers(await getAllUsers()) } finally { setLoading(false) }
   }
 
+  useEffect(() => { load() }, [])
+
+  const STATUS_COLOR: Record<string, string> = {
+    active: 'bg-green-100 text-green-700',
+    pending: 'bg-amber-100 text-amber-700',
+    rejected: 'bg-red-100 text-red-600',
+  }
+
+  if (loading) return <div className="text-center py-16 text-slate-400">Loading users...</div>
+
   return (
-    <div className="min-h-[60vh] flex items-center justify-center">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-8 w-full max-w-sm">
-        <div className="text-center mb-6">
-          <div className="text-4xl mb-3">🔒</div>
-          <h2 className="text-lg font-bold text-slate-800">Admin Access</h2>
-          <p className="text-slate-500 text-sm mt-1">กรอก password เพื่อเข้าใช้งาน</p>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="password"
-            value={input}
-            onChange={e => { setInput(e.target.value); setError(false) }}
-            placeholder="Password"
-            autoFocus
-            className={`w-full border rounded-lg px-4 py-2.5 text-sm text-center tracking-widest focus:outline-none focus:ring-2 ${
-              error
-                ? 'border-red-400 focus:ring-red-200 bg-red-50'
-                : 'border-slate-300 focus:ring-blue-200 focus:border-[#185FA5]'
-            }`}
-          />
-          {error && (
-            <p className="text-red-600 text-sm text-center font-medium">Incorrect password</p>
-          )}
-          <button type="submit"
-            className="w-full bg-[#0C447C] hover:bg-[#185FA5] text-white py-2.5 rounded-xl font-semibold text-sm transition-colors">
-            Enter
-          </button>
-        </form>
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-bold text-slate-800">User Management</h3>
+        <span className="text-xs text-slate-500">{users.length} users</span>
+      </div>
+      <div className="space-y-3">
+        {users.map(u => (
+          <div key={u.uid} className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="font-semibold text-slate-800 text-sm">{u.displayName}</div>
+                <div className="text-xs text-slate-500 mt-0.5">{u.email}{u.employeeId ? ` · ID: ${u.employeeId}` : ''}</div>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_COLOR[u.status] ?? 'bg-slate-100 text-slate-600'}`}>
+                    {u.status.toUpperCase()}
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                    {u.role.toUpperCase()}
+                  </span>
+                  {u.createdAt && (
+                    <span className="text-xs text-slate-400">
+                      {new Date(u.createdAt).toLocaleDateString('th-TH')}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 shrink-0">
+                {u.status === 'pending' && (
+                  <>
+                    <button onClick={async () => { await approveUser(u.uid); load() }}
+                      className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg transition-colors">
+                      Approve
+                    </button>
+                    <button onClick={async () => { await rejectUser(u.uid); load() }}
+                      className="text-xs border border-red-300 text-red-600 hover:bg-red-50 px-3 py-1 rounded-lg transition-colors">
+                      Reject
+                    </button>
+                  </>
+                )}
+                {u.status === 'active' && (
+                  <>
+                    <button onClick={async () => { await changeUserRole(u.uid, u.role === 'admin' ? 'staff' : 'admin'); load() }}
+                      className="text-xs border border-slate-300 text-slate-600 hover:bg-slate-50 px-3 py-1 rounded-lg transition-colors">
+                      {`→ ${u.role === 'admin' ? 'Staff' : 'Admin'}`}
+                    </button>
+                    <button onClick={async () => { if (!window.confirm('Deactivate this user?')) return; await deactivateUser(u.uid); load() }}
+                      className="text-xs border border-red-300 text-red-600 hover:bg-red-50 px-3 py-1 rounded-lg transition-colors">
+                      Deactivate
+                    </button>
+                  </>
+                )}
+                {u.status === 'rejected' && (
+                  <button onClick={async () => { await approveUser(u.uid); load() }}
+                    className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg transition-colors">
+                    Re-activate
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Activity Log Sub-component ────────────────────────────────────────────────
+function ActivityLogTab() {
+  const [logs, setLogs] = useState<ActivityLog[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    getActivityLogs(100).then(setLogs).finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <div className="text-center py-16 text-slate-400">Loading logs...</div>
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-bold text-slate-800">Activity Log</h3>
+        <span className="text-xs text-slate-500">{logs.length} recent events</span>
+      </div>
+      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Time</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">User</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Action</th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">Record</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {logs.map(log => (
+              <tr key={log.id} className="hover:bg-slate-50">
+                <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
+                  {log.timestamp ? new Date(log.timestamp).toLocaleString('th-TH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '–'}
+                </td>
+                <td className="px-4 py-3 text-sm text-slate-700">{log.userName}</td>
+                <td className="px-4 py-3 text-sm text-slate-600">{log.action}</td>
+                <td className="px-4 py-3 text-sm text-slate-600">{log.entityLabel}</td>
+              </tr>
+            ))}
+            {logs.length === 0 && (
+              <tr><td colSpan={4} className="text-center py-10 text-slate-400 text-sm">No activity yet</td></tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   )
@@ -548,7 +634,7 @@ function PasswordGate({ onAuth }: { onAuth: () => void }) {
 
 // ── Main Admin Page ───────────────────────────────────────────────────────────
 export default function AdminPage() {
-  const [authed, setAuthed] = useState<boolean | null>(null)
+  const { isAdmin } = useAuth()
   const [patients, setPatients] = useState<Patient[]>([])
   const [screenings, setScreenings] = useState<Screening[]>([])
   const [outcomes, setOutcomes] = useState<OutcomeMeasurement[]>([])
@@ -564,23 +650,16 @@ export default function AdminPage() {
   const [exportMonth, setExportMonth] = useState(new Date().getMonth())
   const [exportYear, setExportYear] = useState(new Date().getFullYear())
   const [exportLoading, setExportLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'logs'>('dashboard')
   const chartsRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    setAuthed(sessionStorage.getItem(AUTH_KEY) === '1')
-  }, [])
+  if (!isAdmin) return <div className="text-center py-16 text-slate-400">Access denied.</div>
 
   useEffect(() => {
-    if (!authed) return
     Promise.all([getAllPatients(), getAllScreenings(), getAllOutcomes()])
       .then(([p, s, o]) => { setPatients(p); setScreenings(s); setOutcomes(o); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [authed])
-
-  const handleLogout = () => {
-    sessionStorage.removeItem(AUTH_KEY)
-    setAuthed(false)
-  }
+  }, [])
 
   const handleExport = async (type: 'patients' | 'outcomes' | 'monthly' | 'pdf') => {
     setExportLoading(true)
@@ -698,8 +777,6 @@ export default function AdminPage() {
       return rank(a.outcomeAlertStatus) - rank(b.outcomeAlertStatus)
     })
 
-  if (authed === null) return null
-  if (!authed) return <PasswordGate onAuth={() => setAuthed(true)} />
   if (loading) return <div className="text-center py-16 text-slate-400">Loading...</div>
 
   return (
@@ -783,330 +860,346 @@ export default function AdminPage() {
               </div>
             )}
           </div>
+        </div>
+      </div>
 
-          <button onClick={handleLogout}
-            className="text-xs text-slate-500 hover:text-red-600 border border-slate-200 hover:border-red-300 px-3 py-1.5 rounded-lg transition-colors">
-            Logout
+      {/* Tab bar */}
+      <div className="flex gap-2 mb-6">
+        {(['dashboard', 'users', 'logs'] as const).map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold capitalize transition-colors ${activeTab === tab ? 'bg-[#0C447C] text-white' : 'bg-white text-slate-600 border border-slate-200 hover:border-[#185FA5]'}`}>
+            {tab === 'dashboard' ? 'Dashboard' : tab === 'users' ? 'Users' : 'Activity Log'}
           </button>
-        </div>
+        ))}
       </div>
 
-      {/* ── Captured region for PDF export ── */}
-      <div ref={chartsRef}>
+      {/* Users tab */}
+      {activeTab === 'users' && <UserManagement />}
 
-      {/* ── Overview Stats ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-          <div className="text-xs text-slate-500 mb-1">Total Patients</div>
-          <div className="text-3xl font-bold text-slate-800">{patients.length}</div>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-          <div className="text-xs text-slate-500 mb-1">Assessments this week</div>
-          <div className="text-3xl font-bold text-blue-600">{weekAssessments}</div>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-          <div className="text-xs text-slate-500 mb-1">Assessments this month</div>
-          <div className="text-3xl font-bold text-blue-600">{monthAssessments}</div>
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-          <div className="text-xs text-slate-500 mb-1">Avg LOS (Init → D/C)</div>
-          {avgLos !== null
-            ? <><span className="text-3xl font-bold text-violet-600">{avgLos}</span><span className="text-sm text-slate-400 ml-1">days</span></>
-            : <div className="text-slate-300 text-sm mt-1">No discharge data</div>
-          }
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-          <div className="text-xs text-slate-500 mb-2">Level Distribution</div>
-          <div className="space-y-1.5">
-            {([1, 2, 3, 4] as const).map(l => (
-              <div key={l} className="flex items-center gap-2">
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${LEVEL_BG[l]}`}>L{l}</span>
-                <div className="flex-1 bg-slate-100 rounded-full h-1.5">
-                  <div className="h-1.5 rounded-full transition-all" style={{
-                    width: `${patients.length > 0 ? (levelCounts[l] / patients.length) * 100 : 0}%`,
-                    backgroundColor: LEVEL_COLOR[l],
-                  }} />
-                </div>
-                <span className="text-xs text-slate-600 w-5 text-right font-semibold">{levelCounts[l]}</span>
-                <span className="text-xs text-slate-400 w-8">
-                  {patients.length > 0 ? `${Math.round((levelCounts[l] / patients.length) * 100)}%` : '0%'}
-                </span>
+      {/* Logs tab */}
+      {activeTab === 'logs' && <ActivityLogTab />}
+
+      {/* Dashboard tab */}
+      {activeTab === 'dashboard' && (
+        <>
+          {/* ── Captured region for PDF export ── */}
+          <div ref={chartsRef}>
+
+          {/* ── Overview Stats ── */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+              <div className="text-xs text-slate-500 mb-1">Total Patients</div>
+              <div className="text-3xl font-bold text-slate-800">{patients.length}</div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+              <div className="text-xs text-slate-500 mb-1">Assessments this week</div>
+              <div className="text-3xl font-bold text-blue-600">{weekAssessments}</div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+              <div className="text-xs text-slate-500 mb-1">Assessments this month</div>
+              <div className="text-3xl font-bold text-blue-600">{monthAssessments}</div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+              <div className="text-xs text-slate-500 mb-1">Avg LOS (Init → D/C)</div>
+              {avgLos !== null
+                ? <><span className="text-3xl font-bold text-violet-600">{avgLos}</span><span className="text-sm text-slate-400 ml-1">days</span></>
+                : <div className="text-slate-300 text-sm mt-1">No discharge data</div>
+              }
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+              <div className="text-xs text-slate-500 mb-2">Level Distribution</div>
+              <div className="space-y-1.5">
+                {([1, 2, 3, 4] as const).map(l => (
+                  <div key={l} className="flex items-center gap-2">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${LEVEL_BG[l]}`}>L{l}</span>
+                    <div className="flex-1 bg-slate-100 rounded-full h-1.5">
+                      <div className="h-1.5 rounded-full transition-all" style={{
+                        width: `${patients.length > 0 ? (levelCounts[l] / patients.length) * 100 : 0}%`,
+                        backgroundColor: LEVEL_COLOR[l],
+                      }} />
+                    </div>
+                    <span className="text-xs text-slate-600 w-5 text-right font-semibold">{levelCounts[l]}</span>
+                    <span className="text-xs text-slate-400 w-8">
+                      {patients.length > 0 ? `${Math.round((levelCounts[l] / patients.length) * 100)}%` : '0%'}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Charts Row 1 ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-700 mb-4">Level Distribution</h3>
-          <BarChart data={[
-            { label: 'L1 Mild',        value: levelCounts[1], color: LEVEL_COLOR[1] },
-            { label: 'L2 Moderate',    value: levelCounts[2], color: LEVEL_COLOR[2] },
-            { label: 'L3 Mild Severe', value: levelCounts[3], color: LEVEL_COLOR[3] },
-            { label: 'L4 Severe',      value: levelCounts[4], color: LEVEL_COLOR[4] },
-          ]} />
-        </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-          <h3 className="text-sm font-semibold text-slate-700 mb-4">Program Type</h3>
-          <DonutChart segments={[
-            { label: 'Standard',  value: programCounts.Standard,  color: '#22c55e' },
-            { label: 'Intensive', value: programCounts.Intensive, color: '#f97316' },
-          ]} />
-        </div>
-      </div>
-
-      {/* ── Weekly Line Chart ── */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-        <h3 className="text-sm font-semibold text-slate-700 mb-2">Weekly Assessments — last 8 weeks</h3>
-        <LineChart data={weeklyData} />
-      </div>
-
-      {/* ── Outcome Trend ── */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-        <h3 className="text-sm font-semibold text-slate-700 mb-3">Outcome Trend — Initial vs Discharge (avg across all patients)</h3>
-        <TrendChart data={trendData} />
-      </div>
-
-      </div>{/* end chartsRef */}
-
-      {/* ── Reassessment Due Alert ── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-amber-100 bg-amber-50 flex items-center justify-between">
-          <h3 className="font-semibold text-amber-800 text-sm">Reassessment Due (every {REASSESS_DAYS} days)</h3>
-          <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${dueRows.length > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'}`}>
-            {dueRows.length} patients
-          </span>
-        </div>
-        {dueRows.length === 0 ? (
-          <div className="py-8 text-center text-slate-400 text-sm">No patients due for reassessment</div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {dueRows.map(row => {
-              const isOverdue = row.dueStatus === 'overdue'
-              const dd = row.latestScreening ? dueDate(row.latestScreening) : null
-              return (
-                <div key={row.patient.id}
-                  className={`flex items-center px-5 py-3 gap-3 cursor-pointer hover:bg-slate-50 transition-colors ${isOverdue ? 'border-l-4 border-red-400' : 'border-l-4 border-yellow-400'}`}
-                  onClick={() => setSelectedRow(row)}>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-800 text-sm truncate">
-                      {row.patient.firstName} {row.patient.lastName}
-                    </div>
-                    <div className="text-xs text-slate-500 flex gap-2 mt-0.5 flex-wrap">
-                      <span className="font-mono">{row.patient.hn}</span>
-                      <span>{row.patient.location}</span>
-                      {row.latestScreening && (
-                        <span className={`px-1.5 rounded font-semibold ${LEVEL_BG[row.latestScreening.overallLevel]}`}>
-                          L{row.latestScreening.overallLevel}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-xs text-slate-500">
-                      Last: {row.latestScreening?.assessedAt
-                        ? new Date(row.latestScreening.assessedAt).toLocaleDateString('th-TH')
-                        : '–'}
-                    </div>
-                    <div className={`text-xs font-bold mt-0.5 ${isOverdue ? 'text-red-600' : 'text-yellow-600'}`}>
-                      {isOverdue
-                        ? `เกินกำหนด ${Math.abs(row.daysUntilDue)} วัน`
-                        : `ครบใน ${row.daysUntilDue} วัน`}
-                    </div>
-                    <div className="text-xs text-slate-400">
-                      Due: {dd ? dd.toLocaleDateString('th-TH') : '–'}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ── Outcome Alert ── */}
-      {alertRows.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-orange-100 bg-orange-50 flex items-center justify-between">
-            <h3 className="font-semibold text-orange-800 text-sm">Outcome Reassessment Alerts</h3>
-            <div className="flex items-center gap-2">
-              {alertRows.filter(r => r.outcomeAlertStatus === 'overdue').length > 0 && (
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                  {alertRows.filter(r => r.outcomeAlertStatus === 'overdue').length} overdue
-                </span>
-              )}
-              {alertRows.filter(r => r.outcomeAlertStatus === 'due-soon').length > 0 && (
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
-                  {alertRows.filter(r => r.outcomeAlertStatus === 'due-soon').length} due soon
-                </span>
-              )}
             </div>
           </div>
-          <div className="divide-y divide-slate-100">
-            {alertRows.map(row => {
-              const isOverdue  = row.outcomeAlertStatus === 'overdue'
-              const isDueSoon  = row.outcomeAlertStatus === 'due-soon'
-              const borderCls  = isOverdue ? 'border-l-4 border-red-400' : isDueSoon ? 'border-l-4 border-yellow-400' : ''
-              // Non-BRFA missing items only for the badges
-              const nonBrfaMissing = row.missingItems.filter(m => m.groupLabel !== 'BRFA')
-              const brfaMissing    = row.missingItems.filter(m => m.groupLabel === 'BRFA')
-              return (
-                <div key={row.patient.id}
-                  className={`flex items-start px-5 py-3 gap-3 cursor-pointer hover:bg-slate-50 transition-colors ${borderCls}`}
-                  onClick={() => setSelectedRow(row)}>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-slate-800 text-sm">{row.patient.firstName} {row.patient.lastName}</span>
-                      <span className="font-mono text-xs text-slate-400">{row.patient.hn}</span>
-                      {row.latestScreening && (
-                        <span className={`px-1.5 rounded text-xs font-semibold ${LEVEL_BG[row.latestScreening.overallLevel]}`}>
-                          L{row.latestScreening.overallLevel}
-                        </span>
-                      )}
+
+          {/* ── Charts Row 1 ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-700 mb-4">Level Distribution</h3>
+              <BarChart data={[
+                { label: 'L1 Mild',        value: levelCounts[1], color: LEVEL_COLOR[1] },
+                { label: 'L2 Moderate',    value: levelCounts[2], color: LEVEL_COLOR[2] },
+                { label: 'L3 Mild Severe', value: levelCounts[3], color: LEVEL_COLOR[3] },
+                { label: 'L4 Severe',      value: levelCounts[4], color: LEVEL_COLOR[4] },
+              ]} />
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-700 mb-4">Program Type</h3>
+              <DonutChart segments={[
+                { label: 'Standard',  value: programCounts.Standard,  color: '#22c55e' },
+                { label: 'Intensive', value: programCounts.Intensive, color: '#f97316' },
+              ]} />
+            </div>
+          </div>
+
+          {/* ── Weekly Line Chart ── */}
+          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <h3 className="text-sm font-semibold text-slate-700 mb-2">Weekly Assessments — last 8 weeks</h3>
+            <LineChart data={weeklyData} />
+          </div>
+
+          {/* ── Outcome Trend ── */}
+          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+            <h3 className="text-sm font-semibold text-slate-700 mb-3">Outcome Trend — Initial vs Discharge (avg across all patients)</h3>
+            <TrendChart data={trendData} />
+          </div>
+
+          </div>{/* end chartsRef */}
+
+          {/* ── Reassessment Due Alert ── */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-amber-100 bg-amber-50 flex items-center justify-between">
+              <h3 className="font-semibold text-amber-800 text-sm">Reassessment Due (every {REASSESS_DAYS} days)</h3>
+              <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${dueRows.length > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'}`}>
+                {dueRows.length} patients
+              </span>
+            </div>
+            {dueRows.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-sm">No patients due for reassessment</div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {dueRows.map(row => {
+                  const isOverdue = row.dueStatus === 'overdue'
+                  const dd = row.latestScreening ? dueDate(row.latestScreening) : null
+                  return (
+                    <div key={row.patient.id}
+                      className={`flex items-center px-5 py-3 gap-3 cursor-pointer hover:bg-slate-50 transition-colors ${isOverdue ? 'border-l-4 border-red-400' : 'border-l-4 border-yellow-400'}`}
+                      onClick={() => setSelectedRow(row)}>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-slate-800 text-sm truncate">
+                          {row.patient.firstName} {row.patient.lastName}
+                        </div>
+                        <div className="text-xs text-slate-500 flex gap-2 mt-0.5 flex-wrap">
+                          <span className="font-mono">{row.patient.hn}</span>
+                          <span>{row.patient.location}</span>
+                          {row.latestScreening && (
+                            <span className={`px-1.5 rounded font-semibold ${LEVEL_BG[row.latestScreening.overallLevel]}`}>
+                              L{row.latestScreening.overallLevel}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-xs text-slate-500">
+                          Last: {row.latestScreening?.assessedAt
+                            ? new Date(row.latestScreening.assessedAt).toLocaleDateString('th-TH')
+                            : '–'}
+                        </div>
+                        <div className={`text-xs font-bold mt-0.5 ${isOverdue ? 'text-red-600' : 'text-yellow-600'}`}>
+                          {isOverdue
+                            ? `เกินกำหนด ${Math.abs(row.daysUntilDue)} วัน`
+                            : `ครบใน ${row.daysUntilDue} วัน`}
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          Due: {dd ? dd.toLocaleDateString('th-TH') : '–'}
+                        </div>
+                      </div>
                     </div>
-                    {/* Status line */}
-                    <div className="text-xs mt-0.5">
-                      {isOverdue && (
-                        <span className="text-red-600 font-medium">
-                          Reassessment เกินกำหนด — {row.expectedReassCount > 0 ? `RA ${row.expectedReassCount} ยังไม่ครบ` : 'Initial ยังไม่มีข้อมูล'}
-                        </span>
-                      )}
-                      {isDueSoon && row.daysUntilNextReas !== null && (
-                        <span className="text-yellow-600 font-medium">
-                          Reassessment ถัดไปอีก {row.daysUntilNextReas} วัน
-                        </span>
-                      )}
-                    </div>
-                    {/* Missing item badges */}
-                    {nonBrfaMissing.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {nonBrfaMissing.slice(0, 6).map((m, i) => (
-                          <span key={i} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">
-                            {m.groupLabel} / {SESSION_SHORT[m.session] ?? m.session}
-                          </span>
-                        ))}
-                        {nonBrfaMissing.length > 6 && (
-                          <span className="text-xs text-slate-400">+{nonBrfaMissing.length - 6} more</span>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* ── Outcome Alert ── */}
+          {alertRows.length > 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-orange-100 bg-orange-50 flex items-center justify-between">
+                <h3 className="font-semibold text-orange-800 text-sm">Outcome Reassessment Alerts</h3>
+                <div className="flex items-center gap-2">
+                  {alertRows.filter(r => r.outcomeAlertStatus === 'overdue').length > 0 && (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                      {alertRows.filter(r => r.outcomeAlertStatus === 'overdue').length} overdue
+                    </span>
+                  )}
+                  {alertRows.filter(r => r.outcomeAlertStatus === 'due-soon').length > 0 && (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
+                      {alertRows.filter(r => r.outcomeAlertStatus === 'due-soon').length} due soon
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {alertRows.map(row => {
+                  const isOverdue  = row.outcomeAlertStatus === 'overdue'
+                  const isDueSoon  = row.outcomeAlertStatus === 'due-soon'
+                  const borderCls  = isOverdue ? 'border-l-4 border-red-400' : isDueSoon ? 'border-l-4 border-yellow-400' : ''
+                  // Non-BRFA missing items only for the badges
+                  const nonBrfaMissing = row.missingItems.filter(m => m.groupLabel !== 'BRFA')
+                  const brfaMissing    = row.missingItems.filter(m => m.groupLabel === 'BRFA')
+                  return (
+                    <div key={row.patient.id}
+                      className={`flex items-start px-5 py-3 gap-3 cursor-pointer hover:bg-slate-50 transition-colors ${borderCls}`}
+                      onClick={() => setSelectedRow(row)}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-slate-800 text-sm">{row.patient.firstName} {row.patient.lastName}</span>
+                          <span className="font-mono text-xs text-slate-400">{row.patient.hn}</span>
+                          {row.latestScreening && (
+                            <span className={`px-1.5 rounded text-xs font-semibold ${LEVEL_BG[row.latestScreening.overallLevel]}`}>
+                              L{row.latestScreening.overallLevel}
+                            </span>
+                          )}
+                        </div>
+                        {/* Status line */}
+                        <div className="text-xs mt-0.5">
+                          {isOverdue && (
+                            <span className="text-red-600 font-medium">
+                              Reassessment เกินกำหนด — {row.expectedReassCount > 0 ? `RA ${row.expectedReassCount} ยังไม่ครบ` : 'Initial ยังไม่มีข้อมูล'}
+                            </span>
+                          )}
+                          {isDueSoon && row.daysUntilNextReas !== null && (
+                            <span className="text-yellow-600 font-medium">
+                              Reassessment ถัดไปอีก {row.daysUntilNextReas} วัน
+                            </span>
+                          )}
+                        </div>
+                        {/* Missing item badges */}
+                        {nonBrfaMissing.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {nonBrfaMissing.slice(0, 6).map((m, i) => (
+                              <span key={i} className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">
+                                {m.groupLabel} / {SESSION_SHORT[m.session] ?? m.session}
+                              </span>
+                            ))}
+                            {nonBrfaMissing.length > 6 && (
+                              <span className="text-xs text-slate-400">+{nonBrfaMissing.length - 6} more</span>
+                            )}
+                          </div>
+                        )}
+                        {brfaMissing.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {brfaMissing.map((m, i) => (
+                              <span key={i} className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full">
+                                BRFA {SESSION_SHORT[m.session] ?? m.session} ยังไม่บันทึก
+                              </span>
+                            ))}
+                          </div>
                         )}
                       </div>
-                    )}
-                    {brfaMissing.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {brfaMissing.map((m, i) => (
-                          <span key={i} className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full">
-                            BRFA {SESSION_SHORT[m.session] ?? m.session} ยังไม่บันทึก
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-slate-300 text-xl shrink-0 mt-0.5">›</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+                      <span className="text-slate-300 text-xl shrink-0 mt-0.5">›</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
-      {/* ── Patient List Table ── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-slate-100 flex flex-wrap items-center gap-2">
-          <h3 className="font-semibold text-slate-700 text-sm flex-1 min-w-0">
-            All Patients <span className="text-slate-400 font-normal">({filteredRows.length})</span>
-          </h3>
-          <select value={levelFilter}
-            onChange={e => setLevelFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-            className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:border-blue-400">
-            <option value="all">All Levels</option>
-            <option value={1}>L1 Mild</option>
-            <option value={2}>L2 Moderate</option>
-            <option value={3}>L3 Mild Severe</option>
-            <option value={4}>L4 Severe</option>
-          </select>
-          <select value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
-            className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:border-blue-400">
-            <option value="all">All Status</option>
-            <option value="overdue">Overdue</option>
-            <option value="due-soon">Due Soon</option>
-            <option value="ok">OK</option>
-          </select>
-          <select value={locationFilter}
-            onChange={e => setLocationFilter(e.target.value)}
-            className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:border-blue-400 max-w-[140px]">
-            <option value="all">All Locations</option>
-            {WARDS.map(w => <option key={w} value={w}>{w}</option>)}
-          </select>
-          <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
-            className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-600 hover:bg-slate-50 transition-colors">
-            Next Due {sortDir === 'asc' ? '↑' : '↓'}
-          </button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[700px]">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                {['HN', 'Name', 'Location', 'Level', 'Program', 'Last Assessment', 'Next Due', 'Outcomes'].map(h => (
-                  <th key={h} className="text-left px-4 py-2.5 font-semibold text-slate-600 text-xs">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredRows.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-10 text-slate-400">No patients found</td></tr>
-              ) : filteredRows.map(row => {
-                const dd = row.latestScreening ? dueDate(row.latestScreening) : null
-                const dueColor = row.dueStatus === 'overdue' ? 'text-red-600 font-semibold'
-                  : row.dueStatus === 'due-soon' ? 'text-yellow-600 font-semibold'
-                  : 'text-slate-600'
-                return (
-                  <tr key={row.patient.id}
-                    className="hover:bg-slate-50 cursor-pointer transition-colors"
-                    onClick={() => setSelectedRow(row)}>
-                    <td className="px-4 py-2.5 font-mono text-slate-600 text-xs">{row.patient.hn}</td>
-                    <td className="px-4 py-2.5 font-medium text-slate-800">
-                      {row.patient.firstName} {row.patient.lastName}
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-600 text-xs">{row.patient.location}</td>
-                    <td className="px-4 py-2.5">
-                      {row.latestScreening
-                        ? <span className={`px-2 py-0.5 rounded text-xs font-semibold ${LEVEL_BG[row.latestScreening.overallLevel]}`}>L{row.latestScreening.overallLevel}</span>
-                        : <span className="text-slate-300 text-xs">–</span>}
-                    </td>
-                    <td className="px-4 py-2.5 text-xs text-slate-600">{row.latestScreening?.programType ?? '–'}</td>
-                    <td className="px-4 py-2.5 text-xs text-slate-500">
-                      {row.latestScreening?.assessedAt
-                        ? new Date(row.latestScreening.assessedAt).toLocaleDateString('th-TH')
-                        : '–'}
-                    </td>
-                    <td className={`px-4 py-2.5 text-xs ${dueColor}`}>
-                      {dd ? dd.toLocaleDateString('th-TH') : '–'}
-                      {row.dueStatus === 'overdue'   && ` (${Math.abs(row.daysUntilDue)}d late)`}
-                      {row.dueStatus === 'due-soon'  && ` (${row.daysUntilDue}d)`}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                        row.outcomeStatus === 'complete' ? 'bg-emerald-100 text-emerald-700'
-                          : row.outcomeStatus === 'partial' ? 'bg-red-100 text-red-700'
-                          : 'bg-slate-100 text-slate-500'
-                      }`}>
-                        {row.outcomeStatus === 'complete' ? 'Complete'
-                          : row.outcomeStatus === 'partial' ? 'Partial'
-                          : 'None'}
-                      </span>
-                    </td>
+          {/* ── Patient List Table ── */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-slate-100 flex flex-wrap items-center gap-2">
+              <h3 className="font-semibold text-slate-700 text-sm flex-1 min-w-0">
+                All Patients <span className="text-slate-400 font-normal">({filteredRows.length})</span>
+              </h3>
+              <select value={levelFilter}
+                onChange={e => setLevelFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:border-blue-400">
+                <option value="all">All Levels</option>
+                <option value={1}>L1 Mild</option>
+                <option value={2}>L2 Moderate</option>
+                <option value={3}>L3 Mild Severe</option>
+                <option value={4}>L4 Severe</option>
+              </select>
+              <select value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
+                className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:border-blue-400">
+                <option value="all">All Status</option>
+                <option value="overdue">Overdue</option>
+                <option value="due-soon">Due Soon</option>
+                <option value="ok">OK</option>
+              </select>
+              <select value={locationFilter}
+                onChange={e => setLocationFilter(e.target.value)}
+                className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:border-blue-400 max-w-[140px]">
+                <option value="all">All Locations</option>
+                {WARDS.map(w => <option key={w} value={w}>{w}</option>)}
+              </select>
+              <button onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+                className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-600 hover:bg-slate-50 transition-colors">
+                Next Due {sortDir === 'asc' ? '↑' : '↓'}
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[700px]">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    {['HN', 'Name', 'Location', 'Level', 'Program', 'Last Assessment', 'Next Due', 'Outcomes'].map(h => (
+                      <th key={h} className="text-left px-4 py-2.5 font-semibold text-slate-600 text-xs">{h}</th>
+                    ))}
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredRows.length === 0 ? (
+                    <tr><td colSpan={8} className="text-center py-10 text-slate-400">No patients found</td></tr>
+                  ) : filteredRows.map(row => {
+                    const dd = row.latestScreening ? dueDate(row.latestScreening) : null
+                    const dueColor = row.dueStatus === 'overdue' ? 'text-red-600 font-semibold'
+                      : row.dueStatus === 'due-soon' ? 'text-yellow-600 font-semibold'
+                      : 'text-slate-600'
+                    return (
+                      <tr key={row.patient.id}
+                        className="hover:bg-slate-50 cursor-pointer transition-colors"
+                        onClick={() => setSelectedRow(row)}>
+                        <td className="px-4 py-2.5 font-mono text-slate-600 text-xs">{row.patient.hn}</td>
+                        <td className="px-4 py-2.5 font-medium text-slate-800">
+                          {row.patient.firstName} {row.patient.lastName}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-600 text-xs">{row.patient.location}</td>
+                        <td className="px-4 py-2.5">
+                          {row.latestScreening
+                            ? <span className={`px-2 py-0.5 rounded text-xs font-semibold ${LEVEL_BG[row.latestScreening.overallLevel]}`}>L{row.latestScreening.overallLevel}</span>
+                            : <span className="text-slate-300 text-xs">–</span>}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-slate-600">{row.latestScreening?.programType ?? '–'}</td>
+                        <td className="px-4 py-2.5 text-xs text-slate-500">
+                          {row.latestScreening?.assessedAt
+                            ? new Date(row.latestScreening.assessedAt).toLocaleDateString('th-TH')
+                            : '–'}
+                        </td>
+                        <td className={`px-4 py-2.5 text-xs ${dueColor}`}>
+                          {dd ? dd.toLocaleDateString('th-TH') : '–'}
+                          {row.dueStatus === 'overdue'   && ` (${Math.abs(row.daysUntilDue)}d late)`}
+                          {row.dueStatus === 'due-soon'  && ` (${row.daysUntilDue}d)`}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                            row.outcomeStatus === 'complete' ? 'bg-emerald-100 text-emerald-700'
+                              : row.outcomeStatus === 'partial' ? 'bg-red-100 text-red-700'
+                              : 'bg-slate-100 text-slate-500'
+                          }`}>
+                            {row.outcomeStatus === 'complete' ? 'Complete'
+                              : row.outcomeStatus === 'partial' ? 'Partial'
+                              : 'None'}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-      {/* ── Patient Detail Modal ── */}
-      {selectedRow && <PatientModal row={selectedRow} onClose={() => setSelectedRow(null)} />}
+          {/* ── Patient Detail Modal ── */}
+          {selectedRow && <PatientModal row={selectedRow} onClose={() => setSelectedRow(null)} />}
+        </>
+      )}
     </div>
   )
 }

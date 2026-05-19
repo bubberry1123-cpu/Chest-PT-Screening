@@ -4,6 +4,7 @@ import {
   query, where, orderBy, deleteDoc, serverTimestamp, Timestamp, writeBatch,
 } from 'firebase/firestore'
 import { db } from './firebase'
+import { logActivity } from './authStore'
 import type { Patient, Screening, OutcomeMeasurement, OutcomeSession } from '@/types'
 
 function toDate(val: unknown): Date | undefined {
@@ -20,6 +21,7 @@ export async function createPatient(data: Omit<Patient, 'id' | 'createdAt'>): Pr
     ...data,
     createdAt: serverTimestamp(),
   })
+  try { await logActivity('Added patient', 'patient', ref.id, `HN: ${data.hn}`) } catch {}
   return ref.id
 }
 
@@ -67,6 +69,7 @@ export async function createScreening(data: Omit<Screening, 'id' | 'assessedAt'>
     ...data,
     assessedAt: serverTimestamp(),
   })
+  try { await logActivity('Added screening', 'screening', ref.id, `HN: ${data.patientHn}`) } catch {}
   return ref.id
 }
 
@@ -104,6 +107,7 @@ export async function saveOutcome(data: Omit<OutcomeMeasurement, 'id' | 'recorde
   console.log('[saveOutcome] writing to:', ref.path, 'data:', JSON.stringify(data))
   await setDoc(ref, { ...data, recordedAt: serverTimestamp() }, { merge: true })
   console.log('[saveOutcome] success:', docId)
+  try { await logActivity('Saved outcome', 'outcome', docId, `HN: ${data.patientHn} [${data.session}]`) } catch {}
   return docId
 }
 

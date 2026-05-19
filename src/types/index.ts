@@ -67,3 +67,25 @@ export interface OutcomeMeasurement {
   recordedAt?: Date
   assessmentDate?: string  // YYYY-MM-DD, user-editable, separate from recordedAt
 }
+
+export interface UserProfile {
+  uid: string
+  email: string
+  displayName: string
+  employeeId?: string
+  role: 'admin' | 'staff'
+  status: 'pending' | 'active' | 'rejected'
+  createdAt?: Date
+}
+
+export interface ActivityLog {
+  id?: string
+  userId: string
+  userEmail: string
+  userName: string
+  action: string
+  entityType: 'patient' | 'screening' | 'outcome'
+  entityId: string
+  entityLabel: string
+  timestamp?: Date
+}

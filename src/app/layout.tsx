@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import ClientNavBar from '@/components/ClientNavBar'
+import ClientProviders from '@/components/ClientProviders'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -11,22 +12,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="th" className="h-full">
       <body className="min-h-full flex flex-col bg-[#F4F6F9]">
-        <header className="bg-[#0C447C] text-white shadow-md">
-          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-            <span className="text-2xl">🫁</span>
-            <div>
-              <h1 className="font-bold text-lg leading-tight">Chest PT Screening</h1>
-              <p className="text-blue-200 text-xs">ระบบประเมินผู้ป่วย Pulmonary Rehabilitation</p>
+        <ClientProviders>
+          <header className="bg-[#0C447C] text-white shadow-md">
+            <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
+              <span className="text-2xl">🫁</span>
+              <div>
+                <h1 className="font-bold text-lg leading-tight">Chest PT Screening</h1>
+                <p className="text-blue-200 text-xs">Pulmonary Rehabilitation</p>
+              </div>
+              <ClientNavBar />
             </div>
-            <ClientNavBar />
-          </div>
-        </header>
-        <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-6">
-          {children}
-        </main>
-        <footer className="text-center text-slate-400 text-xs py-3 border-t border-slate-200">
-          Chest PT Screening System
-        </footer>
+          </header>
+          <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-6">{children}</main>
+          <footer className="text-center text-slate-400 text-xs py-3 border-t border-slate-200">Chest PT Screening System</footer>
+        </ClientProviders>
       </body>
     </html>
   )
