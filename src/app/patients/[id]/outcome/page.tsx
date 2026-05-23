@@ -3,7 +3,10 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getPatientById, getScreeningsByPatient, saveOutcome, getOutcomesByPatient, deleteOutcomeSession } from '@/lib/localstore'
-import { OUTCOME_GROUPS, OUTCOME_SESSIONS, SESSION_SHORT, getFlatItems } from '@/lib/outcomeItems'
+import {
+  OUTCOME_GROUPS, OUTCOME_SESSIONS, SESSION_SHORT, getFlatItems,
+  ERAS_PHASES, ERAS_OUTCOME_GROUPS, getErasFlatItems, ERAS_PHASE_SHORT,
+} from '@/lib/outcomeItems'
 import { useIsAdmin } from '@/lib/useIsAdmin'
 import { useToast } from '@/lib/useToast'
 import Toast from '@/components/Toast'
@@ -28,9 +31,20 @@ export default function OutcomePage() {
 
   useEffect(() => {
     Promise.all([getPatientById(id), getScreeningsByPatient(id), getOutcomesByPatient(id)])
-      .then(([p, s, o]) => { setPatient(p); setLatestScreening(s[0] ?? null); setOutcomes(o); setLoading(false) })
+      .then(([p, s, o]) => {
+        setPatient(p)
+        setLatestScreening(s[0] ?? null)
+        setOutcomes(o)
+        // Set correct default session based on assessment type
+        if (s[0]?.assessmentType === 'ERAS') {
+          setSession('Prehabilitation' as OutcomeSession)
+        }
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [id])
+
+  const isEras = latestScreening?.assessmentType === 'ERAS'
 
   useEffect(() => {
     const existing = outcomes.find(o => o.session === session)
@@ -53,11 +67,11 @@ export default function OutcomePage() {
   }, [session, outcomes])
 
   const level = latestScreening?.overallLevel as OverallLevel | undefined
-  const groups = level ? OUTCOME_GROUPS[level] : []
+  const groups = isEras ? ERAS_OUTCOME_GROUPS : (level ? OUTCOME_GROUPS[level] : [])
 
   const handleSave = async () => {
     if (!level || !patient) return
-    const allItems = getFlatItems(level)
+    const allItems = isEras ? getErasFlatItems() : getFlatItems(level)
     const filledItems: Record<string, { value: number; note?: string }> = {}
     let hasAny = false
     for (const item of allItems) {
@@ -97,6 +111,9 @@ export default function OutcomePage() {
   )
 
   const hasDataForSession = outcomes.some(o => o.session === session)
+  const sessionShortLabel = isEras
+    ? (ERAS_PHASE_SHORT[session] ?? session)
+    : (SESSION_SHORT[session] ?? session)
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -111,29 +128,62 @@ export default function OutcomePage() {
           <span className="font-semibold text-[#1D4ED8]">{patient.firstName} {patient.lastName}</span>
           <span className="text-blue-600 ml-2 font-mono">HN: {patient.hn}</span>
         </div>
-        <span className="text-[#1D4ED8] font-semibold text-xs px-2.5 py-1 bg-[#F0F7FF] border border-[#BFDBFE] rounded-full">
-          Level {latestScreening.overallLevel} — {latestScreening.levelName}
-        </span>
+        <div className="flex items-center gap-2">
+          {isEras && (
+            <span className="text-purple-700 font-semibold text-xs px-2.5 py-1 bg-purple-50 border border-purple-200 rounded-full">
+              ERAS
+            </span>
+          )}
+          <span className="text-[#1D4ED8] font-semibold text-xs px-2.5 py-1 bg-[#F0F7FF] border border-[#BFDBFE] rounded-full">
+            Level {latestScreening.overallLevel} — {latestScreening.levelName}
+          </span>
+        </div>
       </div>
 
       <h2 className="text-lg font-bold text-slate-800 mb-4">Outcome Measurement</h2>
 
-      {/* Session selector */}
+      {/* Phase / Session selector */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-5">
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Select Session</p>
-        <select
-          value={session}
-          onChange={e => setSession(e.target.value as OutcomeSession)}
-          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#185FA5] bg-white text-slate-700">
-          {OUTCOME_SESSIONS.map(s => {
-            const hasDone = outcomes.some(o => o.session === s)
-            return (
-              <option key={s} value={s}>
-                {s}{hasDone ? ' ✓' : ''}
-              </option>
-            )
-          })}
-        </select>
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
+          {isEras ? 'Select Phase' : 'Select Session'}
+        </p>
+        {isEras ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {ERAS_PHASES.map(phase => {
+              const hasDone = outcomes.some(o => o.session === phase)
+              const isActive = session === phase
+              return (
+                <button
+                  key={phase}
+                  type="button"
+                  onClick={() => setSession(phase as OutcomeSession)}
+                  className={`py-2.5 px-3 rounded-xl border-2 text-xs font-semibold transition-all text-center ${
+                    isActive
+                      ? 'bg-purple-700 border-purple-700 text-white shadow'
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-purple-400 hover:bg-purple-50'
+                  }`}>
+                  {ERAS_PHASE_SHORT[phase]}
+                  {hasDone && <span className={`ml-1 ${isActive ? 'text-purple-200' : 'text-emerald-500'}`}>✓</span>}
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <select
+            value={session}
+            onChange={e => setSession(e.target.value as OutcomeSession)}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#185FA5] bg-white text-slate-700">
+            {OUTCOME_SESSIONS.map(s => {
+              const hasDone = outcomes.some(o => o.session === s)
+              return (
+                <option key={s} value={s}>
+                  {s}{hasDone ? ' ✓' : ''}
+                </option>
+              )
+            })}
+          </select>
+        )}
+
         {/* Assessment Date */}
         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100">
           <label className="text-xs font-semibold text-slate-500 shrink-0">Assessment Date</label>
@@ -152,17 +202,17 @@ export default function OutcomePage() {
             {isAdmin && (
               <button
                 onClick={async () => {
-                  if (!window.confirm(`ลบข้อมูล ${SESSION_SHORT[session]} ทั้งหมด?`)) return
+                  if (!window.confirm(`Delete ${sessionShortLabel} data?`)) return
                   try {
                     await deleteOutcomeSession(id, session)
                     const updated = await getOutcomesByPatient(id)
                     setOutcomes(updated)
                   } catch {
-                    showToast('ลบไม่สำเร็จ กรุณาลองใหม่', 'error')
+                    showToast('Failed to delete. Please try again.', 'error')
                   }
                 }}
                 className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-2 py-0.5 rounded transition-colors">
-                ลบ session นี้
+                Delete this {isEras ? 'phase' : 'session'}
               </button>
             )}
           </div>
@@ -228,10 +278,10 @@ export default function OutcomePage() {
                 <div className="px-5 pb-3 border-t border-slate-100">
                   <p className="text-[11px] font-medium text-slate-400 mt-2 mb-1">mMRC Grades</p>
                   <div className="text-[11px] text-slate-500 space-y-0.5">
-                    <div><span className="inline-block w-5 font-semibold text-slate-600">0</span>หายใจหอบเฉพาะออกกำลังกายหนัก</div>
-                    <div><span className="inline-block w-5 font-semibold text-slate-600">1–2</span>หายใจหอบเมื่อรีบเดินหรือเดินช้ากว่าวัยเดียวกัน</div>
-                    <div><span className="inline-block w-5 font-semibold text-slate-600">3</span>หายใจหอบมาก ต้องหยุดพักเมื่อเดินได้ 100 เมตร</div>
-                    <div><span className="inline-block w-5 font-semibold text-slate-600">4</span>หายใจหอบแม้ขณะพัก</div>
+                    <div><span className="inline-block w-5 font-semibold text-slate-600">0</span>Breathless only with strenuous exercise</div>
+                    <div><span className="inline-block w-5 font-semibold text-slate-600">1–2</span>Short of breath when hurrying or walking up a slight hill</div>
+                    <div><span className="inline-block w-5 font-semibold text-slate-600">3</span>Stops for breath after walking 100 meters</div>
+                    <div><span className="inline-block w-5 font-semibold text-slate-600">4</span>Too breathless to leave the house / breathless at rest</div>
                   </div>
                 </div>
               )}
@@ -264,7 +314,9 @@ export default function OutcomePage() {
               ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
               : btnState === 'saving'
                 ? 'bg-[#0C447C] opacity-80 text-white cursor-not-allowed'
-                : 'bg-[#0C447C] hover:bg-[#185FA5] text-white'
+                : isEras
+                  ? 'bg-purple-700 hover:bg-purple-800 text-white'
+                  : 'bg-[#0C447C] hover:bg-[#185FA5] text-white'
           }`}>
           {btnState === 'saving' && (
             <svg className="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
@@ -272,7 +324,7 @@ export default function OutcomePage() {
               <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
             </svg>
           )}
-          {btnState === 'saved' ? '✓ Saved' : btnState === 'saving' ? 'Saving...' : `Save ${SESSION_SHORT[session]}`}
+          {btnState === 'saved' ? '✓ Saved' : btnState === 'saving' ? 'Saving...' : `Save ${sessionShortLabel}`}
         </button>
       </div>
     </div>

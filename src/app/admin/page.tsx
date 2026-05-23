@@ -260,50 +260,6 @@ function LineChart({ data }: { data: { label: string; value: number }[] }) {
   )
 }
 
-function DonutChart({ segments }: { segments: { label: string; value: number; color: string }[] }) {
-  const total = segments.reduce((s, d) => s + d.value, 0)
-  if (total === 0) return (
-    <div className="h-36 flex items-center justify-center text-slate-400 text-sm">No data</div>
-  )
-  const cx = 60, cy = 60, R = 45, ri = 28
-  let angle = -Math.PI / 2
-  const arcs = segments.map(seg => {
-    const a = (seg.value / total) * 2 * Math.PI
-    const x1 = cx + R * Math.cos(angle), y1 = cy + R * Math.sin(angle)
-    angle += a
-    const x2 = cx + R * Math.cos(angle), y2 = cy + R * Math.sin(angle)
-    const xi1 = cx + ri * Math.cos(angle - a), yi1 = cy + ri * Math.sin(angle - a)
-    const xi2 = cx + ri * Math.cos(angle), yi2 = cy + ri * Math.sin(angle)
-    const largeArc = a > Math.PI ? 1 : 0
-    return {
-      d: `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${R} ${R} 0 ${largeArc} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} L ${xi2.toFixed(2)} ${yi2.toFixed(2)} A ${ri} ${ri} 0 ${largeArc} 0 ${xi1.toFixed(2)} ${yi1.toFixed(2)} Z`,
-      color: seg.color,
-      pct: Math.round((seg.value / total) * 100),
-      label: seg.label,
-      value: seg.value,
-    }
-  })
-  return (
-    <div className="flex items-center gap-5">
-      <svg viewBox="0 0 120 120" className="w-28 h-28 shrink-0">
-        {arcs.map((arc, i) => <path key={i} d={arc.d} fill={arc.color} />)}
-        <text x="60" y="56" textAnchor="middle" fontSize="14" fontWeight="bold" fill="#1e293b">{total}</text>
-        <text x="60" y="70" textAnchor="middle" fontSize="9" fill="#64748b">total</text>
-      </svg>
-      <div className="space-y-2">
-        {arcs.map((arc, i) => (
-          <div key={i} className="flex items-center gap-2 text-sm">
-            <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: arc.color }} />
-            <span className="text-slate-600">{arc.label}</span>
-            <span className="font-bold text-slate-800">{arc.pct}%</span>
-            <span className="text-slate-400 text-xs">({arc.value})</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 function TrendChart({ data }: { data: { label: string; initial: number | null; discharge: number | null }[] }) {
   const vals = data.flatMap(d => [d.initial, d.discharge]).filter((v): v is number => v !== null && v > 0)
   if (vals.length === 0) return (
@@ -716,12 +672,6 @@ export default function AdminPage() {
   // ── Chart data ─────────────────────────────────────────────────────────────
   const weeklyData = useMemo(() => getWeeklyData(screenings), [screenings])
 
-  const programCounts = useMemo(() => {
-    const c = { Standard: 0, Intensive: 0 }
-    rows.forEach(r => { if (r.latestScreening) c[r.latestScreening.programType]++ })
-    return c
-  }, [rows])
-
   const trendData = useMemo(() => {
     const METRICS = [
       { label: 'AMPAC',    keys: ['ampac_part1','ampac_part2','ampac_part3'] },
@@ -753,6 +703,78 @@ export default function AdminPage() {
       return { label: m.label, initial: mean(initVals), discharge: mean(dcVals) }
     })
   }, [rows])
+
+  // ── ERAS stats ─────────────────────────────────────────────────────────────
+  const erasRows = useMemo(
+    () => rows.filter(r => r.latestScreening?.assessmentType === 'ERAS'),
+    [rows]
+  )
+
+  const erasPhaseCounts = useMemo(() => {
+    const counts = { Prehabilitation: 0, 'Pre-op': 0, 'Post-op': 0, DC: 0 }
+    const phaseOrder = ['Prehabilitation', 'Pre-op', 'Post-op', 'DC'] as const
+    erasRows.forEach(r => {
+      const byP: Record<string, OutcomeMeasurement> = {}
+      r.outcomes.forEach(o => { byP[o.session] = o })
+      // Current phase = last phase with data recorded
+      let current: typeof phaseOrder[number] = 'Prehabilitation'
+      for (const p of phaseOrder) {
+        if (byP[p]) current = p
+      }
+      counts[current]++
+    })
+    return counts
+  }, [erasRows])
+
+  const erasLevelCounts = useMemo(() => {
+    const c: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 }
+    erasRows.forEach(r => { if (r.latestScreening) c[r.latestScreening.overallLevel]++ })
+    return c
+  }, [erasRows])
+
+  const erasAvgLos = useMemo(() => {
+    const list: number[] = []
+    erasRows.forEach(r => {
+      const byP: Record<string, OutcomeMeasurement> = {}
+      r.outcomes.forEach(o => { byP[o.session] = o })
+      const d0 = byP['Prehabilitation']?.assessmentDate
+      const d1 = byP['DC']?.assessmentDate
+      if (d0 && d1) {
+        const days = Math.round((new Date(d1).getTime() - new Date(d0).getTime()) / 86_400_000)
+        if (days >= 0) list.push(days)
+      }
+    })
+    return list.length > 0 ? Math.round(list.reduce((a, b) => a + b) / list.length) : null
+  }, [erasRows])
+
+  const ERAS_METRICS = [
+    { key: 'peakCoughFlow',    label: 'Peak Cough Flow', unit: 'L/min' },
+    { key: 'wrightSpirometer', label: 'Wright Spirometry', unit: 'mL' },
+    { key: 'gripStrength_left',  label: 'Grip L', unit: 'kg' },
+    { key: 'gripStrength_right', label: 'Grip R', unit: 'kg' },
+    { key: 'cs30',             label: 'CS-30', unit: 'stands' },
+    { key: 'erasTwoMWalk',     label: '2-Meter Walk', unit: 'sec' },
+  ] as const
+
+  const ERAS_PHASES_LIST = ['Prehabilitation', 'Pre-op', 'Post-op', 'DC'] as const
+  const ERAS_PHASE_SHORT_MAP: Record<string, string> = {
+    'Prehabilitation': 'Pre-hab', 'Pre-op': 'Pre-op', 'Post-op': 'Post-op', 'DC': 'D/C',
+  }
+
+  const erasTrendData = useMemo(() => {
+    return ERAS_METRICS.map(m => {
+      const phaseAvgs = ERAS_PHASES_LIST.map(phase => {
+        const vals: number[] = []
+        erasRows.forEach(r => {
+          const o = r.outcomes.find(x => x.session === phase)
+          const v = o?.items[m.key]?.value
+          if (v !== undefined) vals.push(v)
+        })
+        return vals.length > 0 ? Math.round((vals.reduce((a, b) => a + b) / vals.length) * 10) / 10 : null
+      })
+      return { label: m.label, unit: m.unit, phaseAvgs }
+    })
+  }, [erasRows])
 
   // ── Filtered table rows ────────────────────────────────────────────────────
   const filteredRows = useMemo(() => {
@@ -929,23 +951,14 @@ export default function AdminPage() {
           </div>
 
           {/* ── Charts Row 1 ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-700 mb-4">Level Distribution</h3>
-              <BarChart data={[
-                { label: 'L1 Mild',        value: levelCounts[1], color: LEVEL_COLOR[1] },
-                { label: 'L2 Moderate',    value: levelCounts[2], color: LEVEL_COLOR[2] },
-                { label: 'L3 Mild Severe', value: levelCounts[3], color: LEVEL_COLOR[3] },
-                { label: 'L4 Severe',      value: levelCounts[4], color: LEVEL_COLOR[4] },
-              ]} />
-            </div>
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-              <h3 className="text-sm font-semibold text-slate-700 mb-4">Program Type</h3>
-              <DonutChart segments={[
-                { label: 'Standard',  value: programCounts.Standard,  color: '#22c55e' },
-                { label: 'Intensive', value: programCounts.Intensive, color: '#f97316' },
-              ]} />
-            </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+            <h3 className="text-sm font-semibold text-slate-700 mb-4">Level Distribution</h3>
+            <BarChart data={[
+              { label: 'L1 Mild',        value: levelCounts[1], color: LEVEL_COLOR[1] },
+              { label: 'L2 Moderate',    value: levelCounts[2], color: LEVEL_COLOR[2] },
+              { label: 'L3 Mild Severe', value: levelCounts[3], color: LEVEL_COLOR[3] },
+              { label: 'L4 Severe',      value: levelCounts[4], color: LEVEL_COLOR[4] },
+            ]} />
           </div>
 
           {/* ── Weekly Line Chart ── */}
@@ -1198,6 +1211,111 @@ export default function AdminPage() {
 
           {/* ── Patient Detail Modal ── */}
           {selectedRow && <PatientModal row={selectedRow} onClose={() => setSelectedRow(null)} />}
+
+          {/* ── ERAS Section ── */}
+          <div className="bg-white rounded-2xl border border-purple-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-purple-100 bg-purple-50 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-purple-900">ERAS — Enhanced Recovery After Surgery</h3>
+                <p className="text-purple-600 text-xs mt-0.5">Prehabilitation → Pre-op → Post-op → DC</p>
+              </div>
+              <span className="text-2xl font-bold text-purple-700">{erasRows.length}</span>
+            </div>
+
+            {erasRows.length === 0 ? (
+              <div className="py-10 text-center text-slate-400 text-sm">No ERAS patients yet</div>
+            ) : (
+              <div className="p-5 space-y-6">
+
+                {/* a) Phase breakdown */}
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-700 mb-3">Patient Phase Distribution</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {(['Prehabilitation', 'Pre-op', 'Post-op', 'DC'] as const).map(phase => (
+                      <div key={phase} className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-center">
+                        <div className="text-xs text-purple-600 font-medium mb-1">{ERAS_PHASE_SHORT_MAP[phase]}</div>
+                        <div className="text-2xl font-bold text-purple-800">{erasPhaseCounts[phase]}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* b) Outcome trend across 4 phases */}
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-700 mb-3">Outcome Trends Across Phases (avg across all ERAS patients)</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {erasTrendData.map(m => {
+                      const hasData = m.phaseAvgs.some(v => v !== null)
+                      if (!hasData) return null
+                      const vals = m.phaseAvgs.filter((v): v is number => v !== null)
+                      const maxV = Math.max(...vals, 1)
+                      return (
+                        <div key={m.label} className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold text-slate-700">{m.label}</span>
+                            <span className="text-xs text-slate-400">{m.unit}</span>
+                          </div>
+                          <div className="flex items-end gap-1.5 h-16">
+                            {m.phaseAvgs.map((v, i) => (
+                              <div key={i} className="flex flex-col items-center gap-0.5 flex-1">
+                                <span className="text-[9px] font-semibold text-purple-700">
+                                  {v !== null ? v : '–'}
+                                </span>
+                                <div
+                                  className="w-full rounded-t bg-purple-400 min-h-[2px]"
+                                  style={{ height: v !== null && v > 0 ? `${Math.max((v / maxV) * 44, 3)}px` : '2px', opacity: v !== null ? 1 : 0.2 }}
+                                />
+                                <span className="text-[8px] text-slate-500 text-center leading-none">
+                                  {ERAS_PHASE_SHORT_MAP[ERAS_PHASES_LIST[i]]}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* c) Level distribution */}
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-700 mb-3">ERAS Patient Level Distribution</h4>
+                  <div className="space-y-1.5">
+                    {([1, 2, 3, 4] as const).map(l => (
+                      <div key={l} className="flex items-center gap-2">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${LEVEL_BG[l]}`}>L{l}</span>
+                        <div className="flex-1 bg-slate-100 rounded-full h-1.5">
+                          <div className="h-1.5 rounded-full transition-all" style={{
+                            width: `${erasRows.length > 0 ? (erasLevelCounts[l] / erasRows.length) * 100 : 0}%`,
+                            backgroundColor: LEVEL_COLOR[l],
+                          }} />
+                        </div>
+                        <span className="text-xs font-semibold text-slate-600 w-5 text-right">{erasLevelCounts[l]}</span>
+                        <span className="text-xs text-slate-400 w-8">
+                          {erasRows.length > 0 ? `${Math.round((erasLevelCounts[l] / erasRows.length) * 100)}%` : '0%'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* d) Average LOS */}
+                <div className="flex items-center gap-4 pt-3 border-t border-slate-100">
+                  <div>
+                    <div className="text-xs text-slate-500 mb-0.5">Avg LOS (Prehab → DC)</div>
+                    {erasAvgLos !== null
+                      ? <><span className="text-2xl font-bold text-violet-600">{erasAvgLos}</span><span className="text-sm text-slate-400 ml-1">days</span></>
+                      : <span className="text-slate-300 text-sm">No discharge data yet</span>
+                    }
+                  </div>
+                  <div className="ml-auto text-xs text-slate-400 text-right">
+                    Based on patients with both<br />Prehabilitation + DC outcomes
+                  </div>
+                </div>
+
+              </div>
+            )}
+          </div>
         </>
       )}
     </div>

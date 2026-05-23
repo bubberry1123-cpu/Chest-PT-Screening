@@ -6,6 +6,7 @@ export type RLevel = 1 | 2 | 3 | 4
 export type OverallLevel = 1 | 2 | 3 | 4
 export type ProgramType = 'Standard' | 'Intensive'
 export type Driver = 'Functional' | 'Respiratory' | 'Equal' | 'Non-Cooperative'
+export type AssessmentType = 'Standard' | 'ERAS'
 
 export interface Patient {
   id?: string
@@ -44,6 +45,7 @@ export interface Screening extends ScreeningInput, ScreeningResult {
   assessedBy: string
   notes?: string
   assessedAt?: Date
+  assessmentType?: AssessmentType
 }
 
 export type OutcomeSession =
@@ -51,6 +53,7 @@ export type OutcomeSession =
   | 'Reassessment 1' | 'Reassessment 2' | 'Reassessment 3' | 'Reassessment 4' | 'Reassessment 5'
   | 'Reassessment 6' | 'Reassessment 7' | 'Reassessment 8' | 'Reassessment 9' | 'Reassessment 10'
   | 'Discharge'
+  | 'Prehabilitation' | 'Pre-op' | 'Post-op' | 'DC'
 
 export interface OutcomeEntry {
   value: number

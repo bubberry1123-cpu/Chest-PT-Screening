@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getPatientById, getScreeningsByPatient, getOutcomesByPatient, updatePatient, deletePatient, deleteScreening } from '@/lib/localstore'
-import { OUTCOME_GROUPS, OUTCOME_SESSIONS, SESSION_SHORT } from '@/lib/outcomeItems'
+import { OUTCOME_GROUPS, OUTCOME_SESSIONS, SESSION_SHORT, ERAS_PHASES, ERAS_PHASE_SHORT, ERAS_OUTCOME_GROUPS } from '@/lib/outcomeItems'
 import { useIsAdmin } from '@/lib/useIsAdmin'
 import type { Patient, Screening, OutcomeMeasurement, OverallLevel } from '@/types'
 import { WARDS } from '@/lib/wards'
@@ -12,6 +12,7 @@ import Toast from '@/components/Toast'
 import SeverityBadge from '@/components/SeverityBadge'
 import OutcomeCharts from '@/components/OutcomeCharts'
 import OutcomeSummaryDashboard from '@/components/OutcomeSummaryDashboard'
+import ErasOutcomeCharts from '@/components/ErasOutcomeCharts'
 
 function trendSymbol(diff: number, lowerIsBetter?: boolean) {
   if (diff === 0) return { symbol: '→', color: 'text-slate-400' }
@@ -99,6 +100,99 @@ function OutcomeTable({ outcomes, level }: { outcomes: OutcomeMeasurement[]; lev
                     : null
                   return (
                     <td key={s} className="px-3 py-2 text-center">
+                      <span className="font-semibold text-slate-800">{entry.value}</span>
+                      {trend && <span className={`text-xs font-bold ml-1 ${trend.color}`}>{trend.symbol}</span>}
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── ERAS Outcome Table ────────────────────────────────────────────────────────
+function ErasOutcomeTable({ outcomes }: { outcomes: OutcomeMeasurement[] }) {
+  const byPhase: Record<string, OutcomeMeasurement> = {}
+  outcomes.forEach(o => { byPhase[o.session] = o })
+
+  const filledPhases = ERAS_PHASES.filter(p => byPhase[p])
+  if (filledPhases.length === 0) return null
+
+  const firstPhase = filledPhases[0]
+
+  type Row =
+    | { type: 'header'; key: string; label: string }
+    | { type: 'item'; key: string; itemKey: string; label: string; unit: string; lowerIsBetter?: boolean; indent: boolean }
+
+  const rows: Row[] = []
+  for (const group of ERAS_OUTCOME_GROUPS) {
+    if (group.items.length > 1) {
+      rows.push({ type: 'header', key: `h-${group.groupKey}`, label: group.label })
+      group.items.forEach(item => rows.push({
+        type: 'item', key: item.key, itemKey: item.key,
+        label: item.label, unit: item.unit, lowerIsBetter: item.lowerIsBetter, indent: true,
+      }))
+    } else {
+      const item = group.items[0]
+      rows.push({
+        type: 'item', key: item.key, itemKey: item.key,
+        label: group.label, unit: item.unit, lowerIsBetter: item.lowerIsBetter, indent: false,
+      })
+    }
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-sm">
+      <table className="w-full text-sm min-w-max">
+        <thead className="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th className="text-left px-4 py-2.5 font-semibold text-slate-600 sticky left-0 bg-slate-50 min-w-[200px]">
+              Outcome
+            </th>
+            {filledPhases.map(p => (
+              <th key={p} className="px-3 py-2.5 font-semibold text-center min-w-[90px] text-slate-700">
+                <div>{ERAS_PHASE_SHORT[p]}</div>
+                {byPhase[p]?.assessmentDate && (
+                  <div className="text-[10px] font-normal text-slate-400 mt-0.5">
+                    {new Date(byPhase[p].assessmentDate!).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
+                  </div>
+                )}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="bg-white">
+          {rows.map(row => {
+            if (row.type === 'header') {
+              return (
+                <tr key={row.key} className="border-t border-slate-100">
+                  <td colSpan={filledPhases.length + 1} className="px-4 pt-3 pb-1 text-xs font-bold text-slate-500 uppercase tracking-wider sticky left-0 bg-white">
+                    {row.label}
+                  </td>
+                </tr>
+              )
+            }
+            const { itemKey, label, unit, lowerIsBetter, indent } = row
+            return (
+              <tr key={row.key} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                <td className={`py-2 sticky left-0 bg-white ${indent ? 'pl-8 pr-4' : 'px-4'}`}>
+                  <div className={indent ? 'text-slate-600 text-sm' : 'font-medium text-slate-700 text-sm'}>{label}</div>
+                  <div className="text-xs text-slate-400">{unit}</div>
+                </td>
+                {filledPhases.map(p => {
+                  const entry = byPhase[p]?.items[itemKey]
+                  if (!entry) return <td key={p} className="px-3 py-2 text-center text-slate-300 text-sm">–</td>
+                  const isFirst = p === firstPhase
+                  const baseVal = byPhase[firstPhase]?.items[itemKey]?.value
+                  const trend = !isFirst && baseVal !== undefined
+                    ? trendSymbol(entry.value - baseVal, lowerIsBetter)
+                    : null
+                  return (
+                    <td key={p} className="px-3 py-2 text-center">
                       <span className="font-semibold text-slate-800">{entry.value}</span>
                       {trend && <span className={`text-xs font-bold ml-1 ${trend.color}`}>{trend.symbol}</span>}
                     </td>
@@ -264,6 +358,7 @@ export default function PatientPage() {
   if (!patient) return <div className="text-center py-16 text-slate-400">ไม่พบผู้ป่วย</div>
 
   const latestLevel = screenings[0]?.overallLevel as OverallLevel | undefined
+  const isEras = screenings[0]?.assessmentType === 'ERAS'
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -372,25 +467,34 @@ export default function PatientPage() {
         <div className="mb-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-slate-700">
-              Outcome Measurements ({outcomes.length} session)
+              Outcome Measurements ({outcomes.length} {isEras ? 'phase' : 'session'}{outcomes.length !== 1 ? 's' : ''})
             </h3>
             <Link href={`/patients/${id}/outcome`}
               className="text-xs text-[#0C447C] hover:text-[#185FA5] font-medium">
-              + เพิ่ม / แก้ไข →
+              + Add / Edit →
             </Link>
           </div>
-          <OutcomeTable outcomes={outcomes} level={latestLevel} />
-          <OutcomeCharts outcomes={outcomes} level={latestLevel} isAdmin={isAdmin} />
-          <OutcomeSummaryDashboard outcomes={outcomes} level={latestLevel} />
+          {isEras ? (
+            <>
+              <ErasOutcomeTable outcomes={outcomes} />
+              <ErasOutcomeCharts outcomes={outcomes} />
+            </>
+          ) : (
+            <>
+              <OutcomeTable outcomes={outcomes} level={latestLevel} />
+              <OutcomeCharts outcomes={outcomes} level={latestLevel} isAdmin={isAdmin} />
+              <OutcomeSummaryDashboard outcomes={outcomes} level={latestLevel} />
+            </>
+          )}
         </div>
       )}
 
       {latestLevel && outcomes.length === 0 && (
         <div className="text-center py-8 bg-white rounded-2xl border border-slate-200 border-dashed">
-          <p className="text-slate-400 text-sm mb-2">ยังไม่มีข้อมูล Outcome Measurement</p>
+          <p className="text-slate-400 text-sm mb-2">No outcome data recorded yet</p>
           <Link href={`/patients/${id}/outcome`}
             className="text-sm text-[#0C447C] hover:text-[#185FA5] font-medium underline">
-            บันทึก Initial →
+            {isEras ? 'Record Prehabilitation →' : 'Record Initial →'}
           </Link>
         </div>
       )}

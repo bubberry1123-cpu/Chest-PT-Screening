@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getPatientById, createScreening } from '@/lib/localstore'
 import { calculateScreening, CFS_DESCRIPTIONS } from '@/lib/scoring'
-import type { Patient, O2Support, Cooperativeness, ScreeningInput } from '@/types'
+import type { Patient, O2Support, Cooperativeness, ScreeningInput, AssessmentType } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
 
 const DRIVER_LABELS: Record<string, string> = {
@@ -22,6 +22,7 @@ export default function NewScreeningPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  const [assessmentType, setAssessmentType] = useState<AssessmentType>('Standard')
   const [clinical, setClinical] = useState<{
     cooperativeness: Cooperativeness | null
     cfsScore: number | null
@@ -64,6 +65,7 @@ export default function NewScreeningPage() {
         location: patient.location,
         assessedBy: clinical.assessedBy || 'PT',
         notes: clinical.notes,
+        assessmentType,
         ...input,
         ...res,
       })
@@ -97,6 +99,37 @@ export default function NewScreeningPage() {
 
       {step === 1 && (
         <div className="space-y-4">
+          {/* Assessment Type */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+            <h3 className="font-bold text-slate-800 mb-4">Assessment Type</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <button type="button"
+                onClick={() => setAssessmentType('Standard')}
+                className={`py-4 rounded-xl border-2 text-sm font-semibold transition-all ${
+                  assessmentType === 'Standard'
+                    ? 'bg-[#0C447C] border-[#0C447C] text-white shadow'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-[#185FA5] hover:bg-blue-50'
+                }`}>
+                Standard
+                <div className={`text-xs mt-1 font-normal ${assessmentType === 'Standard' ? 'text-blue-100' : 'text-slate-400'}`}>
+                  Regular PT screening
+                </div>
+              </button>
+              <button type="button"
+                onClick={() => setAssessmentType('ERAS')}
+                className={`py-4 rounded-xl border-2 text-sm font-semibold transition-all ${
+                  assessmentType === 'ERAS'
+                    ? 'bg-purple-700 border-purple-700 text-white shadow'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-purple-400 hover:bg-purple-50'
+                }`}>
+                ERAS
+                <div className={`text-xs mt-1 font-normal ${assessmentType === 'ERAS' ? 'text-purple-100' : 'text-slate-400'}`}>
+                  Enhanced Recovery program
+                </div>
+              </button>
+            </div>
+          </div>
+
           {/* Cooperativeness */}
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
             <h3 className="font-bold text-slate-800 mb-4">A. Ability to Follow Commands *</h3>
@@ -230,6 +263,11 @@ export default function NewScreeningPage() {
 
           {/* Severity badge */}
           <SeverityBadge level={result.overallLevel} size="lg" />
+          {assessmentType === 'ERAS' && (
+            <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-2.5 text-sm text-purple-800">
+              <span className="font-semibold">ERAS Assessment</span> — Outcomes tracked across 4 phases: Prehabilitation → Pre-op → Post-op → DC
+            </div>
+          )}
 
           {/* Info grid: 4 cells */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

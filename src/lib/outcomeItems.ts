@@ -32,6 +32,11 @@ export const SESSION_SHORT: Record<string, string> = {
   'Reassessment 7':   'RA 7',  'Reassessment 8':  'RA 8',
   'Reassessment 9':   'RA 9',  'Reassessment 10': 'RA 10',
   'Discharge':        'D/C',
+  // ERAS phases
+  'Prehabilitation': 'Pre-hab',
+  'Pre-op':          'Pre-op',
+  'Post-op':         'Post-op',
+  'DC':              'D/C',
   // Legacy keys for existing localStorage records
   'Follow-up 1': 'FU 1',  'Follow-up 2':  'FU 2',
   'Follow-up 3': 'FU 3',  'Follow-up 4':  'FU 4',
@@ -127,4 +132,35 @@ export const OUTCOME_ITEMS: Record<OverallLevel, OutcomeItemDef[]> = {
   2: getFlatItems(2),
   3: getFlatItems(3),
   4: getFlatItems(4),
+}
+
+// ── ERAS ──────────────────────────────────────────────────────────────────────
+
+export const ERAS_PHASES = ['Prehabilitation', 'Pre-op', 'Post-op', 'DC'] as const
+export type ErasPhaseValue = typeof ERAS_PHASES[number]
+
+export const ERAS_PHASE_SHORT: Record<string, string> = {
+  'Prehabilitation': 'Pre-hab',
+  'Pre-op':          'Pre-op',
+  'Post-op':         'Post-op',
+  'DC':              'D/C',
+}
+
+export const ERAS_OUTCOME_GROUPS: OutcomeGroupDef[] = [
+  single('peakCoughFlow',   'Peak Cough Flow',   'L/min'),
+  single('wrightSpirometer','Wright Spirometry', 'mL'),
+  {
+    groupKey: 'handGrip',
+    label: 'Hand Grip Strength',
+    items: [
+      { key: 'gripStrength_left',  label: 'Left hand',  unit: 'kg', step: 0.1 },
+      { key: 'gripStrength_right', label: 'Right hand', unit: 'kg', step: 0.1 },
+    ],
+  },
+  single('cs30',         '30-Second Chair Stand Test (CS-30)', 'stands', { showNotes: true }),
+  single('erasTwoMWalk', '2-Meter Walk Test',                  'seconds', { lowerIsBetter: true, step: 0.1 }),
+]
+
+export function getErasFlatItems(): OutcomeItemDef[] {
+  return ERAS_OUTCOME_GROUPS.flatMap(g => g.items)
 }

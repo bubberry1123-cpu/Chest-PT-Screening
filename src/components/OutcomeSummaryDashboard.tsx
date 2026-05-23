@@ -16,7 +16,7 @@ const SHADE_STROKES = [
 ]
 
 function getShade(session: string): { fill: string; stroke: string } {
-  const i = OUTCOME_SESSIONS.indexOf(session as OutcomeSession)
+  const i = (OUTCOME_SESSIONS as readonly string[]).indexOf(session)
   return {
     fill:   SHADE_FILLS[i  >= 0 ? i : 0] ?? '#93C5FD',
     stroke: SHADE_STROKES[i >= 0 ? i : 0] ?? '#3B82F6',
