@@ -53,7 +53,7 @@ export type OutcomeSession =
   | 'Reassessment 1' | 'Reassessment 2' | 'Reassessment 3' | 'Reassessment 4' | 'Reassessment 5'
   | 'Reassessment 6' | 'Reassessment 7' | 'Reassessment 8' | 'Reassessment 9' | 'Reassessment 10'
   | 'Discharge'
-  | 'Prehabilitation' | 'Pre-op' | 'Post-op' | 'DC'
+  | 'Prehabilitation' | 'Pre-op' | 'DC' | 'Follow-up'
 
 export interface OutcomeEntry {
   value: number

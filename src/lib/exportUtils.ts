@@ -281,17 +281,25 @@ export async function exportChartsPDF(
   dateFrom: Date | null,
   dateTo: Date | null
 ) {
-  const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
+  // html-to-image uses the browser's native rendering so oklch/lab colors
+  // (used by Tailwind v4) are handled correctly — html2canvas cannot parse them.
+  const [{ jsPDF }, { toPng }] = await Promise.all([
     import('jspdf'),
-    import('html2canvas'),
+    import('html-to-image'),
   ])
 
-  const canvas = await html2canvas(element, {
-    scale: 1.8,
-    useCORS: true,
+  const imgData = await toPng(element, {
+    pixelRatio: 2,
     backgroundColor: '#f8fafc',
-    logging: false,
-    allowTaint: true,
+    skipFonts: false,
+  })
+
+  // Derive image dimensions from the data URL by loading it into an Image element
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image()
+    i.onload = () => resolve(i)
+    i.onerror = reject
+    i.src = imgData
   })
 
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -326,12 +334,11 @@ export async function exportChartsPDF(
   ]
   pdf.text(statItems.join('   |   '), margin, statY)
 
-  // Chart image — fit to remaining page height
-  const imgData = canvas.toDataURL('image/png')
+  // Chart image — fit to remaining page height, preserve aspect ratio
   const contentY = statY + 5
   const contentH = pageH - contentY - margin
   const contentW = pageW - margin * 2
-  const imgRatio = canvas.height / canvas.width
+  const imgRatio = img.height / img.width
   let drawW = contentW
   let drawH = drawW * imgRatio
   if (drawH > contentH) {

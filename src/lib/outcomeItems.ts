@@ -35,8 +35,8 @@ export const SESSION_SHORT: Record<string, string> = {
   // ERAS phases
   'Prehabilitation': 'Pre-hab',
   'Pre-op':          'Pre-op',
-  'Post-op':         'Post-op',
   'DC':              'D/C',
+  'Follow-up':       'F/U',
   // Legacy keys for existing localStorage records
   'Follow-up 1': 'FU 1',  'Follow-up 2':  'FU 2',
   'Follow-up 3': 'FU 3',  'Follow-up 4':  'FU 4',
@@ -136,14 +136,14 @@ export const OUTCOME_ITEMS: Record<OverallLevel, OutcomeItemDef[]> = {
 
 // ── ERAS ──────────────────────────────────────────────────────────────────────
 
-export const ERAS_PHASES = ['Prehabilitation', 'Pre-op', 'Post-op', 'DC'] as const
+export const ERAS_PHASES = ['Prehabilitation', 'Pre-op', 'DC', 'Follow-up'] as const
 export type ErasPhaseValue = typeof ERAS_PHASES[number]
 
 export const ERAS_PHASE_SHORT: Record<string, string> = {
   'Prehabilitation': 'Pre-hab',
   'Pre-op':          'Pre-op',
-  'Post-op':         'Post-op',
   'DC':              'D/C',
+  'Follow-up':       'F/U',
 }
 
 export const ERAS_OUTCOME_GROUPS: OutcomeGroupDef[] = [

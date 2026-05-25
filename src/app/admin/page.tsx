@@ -313,6 +313,67 @@ function TrendChart({ data }: { data: { label: string; initial: number | null; d
   )
 }
 
+// ── ERAS Grouped Bar Chart ────────────────────────────────────────────────────
+function ErasGroupedChart({ data }: {
+  data: { label: string; unit: string; phaseAvgs: (number | null)[] }[]
+}) {
+  const PHASE_COLORS = ['#3b82f6', '#10b981', '#f97316', '#8b5cf6']
+  const PHASE_LABELS = ['Pre-hab', 'Pre-op', 'D/C', 'F/U']
+  const BAR_H = 84
+
+  const hasAnyData = data.some(m => m.phaseAvgs.some(v => v !== null))
+  if (!hasAnyData) return (
+    <div className="h-36 flex items-center justify-center text-slate-400 text-sm">No ERAS outcome data yet</div>
+  )
+
+  return (
+    <div>
+      <div className="overflow-x-auto">
+        <div className="flex items-end gap-6 min-w-max px-2" style={{ height: BAR_H + 52 }}>
+          {data.map((metric, mi) => {
+            const vals = metric.phaseAvgs.filter((v): v is number => v !== null)
+            const maxV = vals.length > 0 ? Math.max(...vals, 1) : 1
+            return (
+              <div key={mi} className="flex flex-col items-center gap-1">
+                <div className="flex items-end gap-1" style={{ height: BAR_H }}>
+                  {metric.phaseAvgs.map((v, pi) => (
+                    <div key={pi} className="flex flex-col items-center justify-end" style={{ height: BAR_H }}>
+                      {v !== null && (
+                        <span className="text-[9px] font-semibold mb-0.5" style={{ color: PHASE_COLORS[pi] }}>
+                          {v % 1 === 0 ? v : v.toFixed(1)}
+                        </span>
+                      )}
+                      <div
+                        className="w-5 rounded-t"
+                        style={{
+                          backgroundColor: PHASE_COLORS[pi],
+                          height: v !== null && v > 0 ? `${Math.max((v / maxV) * (BAR_H - 20), 3)}px` : '0',
+                          opacity: v !== null ? 1 : 0.15,
+                          minHeight: v !== null ? '2px' : '0',
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+                <span className="text-[10px] text-slate-700 font-semibold text-center leading-tight">{metric.label}</span>
+                <span className="text-[9px] text-slate-400 text-center leading-none">{metric.unit}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+      <div className="flex items-center gap-4 mt-2 px-2 flex-wrap">
+        {PHASE_LABELS.map((label, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: PHASE_COLORS[i] }} />
+            <span className="text-xs text-slate-500">{label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Patient Detail Modal ──────────────────────────────────────────────────────
 function PatientModal({ row, onClose }: { row: PatientRow; onClose: () => void }) {
   const { patient, latestScreening, outcomes, missingItems } = row
@@ -606,6 +667,7 @@ export default function AdminPage() {
   const [exportMonth, setExportMonth] = useState(new Date().getMonth())
   const [exportYear, setExportYear] = useState(new Date().getFullYear())
   const [exportLoading, setExportLoading] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'logs'>('dashboard')
   const chartsRef = useRef<HTMLDivElement>(null)
 
@@ -620,15 +682,20 @@ export default function AdminPage() {
   const handleExport = async (type: 'patients' | 'outcomes' | 'monthly' | 'pdf') => {
     setExportLoading(true)
     setExportOpen(false)
+    setExportError(null)
     try {
       const from = exportDateFrom ? new Date(exportDateFrom) : null
       const to = exportDateTo ? new Date(exportDateTo) : null
       if (type === 'patients') await exportPatientList(patients, screenings, from, to)
       else if (type === 'outcomes') await exportOutcomeData(patients, outcomes, from, to)
       else if (type === 'monthly') await exportMonthlySummary(patients, screenings, exportYear, exportMonth)
-      else if (type === 'pdf' && chartsRef.current) {
+      else if (type === 'pdf') {
+        if (!chartsRef.current) throw new Error('Switch to the Dashboard tab first, then retry.')
         await exportChartsPDF(chartsRef.current, { totalPatients: patients.length, weekAssessments, monthAssessments, levelCounts }, from, to)
       }
+    } catch (err) {
+      console.error('[Export PDF] failed:', err)
+      setExportError(err instanceof Error ? err.message : 'Export failed — check the browser console for details.')
     } finally {
       setExportLoading(false)
     }
@@ -711,8 +778,8 @@ export default function AdminPage() {
   )
 
   const erasPhaseCounts = useMemo(() => {
-    const counts = { Prehabilitation: 0, 'Pre-op': 0, 'Post-op': 0, DC: 0 }
-    const phaseOrder = ['Prehabilitation', 'Pre-op', 'Post-op', 'DC'] as const
+    const counts = { Prehabilitation: 0, 'Pre-op': 0, DC: 0, 'Follow-up': 0 }
+    const phaseOrder = ['Prehabilitation', 'Pre-op', 'DC', 'Follow-up'] as const
     erasRows.forEach(r => {
       const byP: Record<string, OutcomeMeasurement> = {}
       r.outcomes.forEach(o => { byP[o.session] = o })
@@ -748,17 +815,16 @@ export default function AdminPage() {
   }, [erasRows])
 
   const ERAS_METRICS = [
-    { key: 'peakCoughFlow',    label: 'Peak Cough Flow', unit: 'L/min' },
-    { key: 'wrightSpirometer', label: 'Wright Spirometry', unit: 'mL' },
-    { key: 'gripStrength_left',  label: 'Grip L', unit: 'kg' },
-    { key: 'gripStrength_right', label: 'Grip R', unit: 'kg' },
-    { key: 'cs30',             label: 'CS-30', unit: 'stands' },
-    { key: 'erasTwoMWalk',     label: '2-Meter Walk', unit: 'sec' },
+    { key: 'peakCoughFlow',      label: 'Peak CF',  unit: 'L/min' },
+    { key: 'wrightSpirometer',   label: 'Wright',   unit: 'mL' },
+    { key: 'gripStrength_right', label: 'Grip (R)', unit: 'kg' },
+    { key: 'cs30',               label: 'CS-30',    unit: 'stands' },
+    { key: 'erasTwoMWalk',       label: '2-Meter',  unit: 'sec' },
   ] as const
 
-  const ERAS_PHASES_LIST = ['Prehabilitation', 'Pre-op', 'Post-op', 'DC'] as const
+  const ERAS_PHASES_LIST = ['Prehabilitation', 'Pre-op', 'DC', 'Follow-up'] as const
   const ERAS_PHASE_SHORT_MAP: Record<string, string> = {
-    'Prehabilitation': 'Pre-hab', 'Pre-op': 'Pre-op', 'Post-op': 'Post-op', 'DC': 'D/C',
+    'Prehabilitation': 'Pre-hab', 'Pre-op': 'Pre-op', 'DC': 'D/C', 'Follow-up': 'F/U',
   }
 
   const erasTrendData = useMemo(() => {
@@ -884,6 +950,15 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
+
+      {/* Export error banner */}
+      {exportError && (
+        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <span className="text-red-500 mt-0.5 shrink-0">⚠</span>
+          <p className="text-sm text-red-700 flex-1">{exportError}</p>
+          <button onClick={() => setExportError(null)} className="text-red-300 hover:text-red-500 text-lg leading-none shrink-0">×</button>
+        </div>
+      )}
 
       {/* Tab bar */}
       <div className="flex gap-2 mb-6">
@@ -1217,7 +1292,7 @@ export default function AdminPage() {
             <div className="px-5 py-4 border-b border-purple-100 bg-purple-50 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-purple-900">ERAS — Enhanced Recovery After Surgery</h3>
-                <p className="text-purple-600 text-xs mt-0.5">Prehabilitation → Pre-op → Post-op → DC</p>
+                <p className="text-purple-600 text-xs mt-0.5">Prehabilitation → Pre-op → DC → Follow-up</p>
               </div>
               <span className="text-2xl font-bold text-purple-700">{erasRows.length}</span>
             </div>
@@ -1231,7 +1306,7 @@ export default function AdminPage() {
                 <div>
                   <h4 className="text-sm font-semibold text-slate-700 mb-3">Patient Phase Distribution</h4>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {(['Prehabilitation', 'Pre-op', 'Post-op', 'DC'] as const).map(phase => (
+                    {(['Prehabilitation', 'Pre-op', 'DC', 'Follow-up'] as const).map(phase => (
                       <div key={phase} className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-center">
                         <div className="text-xs text-purple-600 font-medium mb-1">{ERAS_PHASE_SHORT_MAP[phase]}</div>
                         <div className="text-2xl font-bold text-purple-800">{erasPhaseCounts[phase]}</div>
@@ -1242,39 +1317,8 @@ export default function AdminPage() {
 
                 {/* b) Outcome trend across 4 phases */}
                 <div>
-                  <h4 className="text-sm font-semibold text-slate-700 mb-3">Outcome Trends Across Phases (avg across all ERAS patients)</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {erasTrendData.map(m => {
-                      const hasData = m.phaseAvgs.some(v => v !== null)
-                      if (!hasData) return null
-                      const vals = m.phaseAvgs.filter((v): v is number => v !== null)
-                      const maxV = Math.max(...vals, 1)
-                      return (
-                        <div key={m.label} className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-bold text-slate-700">{m.label}</span>
-                            <span className="text-xs text-slate-400">{m.unit}</span>
-                          </div>
-                          <div className="flex items-end gap-1.5 h-16">
-                            {m.phaseAvgs.map((v, i) => (
-                              <div key={i} className="flex flex-col items-center gap-0.5 flex-1">
-                                <span className="text-[9px] font-semibold text-purple-700">
-                                  {v !== null ? v : '–'}
-                                </span>
-                                <div
-                                  className="w-full rounded-t bg-purple-400 min-h-[2px]"
-                                  style={{ height: v !== null && v > 0 ? `${Math.max((v / maxV) * 44, 3)}px` : '2px', opacity: v !== null ? 1 : 0.2 }}
-                                />
-                                <span className="text-[8px] text-slate-500 text-center leading-none">
-                                  {ERAS_PHASE_SHORT_MAP[ERAS_PHASES_LIST[i]]}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                  <h4 className="text-sm font-semibold text-slate-700 mb-3">ERAS Outcome Trend — across phases (avg across all patients)</h4>
+                  <ErasGroupedChart data={erasTrendData} />
                 </div>
 
                 {/* c) Level distribution */}

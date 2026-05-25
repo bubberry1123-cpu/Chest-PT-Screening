@@ -286,12 +286,12 @@ export default function OutcomeCharts({
     if (!chartsRef.current) return
     setExporting(true)
     try {
-      const { default: html2canvas } = await import('html2canvas')
-      const canvas = await html2canvas(chartsRef.current, {
-        scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false,
+      const { toPng } = await import('html-to-image')
+      const dataUrl = await toPng(chartsRef.current, {
+        pixelRatio: 2, backgroundColor: '#ffffff', cacheBust: true,
       })
       const a = document.createElement('a')
-      a.href = canvas.toDataURL('image/png')
+      a.href = dataUrl
       a.download = `ChestPT_Outcome_${activeGroup}.png`
       a.click()
     } finally {
