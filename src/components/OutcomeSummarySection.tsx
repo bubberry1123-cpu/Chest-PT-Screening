@@ -876,7 +876,7 @@ export function OutcomeSummarySection({ patients, screenings, outcomes }: {
     patients.forEach(p => {
       if (!p.id) return
       const info: PInfo = { id: p.id, firstName: p.firstName, lastName: p.lastName, hn: p.hn, outcomes: outcomesByPat[p.id] ?? [] }
-      if (latestScreening[p.id]?.assessmentType === 'ERAS') eras.push(info)
+      if ((p.assessmentType ?? latestScreening[p.id]?.assessmentType) === 'ERAS') eras.push(info)
       else std.push(info)
     })
     return { std, eras }

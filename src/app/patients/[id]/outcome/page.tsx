@@ -37,8 +37,8 @@ export default function OutcomePage() {
         setPatient(p)
         setLatestScreening(s[0] ?? null)
         setOutcomes(o)
-        // Set correct default session based on assessment type
-        if (s[0]?.assessmentType === 'ERAS') {
+        const effectiveType = p?.assessmentType ?? s[0]?.assessmentType
+        if (effectiveType === 'ERAS') {
           setSession('Prehabilitation' as OutcomeSession)
         }
         setLoading(false)
@@ -46,7 +46,7 @@ export default function OutcomePage() {
       .catch(() => setLoading(false))
   }, [id])
 
-  const isEras = latestScreening?.assessmentType === 'ERAS'
+  const isEras = (patient?.assessmentType ?? latestScreening?.assessmentType) === 'ERAS'
 
   useEffect(() => {
     const existing = outcomes.find(o => o.session === session)

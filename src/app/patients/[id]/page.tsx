@@ -326,6 +326,7 @@ export default function PatientPage() {
   const [pdfError, setPdfError] = useState<string | null>(null)
   const [confirmDeletePatient, setConfirmDeletePatient] = useState(false)
   const [confirmDeleteScreening, setConfirmDeleteScreening] = useState<Screening | null>(null)
+  const [confirmSwitchType, setConfirmSwitchType] = useState(false)
   const pdfChartsRef = useRef<HTMLDivElement>(null)
   const pdfSummaryRef = useRef<HTMLDivElement>(null)
   const { toast, showToast } = useToast()
@@ -363,7 +364,17 @@ export default function PatientPage() {
   if (!patient) return <div className="text-center py-16 text-slate-400">ไม่พบผู้ป่วย</div>
 
   const latestLevel = screenings[0]?.overallLevel as OverallLevel | undefined
-  const isEras = screenings[0]?.assessmentType === 'ERAS'
+  const isEras = (patient.assessmentType ?? screenings[0]?.assessmentType) === 'ERAS'
+
+  const handleSwitchType = async () => {
+    const newType = isEras ? 'Standard' : 'ERAS'
+    try {
+      await updatePatient(id, { assessmentType: newType })
+      setPatient(prev => prev ? { ...prev, assessmentType: newType } : prev)
+    } catch {
+      showToast('Failed to switch type. Please try again.', 'error')
+    }
+  }
 
   const handleDownloadPDF = async () => {
     if (!patient) return
@@ -571,6 +582,17 @@ export default function PatientPage() {
           onCancel={() => setConfirmDeleteScreening(null)}
         />
       )}
+      {confirmSwitchType && (
+        <ConfirmDialog
+          title="Switch assessment type"
+          message={isEras
+            ? `Switch this patient from ERAS to Standard?\nExisting outcome data will be kept but only Standard sessions and outcomes will be shown.`
+            : `Switch this patient from Standard to ERAS?\nExisting outcome data will be kept but only ERAS phases and outcomes will be shown.`}
+          confirmLabel="Confirm switch"
+          onConfirm={() => { setConfirmSwitchType(false); handleSwitchType() }}
+          onCancel={() => setConfirmSwitchType(false)}
+        />
+      )}
       <div className="flex items-center gap-3 mb-5">
         <Link href="/" className="text-slate-400 hover:text-slate-600 text-sm">← กลับ</Link>
       </div>
@@ -579,12 +601,20 @@ export default function PatientPage() {
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center flex-wrap gap-2">
               <h2 className="text-lg font-bold text-slate-800">{patient.firstName} {patient.lastName}</h2>
               {isAdmin && (
                 <button onClick={() => setEditOpen(true)}
                   className="text-xs text-slate-400 hover:text-[#185FA5] border border-slate-200 hover:border-[#185FA5] px-2 py-0.5 rounded transition-colors">
                   Edit
+                </button>
+              )}
+              {isAdmin && (
+                <button onClick={() => setConfirmSwitchType(true)}
+                  className={`text-xs px-2 py-0.5 rounded border transition-colors ${isEras
+                    ? 'text-blue-600 border-blue-200 hover:border-blue-400 hover:text-blue-800'
+                    : 'text-purple-600 border-purple-200 hover:border-purple-400 hover:text-purple-800'}`}>
+                  Switch to {isEras ? 'Standard' : 'ERAS'}
                 </button>
               )}
             </div>

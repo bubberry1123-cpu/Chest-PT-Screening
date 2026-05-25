@@ -793,7 +793,7 @@ export default function AdminPage() {
 
   // ── ERAS stats ─────────────────────────────────────────────────────────────
   const erasRows = useMemo(
-    () => rows.filter(r => r.latestScreening?.assessmentType === 'ERAS'),
+    () => rows.filter(r => (r.patient.assessmentType ?? r.latestScreening?.assessmentType) === 'ERAS'),
     [rows]
   )
 

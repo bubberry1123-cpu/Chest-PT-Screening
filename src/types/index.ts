@@ -18,6 +18,7 @@ export interface Patient {
   nationality: string
   location: string
   createdAt?: Date
+  assessmentType?: AssessmentType
 }
 
 export interface ScreeningInput {
