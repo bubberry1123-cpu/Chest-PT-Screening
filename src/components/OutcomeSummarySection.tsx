@@ -8,10 +8,15 @@ import {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface Metric   { key: string; label: string; unit: string }
-interface PInfo    { id: string; firstName: string; lastName: string; hn: string; outcomes: OutcomeMeasurement[] }
-interface Series   { id: string; label: string; color: string; points: (number | null)[] }
-type ViewMode      = 'average' | 'single' | 'compare'
+interface Metric      { key: string; label: string; unit: string }
+interface PInfo       { id: string; firstName: string; lastName: string; hn: string; outcomes: OutcomeMeasurement[] }
+interface Series      { id: string; label: string; color: string; points: (number | null)[] }
+interface MiniSeries  { label: string; points: (number | null)[]; color: string }
+type ViewMode         = 'average' | 'single' | 'compare'
+
+type SingleCardDef = { type: 'single'; key: string }
+type GroupCardDef  = { type: 'group'; label: string; unit: string; keys: string[]; subLabels: string[] }
+type CardDef       = SingleCardDef | GroupCardDef
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -43,13 +48,34 @@ const ERAS_METRICS: Metric[] = [
   { key: 'erasTwoMWalk',       label: '2-Meter Walk',      unit: 'sec'    },
 ]
 
-const COLORS = [
-  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-  '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1',
-]
+// Colors for avg/compare series and for multi-line card sub-metrics
+const COLORS      = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1']
+const CARD_COLORS = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6']
 
 const STD_SESSIONS  = OUTCOME_SESSIONS as readonly string[]
 const ERAS_SESSIONS = ERAS_PHASES      as readonly string[]
+
+// Card layout definitions for the single-patient grid
+const STD_CARD_DEFS: CardDef[] = [
+  { type: 'group', label: 'AMPAC',     unit: '/24', keys: ['ampac_part1', 'ampac_part2', 'ampac_part3'],            subLabels: ['Pt 1', 'Pt 2', 'Pt 3']          },
+  { type: 'group', label: 'BRFA',      unit: '%',   keys: ['brfa_part1', 'brfa_part2', 'brfa_q20', 'brfa_q21'],     subLabels: ['Pt 1', 'Pt 2', 'Q20', 'Q21']    },
+  { type: 'single', key: 'dyspneaScale'       },
+  { type: 'single', key: 'peakCoughFlow'      },
+  { type: 'single', key: 'wrightSpirometer'   },
+  { type: 'group', label: 'Hand Grip', unit: 'kg',  keys: ['gripStrength_left', 'gripStrength_right'],               subLabels: ['Left', 'Right']                  },
+  { type: 'single', key: 'cs30'               },
+  { type: 'single', key: 'sixMWT'             },
+  { type: 'single', key: 'twoMinMarching'     },
+  { type: 'single', key: 'twoMeterWalk'       },
+]
+
+const ERAS_CARD_DEFS: CardDef[] = [
+  { type: 'single', key: 'peakCoughFlow'    },
+  { type: 'single', key: 'wrightSpirometer' },
+  { type: 'group', label: 'Hand Grip', unit: 'kg', keys: ['gripStrength_left', 'gripStrength_right'], subLabels: ['Left', 'Right'] },
+  { type: 'single', key: 'cs30'            },
+  { type: 'single', key: 'erasTwoMWalk'    },
+]
 
 // ── Searchable patient picker ─────────────────────────────────────────────────
 
@@ -187,7 +213,6 @@ function OutcomeLineChart({ series, xLabels, metric }: {
   return (
     <div ref={boxRef} className="relative w-full select-none">
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 210 }}>
-        {/* grid */}
         {gridVals.map((v, i) => {
           const y = yp(v)
           return (
@@ -197,21 +222,13 @@ function OutcomeLineChart({ series, xLabels, metric }: {
             </g>
           )
         })}
-
-        {/* axes */}
         <line x1={PL} y1={PT} x2={PL} y2={PT + chartH} stroke="#e2e8f0" strokeWidth="1" />
         <line x1={PL} y1={PT + chartH} x2={W - PR} y2={PT + chartH} stroke="#e2e8f0" strokeWidth="1" />
-
-        {/* x labels */}
         {xLabels.map((lbl, i) => (
           <text key={i} x={xp(i)} y={H - 3} fontSize="9" fill="#94a3b8" textAnchor="middle">{lbl}</text>
         ))}
-
-        {/* y unit */}
         <text x={11} y={PT + chartH / 2} fontSize="8" fill="#94a3b8" textAnchor="middle"
           transform={`rotate(-90,11,${PT + chartH / 2})`}>{metric.unit}</text>
-
-        {/* series */}
         {series.map(s => {
           let d = '', inSeg = false
           const dots: { xi: number; cx: number; cy: number; val: number }[] = []
@@ -227,18 +244,14 @@ function OutcomeLineChart({ series, xLabels, metric }: {
               {d && <path d={d} fill="none" stroke={s.color} strokeWidth="2.5"
                 strokeLinecap="round" strokeLinejoin="round" />}
               {dots.map(pt => (
-                <circle key={pt.xi}
-                  cx={pt.cx} cy={pt.cy} r="4.5"
+                <circle key={pt.xi} cx={pt.cx} cy={pt.cy} r="4.5"
                   fill={s.color} stroke="white" strokeWidth="2"
                   style={{ cursor: 'pointer' }}
                   onMouseEnter={e => {
                     const bRect = boxRef.current?.getBoundingClientRect()
                     if (!bRect) return
-                    setTip({
-                      x: e.clientX - bRect.left + 10,
-                      y: e.clientY - bRect.top  - 52,
-                      lines: [xLabels[pt.xi], `${s.label}: ${fmt(pt.val)} ${metric.unit}`],
-                    })
+                    setTip({ x: e.clientX - bRect.left + 10, y: e.clientY - bRect.top - 52,
+                      lines: [xLabels[pt.xi], `${s.label}: ${fmt(pt.val)} ${metric.unit}`] })
                   }}
                   onMouseLeave={() => setTip(null)}
                 />
@@ -247,7 +260,6 @@ function OutcomeLineChart({ series, xLabels, metric }: {
           )
         })}
       </svg>
-
       {tip && (
         <div className="absolute pointer-events-none bg-slate-800 text-white text-xs rounded-lg px-2.5 py-2 shadow-xl z-20 whitespace-nowrap"
           style={{ left: tip.x, top: tip.y }}>
@@ -258,99 +270,157 @@ function OutcomeLineChart({ series, xLabels, metric }: {
   )
 }
 
-// ── Mini line chart (compact, for single-patient cards) ───────────────────────
+// ── Mini multi-series line chart (compact cards in single-patient grid) ────────
 
-function MiniLineChart({ points, sessionLabels, color }: {
-  points: (number | null)[]
+function MiniLineChart({ seriesList, sessionLabels, showLegend }: {
+  seriesList: MiniSeries[]
   sessionLabels: string[]
-  color: string
+  showLegend?: boolean
 }) {
-  const vals = points.filter((v): v is number => v !== null)
-  if (vals.length === 0) return null
+  const allVals = seriesList.flatMap(s => s.points).filter((v): v is number => v !== null)
+  if (allVals.length === 0) return null
 
   const W = 200, H = 72, PL = 6, PR = 6, PT = 5, PB = 16
   const chartW = W - PL - PR
   const chartH = H - PT - PB
-  const n = points.length
-  const rawMin = Math.min(...vals)
-  const rawMax = Math.max(...vals)
-  const pad = (rawMax - rawMin) * 0.15 || 1
-  const yMin = Math.max(0, rawMin - pad)
-  const yMax = rawMax + pad
+  const n      = sessionLabels.length
+  const rawMin = Math.min(...allVals)
+  const rawMax = Math.max(...allVals)
+  const pad    = (rawMax - rawMin) * 0.15 || 1
+  const yMin   = Math.max(0, rawMin - pad)
+  const yMax   = rawMax + pad
   const yRange = yMax - yMin
   const xp = (i: number) => PL + (n > 1 ? i / (n - 1) : 0.5) * chartW
   const yp = (v: number) => PT + (1 - (v - yMin) / yRange) * chartH
 
-  let d = '', inSeg = false
-  const dots: { cx: number; cy: number }[] = []
-  points.forEach((v, i) => {
-    if (v === null) { inSeg = false; return }
-    const cx = xp(i), cy = yp(v)
-    d += inSeg ? ` L ${cx},${cy}` : `M ${cx},${cy}`
-    inSeg = true
-    dots.push({ cx, cy })
-  })
-
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 58 }}>
-      <line x1={PL} y1={PT + chartH} x2={W - PR} y2={PT + chartH} stroke="#e2e8f0" strokeWidth="1" />
-      {d && <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
-      {dots.map((pt, i) => (
-        <circle key={i} cx={pt.cx} cy={pt.cy} r="2.5" fill={color} stroke="white" strokeWidth="1.5" />
-      ))}
-      {sessionLabels.map((lbl, i) => (
-        <text key={i} x={xp(i)} y={H - 1} fontSize="7" fill="#94a3b8" textAnchor="middle">{lbl}</text>
-      ))}
-    </svg>
+    <>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 58 }}>
+        <line x1={PL} y1={PT + chartH} x2={W - PR} y2={PT + chartH} stroke="#e2e8f0" strokeWidth="1" />
+        {seriesList.map(s => {
+          let d = '', inSeg = false
+          const dots: { cx: number; cy: number }[] = []
+          s.points.forEach((v, i) => {
+            if (v === null) { inSeg = false; return }
+            const cx = xp(i), cy = yp(v)
+            d += inSeg ? ` L ${cx},${cy}` : `M ${cx},${cy}`
+            inSeg = true
+            dots.push({ cx, cy })
+          })
+          return (
+            <g key={s.label}>
+              {d && <path d={d} fill="none" stroke={s.color} strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round" />}
+              {dots.map((pt, i) => (
+                <circle key={i} cx={pt.cx} cy={pt.cy} r="2.5"
+                  fill={s.color} stroke="white" strokeWidth="1.5" />
+              ))}
+            </g>
+          )
+        })}
+        {sessionLabels.map((lbl, i) => (
+          <text key={i} x={xp(i)} y={H - 1} fontSize="7" fill="#94a3b8" textAnchor="middle">{lbl}</text>
+        ))}
+      </svg>
+      {showLegend && seriesList.length > 1 && (
+        <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 mt-1">
+          {seriesList.map(s => (
+            <div key={s.label} className="flex items-center gap-1">
+              <div className="w-3.5 h-[2px] rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+              <span className="text-[9px] text-slate-500 leading-tight">{s.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
   )
 }
 
 // ── Single-patient outcome card grid ─────────────────────────────────────────
 
-function SinglePatientGrid({ patient, sessions, sessionLabels, metrics, color }: {
+function SinglePatientGrid({ patient, sessions, sessionLabels, metrics, cardDefs, color }: {
   patient: PInfo
   sessions: readonly string[]
   sessionLabels: string[]
   metrics: Metric[]
+  cardDefs: CardDef[]
   color: string
 }) {
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-      {metrics.map(m => {
-        const points = sessions.map(sess => {
-          const o = patient.outcomes.find(x => x.session === sess)
-          return o?.items[m.key]?.value ?? null
-        })
-        const hasData = points.some(v => v !== null)
-        return (
-          <div key={m.key} className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
-            <div className="flex items-baseline justify-between mb-1.5">
-              <span className="text-xs font-bold text-slate-700 leading-tight">{m.label}</span>
-              <span className="text-[10px] text-slate-400 ml-1 shrink-0">{m.unit}</span>
-            </div>
-            {hasData ? (
-              <MiniLineChart points={points} sessionLabels={sessionLabels} color={color} />
-            ) : (
-              <div className="flex items-center justify-center text-xs text-slate-300" style={{ height: 58 }}>
-                No data
-              </div>
-            )}
+  const metricMap = useMemo(() => {
+    const m: Record<string, Metric> = {}
+    metrics.forEach(x => { m[x.key] = x })
+    return m
+  }, [metrics])
+
+  const getPoints = (key: string): (number | null)[] =>
+    sessions.map(sess => {
+      const o = patient.outcomes.find(x => x.session === sess)
+      return o?.items[key]?.value ?? null
+    })
+
+  const cards = cardDefs.map(def => {
+    if (def.type === 'single') {
+      const m = metricMap[def.key]
+      if (!m) return null
+      const points = getPoints(def.key)
+      if (!points.some(v => v !== null)) return null        // hide empty
+      return (
+        <div key={def.key} className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
+          <div className="flex items-baseline justify-between mb-1.5">
+            <span className="text-xs font-bold text-slate-700 leading-tight">{m.label}</span>
+            <span className="text-[10px] text-slate-400 ml-1 shrink-0">{m.unit}</span>
           </div>
-        )
-      })}
-    </div>
-  )
+          <MiniLineChart
+            seriesList={[{ label: m.label, points, color }]}
+            sessionLabels={sessionLabels}
+          />
+        </div>
+      )
+    }
+
+    // grouped card — keep only sub-measures that have data
+    const seriesList: MiniSeries[] = def.keys
+      .map((k, i) => {
+        const points = getPoints(k)
+        if (!points.some(v => v !== null)) return null      // skip sub-measure with no data
+        return { label: def.subLabels[i], points, color: CARD_COLORS[i % CARD_COLORS.length] }
+      })
+      .filter((s): s is MiniSeries => s !== null)
+
+    if (seriesList.length === 0) return null                // hide card if no sub-measure has data
+
+    return (
+      <div key={def.label} className="bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
+        <div className="flex items-baseline justify-between mb-1.5">
+          <span className="text-xs font-bold text-slate-700 leading-tight">{def.label}</span>
+          <span className="text-[10px] text-slate-400 ml-1 shrink-0">{def.unit}</span>
+        </div>
+        <MiniLineChart seriesList={seriesList} sessionLabels={sessionLabels} showLegend />
+      </div>
+    )
+  }).filter(Boolean)
+
+  if (cards.length === 0) {
+    return (
+      <div className="py-10 text-center text-slate-400 text-sm">
+        No outcome data recorded for this patient
+      </div>
+    )
+  }
+
+  return <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{cards}</div>
 }
 
 // ── One block (Standard or ERAS) ──────────────────────────────────────────────
 
-function OutcomeBlock({ title, accent, patients, sessions, sessionLabels, metrics, blockType }: {
+function OutcomeBlock({ title, accent, patients, sessions, sessionLabels, metrics, cardDefs, blockType }: {
   title: string
   accent: string
   patients: PInfo[]
   sessions: readonly string[]
   sessionLabels: string[]
   metrics: Metric[]
+  cardDefs: CardDef[]
   blockType: 'standard' | 'eras'
 }) {
   const [mode, setMode]               = useState<ViewMode>('average')
@@ -364,7 +434,7 @@ function OutcomeBlock({ title, accent, patients, sessions, sessionLabels, metric
   const metric        = useMemo(() => metrics.find(m => m.key === metricKey) ?? metrics[0], [metrics, metricKey])
   const singlePatient = useMemo(() => singleId ? patients.find(x => x.id === singleId) ?? null : null, [singleId, patients])
 
-  // ── Series data ─────────────────────────────────────────────────────────────
+  // ── Series data (avg / compare modes) ──────────────────────────────────────
   const series = useMemo<Series[]>(() => {
     const pts = (p: PInfo) => sessions.map(sess => {
       const o = p.outcomes.find(x => x.session === sess)
@@ -418,7 +488,7 @@ function OutcomeBlock({ title, accent, patients, sessions, sessionLabels, metric
       ])
 
       if (mode === 'single' && singlePatient) {
-        // ── Single patient: portrait PDF with card grid + autotable ───────────
+        // ── Single patient: portrait PDF with card grid image + autotable ─────
         const { default: autoTable } = await import('jspdf-autotable')
 
         const imgData = await toPng(chartRef.current, { pixelRatio: 2, backgroundColor: '#f8fafc', cacheBust: true })
@@ -427,9 +497,9 @@ function OutcomeBlock({ title, accent, patients, sessions, sessionLabels, metric
         })
 
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-        const pw = pdf.internal.pageSize.getWidth()
-        const ph = pdf.internal.pageSize.getHeight()
-        const mg = 12
+        const pw  = pdf.internal.pageSize.getWidth()
+        const ph  = pdf.internal.pageSize.getHeight()
+        const mg  = 12
 
         // Header
         pdf.setFillColor(29, 78, 216)
@@ -439,18 +509,15 @@ function OutcomeBlock({ title, accent, patients, sessions, sessionLabels, metric
         pdf.setFont('helvetica', 'normal').setFontSize(8.5)
         pdf.text(`HN: ${singlePatient.hn}   |   ${title}`, mg, 17.5)
 
-        // Card grid image — use up to 55% of page height
-        const imgY = 26
-        const maxImgH = (ph - imgY - mg) * 0.55
-        const imgRatio = img.height / img.width
-        let iW = pw - mg * 2, iH = iW * imgRatio
-        if (iH > maxImgH) { iH = maxImgH; iW = iH / imgRatio }
+        // Card grid image — up to 52% of usable page height
+        const imgY    = 26
+        const maxImgH = (ph - imgY - mg) * 0.52
+        const ratio   = img.height / img.width
+        let iW = pw - mg * 2, iH = iW * ratio
+        if (iH > maxImgH) { iH = maxImgH; iW = iH / ratio }
         pdf.addImage(imgData, 'PNG', mg + (pw - mg * 2 - iW) / 2, imgY, iW, iH)
 
-        // Data table — metrics as rows, sessions as columns
-        const tableStartY = imgY + iH + 6
-
-        // Truncate session labels if too many columns
+        // Data table: each individual sub-measure as its own row
         const visibleSessions = sessions.length > 12
           ? (sessions as string[]).slice(0, 12)
           : sessions as string[]
@@ -466,7 +533,7 @@ function OutcomeBlock({ title, accent, patients, sessions, sessionLabels, metric
         ])
 
         autoTable(pdf, {
-          startY: tableStartY,
+          startY: imgY + iH + 6,
           head,
           body,
           styles: { fontSize: 7, cellPadding: 2 },
@@ -486,9 +553,9 @@ function OutcomeBlock({ title, accent, patients, sessions, sessionLabels, metric
         })
 
         const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-        const pw = pdf.internal.pageSize.getWidth()
-        const ph = pdf.internal.pageSize.getHeight()
-        const mg = 12
+        const pw  = pdf.internal.pageSize.getWidth()
+        const ph  = pdf.internal.pageSize.getHeight()
+        const mg  = 12
 
         // Header
         pdf.setFillColor(29, 78, 216)
@@ -502,11 +569,11 @@ function OutcomeBlock({ title, accent, patients, sessions, sessionLabels, metric
         pdf.text(modeLabel, mg, 18)
 
         // Chart image
-        const chartY = 24
+        const chartY  = 24
         const maxImgH = (ph - chartY - mg) * 0.52
-        const imgRatio = img.height / img.width
-        let iW = pw - mg * 2, iH = iW * imgRatio
-        if (iH > maxImgH) { iH = maxImgH; iW = iH / imgRatio }
+        const ratio   = img.height / img.width
+        let iW = pw - mg * 2, iH = iW * ratio
+        if (iH > maxImgH) { iH = maxImgH; iW = iH / ratio }
         pdf.addImage(imgData, 'PNG', mg + (pw - mg * 2 - iW) / 2, chartY, iW, iH)
 
         // Manual table
@@ -562,7 +629,7 @@ function OutcomeBlock({ title, accent, patients, sessions, sessionLabels, metric
       ) : (
         <div className="p-5 space-y-4">
 
-          {/* Mode + picker row */}
+          {/* Mode + picker + outcome-selector row */}
           <div className="flex flex-wrap items-end gap-5">
             <div>
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">View mode</p>
@@ -592,7 +659,7 @@ function OutcomeBlock({ title, accent, patients, sessions, sessionLabels, metric
               </div>
             )}
 
-            {/* Outcome selector — hidden in single-patient mode (all outcomes shown) */}
+            {/* Outcome selector hidden in single mode — all outcomes shown in card grid */}
             {mode !== 'single' && (
               <div>
                 <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Outcome</p>
@@ -639,6 +706,7 @@ function OutcomeBlock({ title, accent, patients, sessions, sessionLabels, metric
                   sessions={sessions}
                   sessionLabels={sessionLabels}
                   metrics={metrics}
+                  cardDefs={cardDefs}
                   color={accent}
                 />
               ) : (
@@ -735,8 +803,8 @@ export function OutcomeSummarySection({ patients, screenings, outcomes }: {
     return { std, eras }
   }, [patients, latestScreening, outcomesByPat])
 
-  const stdLabels  = STD_SESSIONS.map(s  => SESSION_SHORT[s]     ?? s)
-  const erasLabels = ERAS_SESSIONS.map(p => ERAS_PHASE_SHORT[p]  ?? p)
+  const stdLabels  = STD_SESSIONS.map(s  => SESSION_SHORT[s]    ?? s)
+  const erasLabels = ERAS_SESSIONS.map(p => ERAS_PHASE_SHORT[p] ?? p)
 
   return (
     <div className="space-y-5">
@@ -752,6 +820,7 @@ export function OutcomeSummarySection({ patients, screenings, outcomes }: {
         sessions={STD_SESSIONS}
         sessionLabels={stdLabels}
         metrics={STD_METRICS}
+        cardDefs={STD_CARD_DEFS}
         blockType="standard"
       />
 
@@ -762,6 +831,7 @@ export function OutcomeSummarySection({ patients, screenings, outcomes }: {
         sessions={ERAS_SESSIONS}
         sessionLabels={erasLabels}
         metrics={ERAS_METRICS}
+        cardDefs={ERAS_CARD_DEFS}
         blockType="eras"
       />
     </div>
