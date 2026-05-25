@@ -10,6 +10,7 @@ import type { UserProfile, ActivityLog } from '@/types'
 import { exportPatientList, exportOutcomeData, exportMonthlySummary, exportChartsPDF } from '@/lib/exportUtils'
 import { WARDS } from '@/lib/wards'
 import { OutcomeSummarySection } from '@/components/OutcomeSummarySection'
+import ConfirmDialog from '@/components/ConfirmDialog'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const REASSESS_DAYS = 14
@@ -519,6 +520,7 @@ function PatientModal({ row, onClose }: { row: PatientRow; onClose: () => void }
 function UserManagement() {
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
+  const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -537,6 +539,15 @@ function UserManagement() {
 
   return (
     <div>
+      {confirmAction && (
+        <ConfirmDialog
+          title={confirmAction.title}
+          message={confirmAction.message}
+          confirmLabel="Confirm"
+          onConfirm={() => { const fn = confirmAction.onConfirm; setConfirmAction(null); fn() }}
+          onCancel={() => setConfirmAction(null)}
+        />
+      )}
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-bold text-slate-800">User Management</h3>
         <span className="text-xs text-slate-500">{users.length} users</span>
@@ -569,7 +580,11 @@ function UserManagement() {
                       className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-lg transition-colors">
                       Approve
                     </button>
-                    <button onClick={async () => { await rejectUser(u.uid); load() }}
+                    <button onClick={() => setConfirmAction({
+                        title: 'Reject User',
+                        message: `Reject "${u.displayName || u.email}"?\nThey will not be able to log in.`,
+                        onConfirm: async () => { await rejectUser(u.uid); load() },
+                      })}
                       className="text-xs border border-red-300 text-red-600 hover:bg-red-50 px-3 py-1 rounded-lg transition-colors">
                       Reject
                     </button>
@@ -581,7 +596,11 @@ function UserManagement() {
                       className="text-xs border border-slate-300 text-slate-600 hover:bg-slate-50 px-3 py-1 rounded-lg transition-colors">
                       {`→ ${u.role === 'admin' ? 'Staff' : 'Admin'}`}
                     </button>
-                    <button onClick={async () => { if (!window.confirm('Deactivate this user?')) return; await deactivateUser(u.uid); load() }}
+                    <button onClick={() => setConfirmAction({
+                        title: 'Deactivate User',
+                        message: `Deactivate "${u.displayName || u.email}"?\nThey will lose access until re-activated.`,
+                        onConfirm: async () => { await deactivateUser(u.uid); load() },
+                      })}
                       className="text-xs border border-red-300 text-red-600 hover:bg-red-50 px-3 py-1 rounded-lg transition-colors">
                       Deactivate
                     </button>

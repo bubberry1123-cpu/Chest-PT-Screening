@@ -4,12 +4,14 @@ import Link from 'next/link'
 import { getAllPatients, searchPatients, deletePatient } from '@/lib/localstore'
 import { useIsAdmin } from '@/lib/useIsAdmin'
 import type { Patient } from '@/types'
+import ConfirmDialog from '@/components/ConfirmDialog'
 
 export default function HomePage() {
   const isAdmin = useIsAdmin()
   const [patients, setPatients] = useState<Patient[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [confirmTarget, setConfirmTarget] = useState<Patient | null>(null)
 
   useEffect(() => {
     getAllPatients()
@@ -25,18 +27,30 @@ export default function HomePage() {
     } catch { /* ค้นหาไม่ได้ แสดงผลเดิม */ }
   }
 
-  const handleDelete = async (p: Patient) => {
-    if (!window.confirm(`ลบผู้ป่วย "${p.firstName} ${p.lastName}" (HN: ${p.hn}) และข้อมูลทั้งหมด?`)) return
+  const confirmDelete = async () => {
+    if (!confirmTarget) return
     try {
-      await deletePatient(p.id!)
-      setPatients(prev => prev.filter(x => x.id !== p.id))
+      await deletePatient(confirmTarget.id!)
+      setPatients(prev => prev.filter(x => x.id !== confirmTarget.id))
     } catch {
       alert('ลบไม่สำเร็จ กรุณาลองใหม่')
+    } finally {
+      setConfirmTarget(null)
     }
   }
 
   return (
     <div>
+      {confirmTarget && (
+        <ConfirmDialog
+          title="ลบผู้ป่วย"
+          message={`ลบผู้ป่วย "${confirmTarget.firstName} ${confirmTarget.lastName}" (HN: ${confirmTarget.hn}) และข้อมูลทั้งหมด?\nการกระทำนี้ไม่สามารถกู้คืนได้`}
+          confirmLabel="ลบ"
+          onConfirm={confirmDelete}
+          onCancel={() => setConfirmTarget(null)}
+        />
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
           <h2 className="text-lg font-bold text-slate-800">รายการผู้ป่วย</h2>
@@ -99,7 +113,7 @@ export default function HomePage() {
                         ดูข้อมูล →
                       </Link>
                       {isAdmin && (
-                        <button onClick={() => handleDelete(p)}
+                        <button onClick={() => setConfirmTarget(p)}
                           className="text-red-500 hover:text-red-700 text-xs font-medium transition-colors">
                           ลบ
                         </button>

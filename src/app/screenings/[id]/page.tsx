@@ -6,6 +6,7 @@ import { getScreeningById, deleteScreening } from '@/lib/localstore'
 import { useIsAdmin } from '@/lib/useIsAdmin'
 import type { Screening } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
+import ConfirmDialog from '@/components/ConfirmDialog'
 
 const O2_LABELS: Record<string, string> = {
   room_air: 'Room Air',
@@ -32,6 +33,7 @@ export default function ScreeningDetailPage() {
   const isAdmin = useIsAdmin()
   const [screening, setScreening] = useState<Screening | null>(null)
   const [loading, setLoading] = useState(true)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   useEffect(() => {
     getScreeningById(id)
@@ -41,7 +43,6 @@ export default function ScreeningDetailPage() {
 
   const handleDelete = async () => {
     if (!screening) return
-    if (!window.confirm('ลบการประเมินนี้?')) return
     try {
       await deleteScreening(id)
       router.push(`/patients/${screening.patientId}`)
@@ -53,16 +54,29 @@ export default function ScreeningDetailPage() {
   if (loading) return <div className="text-center py-16 text-slate-400">กำลังโหลด...</div>
   if (!screening) return <div className="text-center py-16 text-slate-400">ไม่พบข้อมูลการประเมิน</div>
 
+  const screeningDate = screening.assessedAt instanceof Date
+    ? screening.assessedAt.toLocaleDateString('th-TH')
+    : 'นี้'
+
   const date = screening.assessedAt instanceof Date
     ? screening.assessedAt.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     : 'ไม่ทราบวันที่'
 
   return (
     <div className="max-w-2xl mx-auto">
+      {confirmOpen && (
+        <ConfirmDialog
+          title="ลบการประเมิน"
+          message={`ลบการประเมินวันที่ ${screeningDate}?\nการกระทำนี้ไม่สามารถกู้คืนได้`}
+          confirmLabel="ลบ"
+          onConfirm={() => { setConfirmOpen(false); handleDelete() }}
+          onCancel={() => setConfirmOpen(false)}
+        />
+      )}
       <div className="flex items-center justify-between gap-2 mb-5">
         <Link href={`/patients/${screening.patientId}`} className="text-slate-400 hover:text-slate-600 text-sm">← กลับ</Link>
         {isAdmin && (
-          <button onClick={handleDelete}
+          <button onClick={() => setConfirmOpen(true)}
             className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1.5 rounded-xl transition-colors">
             ลบการประเมินนี้
           </button>

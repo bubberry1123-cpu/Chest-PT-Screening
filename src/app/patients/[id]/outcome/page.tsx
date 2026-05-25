@@ -10,6 +10,7 @@ import {
 import { useIsAdmin } from '@/lib/useIsAdmin'
 import { useToast } from '@/lib/useToast'
 import Toast from '@/components/Toast'
+import ConfirmDialog from '@/components/ConfirmDialog'
 import type { Patient, Screening, OutcomeMeasurement, OutcomeSession, OverallLevel } from '@/types'
 
 type BtnState = 'idle' | 'saving' | 'saved'
@@ -28,6 +29,7 @@ export default function OutcomePage() {
   const [btnState, setBtnState] = useState<BtnState>('idle')
   const [loading, setLoading] = useState(true)
   const { toast, showToast } = useToast()
+  const [confirmDeleteSession, setConfirmDeleteSession] = useState(false)
 
   useEffect(() => {
     Promise.all([getPatientById(id), getScreeningsByPatient(id), getOutcomesByPatient(id)])
@@ -201,21 +203,30 @@ export default function OutcomePage() {
             <p className="text-xs text-emerald-600">✓ Has existing data — editing will overwrite</p>
             {isAdmin && (
               <button
-                onClick={async () => {
-                  if (!window.confirm(`Delete ${sessionShortLabel} data?`)) return
-                  try {
-                    await deleteOutcomeSession(id, session)
-                    const updated = await getOutcomesByPatient(id)
-                    setOutcomes(updated)
-                  } catch {
-                    showToast('Failed to delete. Please try again.', 'error')
-                  }
-                }}
+                onClick={() => setConfirmDeleteSession(true)}
                 className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-2 py-0.5 rounded transition-colors">
                 Delete this {isEras ? 'phase' : 'session'}
               </button>
             )}
           </div>
+        )}
+        {confirmDeleteSession && (
+          <ConfirmDialog
+            title={`Delete ${isEras ? 'Phase' : 'Session'}`}
+            message={`Delete all data for "${sessionShortLabel}"?\nThis cannot be undone.`}
+            confirmLabel="Delete"
+            onConfirm={async () => {
+              setConfirmDeleteSession(false)
+              try {
+                await deleteOutcomeSession(id, session)
+                const updated = await getOutcomesByPatient(id)
+                setOutcomes(updated)
+              } catch {
+                showToast('Failed to delete. Please try again.', 'error')
+              }
+            }}
+            onCancel={() => setConfirmDeleteSession(false)}
+          />
         )}
       </div>
 

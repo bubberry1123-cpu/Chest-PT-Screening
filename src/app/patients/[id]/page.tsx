@@ -9,6 +9,7 @@ import type { Patient, Screening, OutcomeMeasurement, OverallLevel } from '@/typ
 import { WARDS } from '@/lib/wards'
 import { useToast } from '@/lib/useToast'
 import Toast from '@/components/Toast'
+import ConfirmDialog from '@/components/ConfirmDialog'
 import SeverityBadge from '@/components/SeverityBadge'
 import OutcomeCharts, { OutcomeChartsAll } from '@/components/OutcomeCharts'
 import OutcomeSummaryDashboard from '@/components/OutcomeSummaryDashboard'
@@ -323,6 +324,8 @@ export default function PatientPage() {
   const [editOpen, setEditOpen] = useState(false)
   const [pdfExporting, setPdfExporting] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
+  const [confirmDeletePatient, setConfirmDeletePatient] = useState(false)
+  const [confirmDeleteScreening, setConfirmDeleteScreening] = useState<Screening | null>(null)
   const pdfChartsRef = useRef<HTMLDivElement>(null)
   const pdfSummaryRef = useRef<HTMLDivElement>(null)
   const { toast, showToast } = useToast()
@@ -339,7 +342,6 @@ export default function PatientPage() {
 
   const handleDeletePatient = async () => {
     if (!patient) return
-    if (!window.confirm(`ลบผู้ป่วย "${patient.firstName} ${patient.lastName}" และข้อมูลทั้งหมด?\nการกระทำนี้ไม่สามารถกู้คืนได้`)) return
     try {
       await deletePatient(id)
       router.push('/')
@@ -349,7 +351,6 @@ export default function PatientPage() {
   }
 
   const handleDeleteScreening = async (s: Screening) => {
-    if (!window.confirm(`ลบการประเมินวันที่ ${s.assessedAt instanceof Date ? s.assessedAt.toLocaleDateString('th-TH') : '?'} ?`)) return
     try {
       await deleteScreening(s.id!)
       setScreenings(prev => prev.filter(x => x.id !== s.id))
@@ -407,39 +408,6 @@ export default function PatientPage() {
         mg + 5, curY + 25
       )
       curY += 38
-
-      // ── Assessment History ──────────────────────────────────────────────────
-      pdf.setFont('helvetica', 'bold').setFontSize(10).setTextColor(30, 41, 59)
-      pdf.text('Assessment History', mg, curY)
-      curY += 3
-
-      const asmHead = [['Date', 'Assessor', 'CFS', 'F / R', 'Type', 'Program', 'Level']]
-      const asmBody = screenings.map(s => [
-        s.assessedAt instanceof Date
-          ? s.assessedAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-          : '—',
-        s.assessedBy || '—',
-        String(s.cfsScore ?? '—'),
-        `F${s.fLevel} / R${s.rLevel}`,
-        s.assessmentType ?? 'Standard',
-        s.programType ?? '—',
-        `L${s.overallLevel} — ${s.levelName}`,
-      ])
-      autoTable(pdf, {
-        startY: curY,
-        head: asmHead,
-        body: asmBody,
-        styles: { fontSize: 7.5, cellPadding: 2 },
-        headStyles: { fillColor: [27, 58, 107], textColor: 255, fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        columnStyles: {
-          0: { cellWidth: 26 }, 2: { cellWidth: 10 },
-          3: { cellWidth: 18 }, 4: { cellWidth: 18 },
-          5: { cellWidth: 20 }, 6: { cellWidth: 38 },
-        },
-        margin: { left: mg, right: mg },
-      })
-      curY = (pdf as any).lastAutoTable.finalY + 8
 
       // ── Outcome Measurements Table ──────────────────────────────────────────
       if (outcomes.length > 0 && latestLevel) {
@@ -585,6 +553,24 @@ export default function PatientPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
+      {confirmDeletePatient && patient && (
+        <ConfirmDialog
+          title="ลบผู้ป่วย"
+          message={`ลบผู้ป่วย "${patient.firstName} ${patient.lastName}" และข้อมูลทั้งหมด?\nการกระทำนี้ไม่สามารถกู้คืนได้`}
+          confirmLabel="ลบ"
+          onConfirm={() => { setConfirmDeletePatient(false); handleDeletePatient() }}
+          onCancel={() => setConfirmDeletePatient(false)}
+        />
+      )}
+      {confirmDeleteScreening && (
+        <ConfirmDialog
+          title="ลบการประเมิน"
+          message={`ลบการประเมินวันที่ ${confirmDeleteScreening.assessedAt instanceof Date ? confirmDeleteScreening.assessedAt.toLocaleDateString('th-TH') : '?'}?\nการกระทำนี้ไม่สามารถกู้คืนได้`}
+          confirmLabel="ลบ"
+          onConfirm={() => { const s = confirmDeleteScreening; setConfirmDeleteScreening(null); handleDeleteScreening(s) }}
+          onCancel={() => setConfirmDeleteScreening(null)}
+        />
+      )}
       <div className="flex items-center gap-3 mb-5">
         <Link href="/" className="text-slate-400 hover:text-slate-600 text-sm">← กลับ</Link>
       </div>
@@ -614,7 +600,7 @@ export default function PatientPage() {
               + Outcome
             </Link>
             {isAdmin && (
-              <button onClick={handleDeletePatient}
+              <button onClick={() => setConfirmDeletePatient(true)}
                 className="border border-red-300 text-red-600 hover:bg-red-50 px-4 py-2 rounded-xl text-sm font-semibold transition-colors text-center whitespace-nowrap">
                 ลบผู้ป่วย
               </button>
@@ -675,7 +661,7 @@ export default function PatientPage() {
               </Link>
               {isAdmin && (
                 <button
-                  onClick={e => { e.preventDefault(); handleDeleteScreening(s) }}
+                  onClick={e => { e.preventDefault(); setConfirmDeleteScreening(s) }}
                   className="absolute top-2 right-2 text-xs text-slate-400 hover:text-red-600 px-1.5 py-0.5 rounded transition-colors bg-white border border-transparent hover:border-red-200">
                   ลบ
                 </button>
