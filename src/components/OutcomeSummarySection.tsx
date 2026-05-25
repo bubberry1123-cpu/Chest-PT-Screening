@@ -468,17 +468,15 @@ function OutcomeBlock({ title, accent, patients, sessions, sessionLabels, metric
           {/* Outcome selector */}
           <div>
             <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Outcome</p>
-            <div className="flex flex-wrap gap-1.5">
+            <select
+              value={metricKey}
+              onChange={e => setMetricKey(e.target.value)}
+              className="border border-slate-200 rounded-xl px-3 py-1.5 text-sm text-slate-700 bg-white focus:outline-none focus:border-blue-400 transition-colors"
+            >
               {metrics.map(m => (
-                <button key={m.key} onClick={() => setMetricKey(m.key)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                    metricKey === m.key ? 'text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                  style={metricKey === m.key ? { backgroundColor: accent } : {}}>
-                  {m.label}
-                </button>
+                <option key={m.key} value={m.key}>{m.label}</option>
               ))}
-            </div>
+            </select>
           </div>
 
           {/* Chart area (captured for PDF) */}
