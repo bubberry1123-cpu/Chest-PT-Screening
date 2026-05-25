@@ -384,7 +384,7 @@ export default function PatientPage() {
       let curY = 0
 
       // ── Header bar ──────────────────────────────────────────────────────────
-      pdf.setFillColor(29, 78, 216)
+      pdf.setFillColor(27, 58, 107)
       pdf.rect(0, 0, pw, 24, 'F')
       pdf.setFont('helvetica', 'bold').setFontSize(12).setTextColor(255, 255, 255)
       pdf.text('Chest PT Screening — Patient Report', mg, 11)
@@ -430,7 +430,7 @@ export default function PatientPage() {
         head: asmHead,
         body: asmBody,
         styles: { fontSize: 7.5, cellPadding: 2 },
-        headStyles: { fillColor: [29, 78, 216], textColor: 255, fontStyle: 'bold' },
+        headStyles: { fillColor: [27, 58, 107], textColor: 255, fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [248, 250, 252] },
         columnStyles: {
           0: { cellWidth: 26 }, 2: { cellWidth: 10 },
@@ -501,7 +501,7 @@ export default function PatientPage() {
             if (group.items.length > 1) {
               body.push([{
                 content: group.label, colSpan: filledSessions.length + 1,
-                styles: { fontStyle: 'bold', fillColor: [219, 234, 254], textColor: [29, 78, 216] },
+                styles: { fontStyle: 'bold', fillColor: [215, 224, 240], textColor: [27, 58, 107] },
               }])
               group.items.forEach(item => {
                 if (!filledSessions.some(s => bySession[s]?.items[item.key]?.value !== undefined)) return
@@ -528,7 +528,7 @@ export default function PatientPage() {
           autoTable(pdf, {
             startY: curY, head, body,
             styles: { fontSize: 7.5, cellPadding: 2 },
-            headStyles: { fillColor: [29, 78, 216], textColor: 255, fontStyle: 'bold' },
+            headStyles: { fillColor: [27, 58, 107], textColor: 255, fontStyle: 'bold' },
             alternateRowStyles: { fillColor: [248, 250, 252] },
             columnStyles: { 0: { fontStyle: 'italic', cellWidth: 52 } },
             margin: { left: mg, right: mg },
