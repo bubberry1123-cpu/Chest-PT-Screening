@@ -9,6 +9,7 @@ import type { Patient, Screening, OutcomeMeasurement, OverallLevel, OutcomeSessi
 import type { UserProfile, ActivityLog } from '@/types'
 import { exportPatientList, exportOutcomeData, exportMonthlySummary, exportChartsPDF } from '@/lib/exportUtils'
 import { WARDS } from '@/lib/wards'
+import { OutcomeSummarySection } from '@/components/OutcomeSummarySection'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const REASSESS_DAYS = 14
@@ -1359,7 +1360,14 @@ export default function AdminPage() {
 
               </div>
             )}
-          </div>
+          </div>{/* end ERAS section */}
+
+          {/* ── Outcome Summary ── */}
+          <OutcomeSummarySection
+            patients={patients}
+            screenings={screenings}
+            outcomes={outcomes}
+          />
         </>
       )}
     </div>
