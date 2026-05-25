@@ -267,6 +267,57 @@ function LineChartSVG({ chartDef, outcomes }: { chartDef: ChartDef; outcomes: Ou
   )
 }
 
+// ── All-groups layout for PDF capture ────────────────────────────────────────
+
+export function OutcomeChartsAll({
+  outcomes,
+  level,
+}: {
+  outcomes: OutcomeMeasurement[]
+  level: OverallLevel
+}) {
+  const groups = (Object.keys(CHART_GROUPS) as GroupKey[]).map(gk => {
+    const gd = CHART_GROUPS[gk]
+    const visibleCharts = gd.charts
+      .map((c): ChartDef => ({
+        title: c.title, unit: c.unit, inverted: c.inverted,
+        series: resolveColors(c.series, level),
+      }))
+      .filter(c => c.series.some(s => outcomes.some(o => o.items[s.key] !== undefined)))
+    return { key: gk, label: gd.label, charts: visibleCharts }
+  }).filter(g => g.charts.length > 0)
+
+  if (groups.length === 0) return null
+
+  return (
+    <div className="space-y-5">
+      {groups.map(group => (
+        <div key={group.key}>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">{group.label}</p>
+          <div className="space-y-3">
+            {group.charts.map(chart => (
+              <div key={chart.title} className="bg-white rounded-xl border border-slate-200 p-4">
+                <div className="flex items-center gap-4 flex-wrap mb-2">
+                  <span className="text-xs font-bold text-slate-700">{chart.title}</span>
+                  {chart.series.map(s => (
+                    <div key={s.key} className="flex items-center gap-1.5">
+                      <div className="w-5 h-[2.5px] rounded-full" style={{ backgroundColor: s.color }} />
+                      <span className="text-xs text-slate-500">
+                        {s.label}{s.unit ? ` (${s.unit})` : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <LineChartSVG chartDef={chart} outcomes={outcomes} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 export default function OutcomeCharts({

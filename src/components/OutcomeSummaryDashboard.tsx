@@ -15,8 +15,8 @@ const SHADE_STROKES = [
   '#172554', '#0F172A', '#060A13', '#2D3748',
 ]
 
-function getShade(session: string): { fill: string; stroke: string } {
-  const i = (OUTCOME_SESSIONS as readonly string[]).indexOf(session)
+function getShade(session: string, overrideIdx?: number): { fill: string; stroke: string } {
+  const i = overrideIdx !== undefined ? overrideIdx : (OUTCOME_SESSIONS as readonly string[]).indexOf(session)
   return {
     fill:   SHADE_FILLS[i  >= 0 ? i : 0] ?? '#93C5FD',
     stroke: SHADE_STROKES[i >= 0 ? i : 0] ?? '#3B82F6',
@@ -43,7 +43,7 @@ const AMPAC_PARTS = [
   { key: 'ampac_part3', label: 'P3 Applied Cognitive', color: '#AFA9EC' },
 ] as const
 
-interface OtherDef {
+export interface OtherDef {
   key: string; label: string; unit: string
   color: string; maxRef: number
 }
@@ -71,10 +71,11 @@ function getFilledSessions(outcomes: OutcomeMeasurement[]): string[] {
 
 // ── Session datum ─────────────────────────────────────────────────────────────
 
-interface SessionDatum {
+export interface SessionDatum {
   session: string
   label: string
   color: string
+  shadeIdx?: number
   o: OutcomeMeasurement | undefined
 }
 
@@ -93,7 +94,7 @@ type SegTooltip = {
   segMidY: number
 }
 
-function BrfaSegmentBar({ sessions }: { sessions: SessionDatum[] }) {
+export function BrfaSegmentBar({ sessions }: { sessions: SessionDatum[] }) {
   const W = 72, H = 320, BAR_L = 8, BAR_W = 56
   const TOP_PAD = 10, BOT_PAD = 22
   const CHART_H = H - TOP_PAD - BOT_PAD
@@ -183,7 +184,7 @@ const AMPAC_SVG_SEGS = [
   { key: 'ampac_part1', short: 'P1', fullLabel: 'P1 Basic Mobility',    segColor: '#3C3489' },
 ] as const
 
-function AmpacSegmentBar({ sessions }: { sessions: SessionDatum[] }) {
+export function AmpacSegmentBar({ sessions }: { sessions: SessionDatum[] }) {
   const W = 72, H = 320, BAR_L = 8, BAR_W = 56
   const TOP_PAD = 10, BOT_PAD = 22
   const CHART_H = H - TOP_PAD - BOT_PAD
@@ -275,7 +276,7 @@ const SIDE_PAD = 8
 const GAP_WITHIN = 2
 const GAP_BETWEEN = 14
 
-function CustomBarChart({ defs, sessions }: { defs: OtherDef[]; sessions: SessionDatum[] }) {
+export function CustomBarChart({ defs, sessions }: { defs: OtherDef[]; sessions: SessionDatum[] }) {
   const N = sessions.length
   const BAR_W = Math.min(40, Math.max(14, Math.floor(64 / N)))
   const groupW = N * BAR_W + Math.max(0, N - 1) * GAP_WITHIN
@@ -299,7 +300,7 @@ function CustomBarChart({ defs, sessions }: { defs: OtherDef[]; sessions: Sessio
                 const barH = Math.max(MIN_H, (val / def.maxRef) * MAX_H)
                 const barX = groupX + si * (BAR_W + GAP_WITHIN)
                 const barY = VAL_PAD + MAX_H - barH
-                const { fill, stroke } = getShade(sd.session)
+                const { fill, stroke } = getShade(sd.session, sd.shadeIdx)
 
                 return (
                   <g key={sd.session}>
@@ -340,6 +341,49 @@ function CustomBarChart({ defs, sessions }: { defs: OtherDef[]; sessions: Sessio
           )
         })}
       </svg>
+    </div>
+  )
+}
+
+// ── Shared chart core (used by admin section too) ─────────────────────────────
+
+export function OutcomeSummaryChartCore({
+  sessions,
+  otherDefs,
+}: {
+  sessions: SessionDatum[]
+  otherDefs: OtherDef[]
+}) {
+  const showBrfa  = sessions.some(sd => BRFA_PARTS.some(p => sd.o?.items[p.key]?.value !== undefined))
+  const showAmpac = sessions.some(sd => AMPAC_PARTS.some(p => sd.o?.items[p.key]?.value !== undefined))
+  const presentOthers = otherDefs.filter(d => sessions.some(sd => sd.o?.items[d.key]?.value !== undefined))
+  const showOther = presentOthers.length > 0
+
+  if (!showBrfa && !showAmpac && !showOther)
+    return <div className="text-center py-8 text-slate-400 text-sm">No data for selected sessions</div>
+
+  const legendItems = sessions.map(sd => {
+    const { stroke } = getShade(sd.session, sd.shadeIdx)
+    return { key: sd.session, label: sd.label, color: stroke }
+  })
+
+  return (
+    <div>
+      {legendItems.length > 0 && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1.5 mb-3 pb-3 border-b border-slate-100">
+          {legendItems.map(item => (
+            <div key={item.key} className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: item.color }} />
+              <span className="text-[11px] text-slate-500">{item.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex items-end gap-1">
+        {showBrfa  && <BrfaSegmentBar  sessions={sessions} />}
+        {showAmpac && <AmpacSegmentBar sessions={sessions} />}
+        {showOther && <CustomBarChart  defs={presentOthers} sessions={sessions} />}
+      </div>
     </div>
   )
 }

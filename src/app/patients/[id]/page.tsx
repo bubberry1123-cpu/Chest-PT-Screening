@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getPatientById, getScreeningsByPatient, getOutcomesByPatient, updatePatient, deletePatient, deleteScreening } from '@/lib/localstore'
@@ -10,7 +10,7 @@ import { WARDS } from '@/lib/wards'
 import { useToast } from '@/lib/useToast'
 import Toast from '@/components/Toast'
 import SeverityBadge from '@/components/SeverityBadge'
-import OutcomeCharts from '@/components/OutcomeCharts'
+import OutcomeCharts, { OutcomeChartsAll } from '@/components/OutcomeCharts'
 import OutcomeSummaryDashboard from '@/components/OutcomeSummaryDashboard'
 import ErasOutcomeCharts from '@/components/ErasOutcomeCharts'
 
@@ -321,6 +321,10 @@ export default function PatientPage() {
   const [outcomes, setOutcomes] = useState<OutcomeMeasurement[]>([])
   const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
+  const [pdfExporting, setPdfExporting] = useState(false)
+  const [pdfError, setPdfError] = useState<string | null>(null)
+  const pdfChartsRef = useRef<HTMLDivElement>(null)
+  const pdfSummaryRef = useRef<HTMLDivElement>(null)
   const { toast, showToast } = useToast()
 
   useEffect(() => {
@@ -359,6 +363,225 @@ export default function PatientPage() {
 
   const latestLevel = screenings[0]?.overallLevel as OverallLevel | undefined
   const isEras = screenings[0]?.assessmentType === 'ERAS'
+
+  const handleDownloadPDF = async () => {
+    if (!patient) return
+    setPdfExporting(true)
+    setPdfError(null)
+    try {
+      const [{ toPng }, jspdfMod, autoTableMod] = await Promise.all([
+        import('html-to-image'),
+        import('jspdf'),
+        import('jspdf-autotable'),
+      ])
+      const { jsPDF } = jspdfMod
+      const autoTable = autoTableMod.default
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pw = pdf.internal.pageSize.getWidth()
+      const ph = pdf.internal.pageSize.getHeight()
+      const mg = 12
+      let curY = 0
+
+      // ── Header bar ──────────────────────────────────────────────────────────
+      pdf.setFillColor(29, 78, 216)
+      pdf.rect(0, 0, pw, 24, 'F')
+      pdf.setFont('helvetica', 'bold').setFontSize(12).setTextColor(255, 255, 255)
+      pdf.text('Chest PT Screening — Patient Report', mg, 11)
+      pdf.setFont('helvetica', 'normal').setFontSize(8)
+      pdf.text(
+        `Generated: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`,
+        mg, 19
+      )
+      curY = 30
+
+      // ── Patient info box ────────────────────────────────────────────────────
+      pdf.setFillColor(241, 245, 249)
+      pdf.roundedRect(mg, curY, pw - mg * 2, 32, 3, 3, 'F')
+      pdf.setFont('helvetica', 'bold').setFontSize(13).setTextColor(15, 23, 42)
+      pdf.text(`${patient.firstName} ${patient.lastName}`, mg + 5, curY + 9)
+      pdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(71, 85, 105)
+      pdf.text(`HN: ${patient.hn}`, mg + 5, curY + 17)
+      pdf.text(
+        `Age: ${patient.age}  ·  Sex: ${patient.sex}  ·  Nationality: ${patient.nationality}  ·  Location: ${patient.location || '—'}`,
+        mg + 5, curY + 25
+      )
+      curY += 38
+
+      // ── Assessment History ──────────────────────────────────────────────────
+      pdf.setFont('helvetica', 'bold').setFontSize(10).setTextColor(30, 41, 59)
+      pdf.text('Assessment History', mg, curY)
+      curY += 3
+
+      const asmHead = [['Date', 'Assessor', 'CFS', 'F / R', 'Type', 'Program', 'Level']]
+      const asmBody = screenings.map(s => [
+        s.assessedAt instanceof Date
+          ? s.assessedAt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+          : '—',
+        s.assessedBy || '—',
+        String(s.cfsScore ?? '—'),
+        `F${s.fLevel} / R${s.rLevel}`,
+        s.assessmentType ?? 'Standard',
+        s.programType ?? '—',
+        `L${s.overallLevel} — ${s.levelName}`,
+      ])
+      autoTable(pdf, {
+        startY: curY,
+        head: asmHead,
+        body: asmBody,
+        styles: { fontSize: 7.5, cellPadding: 2 },
+        headStyles: { fillColor: [29, 78, 216], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        columnStyles: {
+          0: { cellWidth: 26 }, 2: { cellWidth: 10 },
+          3: { cellWidth: 18 }, 4: { cellWidth: 18 },
+          5: { cellWidth: 20 }, 6: { cellWidth: 38 },
+        },
+        margin: { left: mg, right: mg },
+      })
+      curY = (pdf as any).lastAutoTable.finalY + 8
+
+      // ── Outcome Measurements Table ──────────────────────────────────────────
+      if (outcomes.length > 0 && latestLevel) {
+        if (curY + 20 > ph - mg) { pdf.addPage(); curY = mg }
+        pdf.setFont('helvetica', 'bold').setFontSize(10).setTextColor(30, 41, 59)
+        pdf.text('Outcome Measurements', mg, curY)
+        curY += 3
+
+        if (isEras) {
+          const erasByPhase: Record<string, OutcomeMeasurement> = {}
+          outcomes.forEach(o => { erasByPhase[o.session] = o })
+          const filledPhases = ERAS_PHASES.filter(p => erasByPhase[p])
+          const head = [['Outcome (unit)', ...filledPhases.map(p => ERAS_PHASE_SHORT[p] ?? p)]]
+          const body: any[][] = []
+          for (const group of ERAS_OUTCOME_GROUPS) {
+            if (group.items.length > 1) {
+              body.push([{
+                content: group.label, colSpan: filledPhases.length + 1,
+                styles: { fontStyle: 'bold', fillColor: [237, 233, 254], textColor: [91, 33, 182] },
+              }])
+              group.items.forEach(item => {
+                if (!filledPhases.some(p => erasByPhase[p]?.items[item.key]?.value !== undefined)) return
+                body.push([
+                  `  ${item.label} (${item.unit})`,
+                  ...filledPhases.map(p => {
+                    const v = erasByPhase[p]?.items[item.key]?.value
+                    return v !== undefined ? String(v) : '—'
+                  }),
+                ])
+              })
+            } else {
+              const item = group.items[0]
+              if (!filledPhases.some(p => erasByPhase[p]?.items[item.key]?.value !== undefined)) continue
+              body.push([
+                `${group.label} (${item.unit})`,
+                ...filledPhases.map(p => {
+                  const v = erasByPhase[p]?.items[item.key]?.value
+                  return v !== undefined ? String(v) : '—'
+                }),
+              ])
+            }
+          }
+          autoTable(pdf, {
+            startY: curY, head, body,
+            styles: { fontSize: 7.5, cellPadding: 2 },
+            headStyles: { fillColor: [124, 58, 237], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [250, 245, 255] },
+            columnStyles: { 0: { fontStyle: 'italic', cellWidth: 52 } },
+            margin: { left: mg, right: mg },
+          })
+        } else {
+          const bySession: Record<string, OutcomeMeasurement> = {}
+          outcomes.forEach(o => { bySession[o.session] = o })
+          const filledSessions = OUTCOME_SESSIONS.filter(s => bySession[s])
+          const groups = OUTCOME_GROUPS[latestLevel]
+          const head = [['Outcome (unit)', ...filledSessions.map(s => SESSION_SHORT[s] ?? s)]]
+          const body: any[][] = []
+          for (const group of groups) {
+            if (group.items.length > 1) {
+              body.push([{
+                content: group.label, colSpan: filledSessions.length + 1,
+                styles: { fontStyle: 'bold', fillColor: [219, 234, 254], textColor: [29, 78, 216] },
+              }])
+              group.items.forEach(item => {
+                if (!filledSessions.some(s => bySession[s]?.items[item.key]?.value !== undefined)) return
+                body.push([
+                  `  ${item.label} (${item.unit})`,
+                  ...filledSessions.map(s => {
+                    const v = bySession[s]?.items[item.key]?.value
+                    return v !== undefined ? String(v) : '—'
+                  }),
+                ])
+              })
+            } else {
+              const item = group.items[0]
+              if (!filledSessions.some(s => bySession[s]?.items[item.key]?.value !== undefined)) continue
+              body.push([
+                `${group.label} (${item.unit})`,
+                ...filledSessions.map(s => {
+                  const v = bySession[s]?.items[item.key]?.value
+                  return v !== undefined ? String(v) : '—'
+                }),
+              ])
+            }
+          }
+          autoTable(pdf, {
+            startY: curY, head, body,
+            styles: { fontSize: 7.5, cellPadding: 2 },
+            headStyles: { fillColor: [29, 78, 216], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            columnStyles: { 0: { fontStyle: 'italic', cellWidth: 52 } },
+            margin: { left: mg, right: mg },
+          })
+        }
+        curY = (pdf as any).lastAutoTable.finalY + 8
+      }
+
+      // ── Chart images ────────────────────────────────────────────────────────
+      const captureAndPlace = async (el: HTMLElement | null, title: string, bg = '#f8fafc') => {
+        if (!el) return
+        const imgData = await toPng(el, { pixelRatio: 2, backgroundColor: bg, cacheBust: true })
+        const img = await new Promise<HTMLImageElement>((res, rej) => {
+          const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = imgData
+        })
+        const avail = pw - mg * 2
+        const ratio = img.height / img.width
+        let drawW = avail
+        let drawH = drawW * ratio
+        const maxH = ph - mg * 2 - 20
+        if (drawH > maxH) { drawH = maxH; drawW = drawH / ratio }
+        if (curY + drawH + 18 > ph - mg) { pdf.addPage(); curY = mg }
+        pdf.setFont('helvetica', 'bold').setFontSize(10).setTextColor(30, 41, 59)
+        pdf.text(title, mg, curY)
+        curY += 4
+        pdf.addImage(imgData, 'PNG', mg + (avail - drawW) / 2, curY, drawW, drawH)
+        curY += drawH + 8
+      }
+
+      if (outcomes.length > 0) {
+        await captureAndPlace(pdfChartsRef.current, isEras ? 'ERAS Outcome Trend Charts' : 'Outcome Trend Charts')
+        if (!isEras) {
+          await captureAndPlace(pdfSummaryRef.current, 'Outcome Summary', '#ffffff')
+        }
+      }
+
+      // ── Save ────────────────────────────────────────────────────────────────
+      const safeName = `${patient.firstName}_HN${patient.hn}`
+        .replace(/\s+/g, '_')
+        .replace(/[^a-zA-Z0-9_]/g, '')
+        .toUpperCase()
+      const dateStr = new Date().toLocaleDateString('en-GB', {
+        day: '2-digit', month: '2-digit', year: '2-digit',
+      }).replace(/\//g, '')
+      pdf.save(`${safeName}_report_${dateStr}.pdf`)
+
+    } catch (err) {
+      console.error('[Download PDF]', err)
+      setPdfError(err instanceof Error ? err.message : 'PDF generation failed. Check the browser console.')
+    } finally {
+      setPdfExporting(false)
+    }
+  }
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -496,6 +719,71 @@ export default function PatientPage() {
             className="text-sm text-[#0C447C] hover:text-[#185FA5] font-medium underline">
             {isEras ? 'Record Prehabilitation →' : 'Record Initial →'}
           </Link>
+        </div>
+      )}
+
+      {/* ── Download PDF button ───────────────────────────────────────────── */}
+      <div className="mt-6 mb-2">
+        <button
+          onClick={handleDownloadPDF}
+          disabled={pdfExporting}
+          className="w-full flex items-center justify-center gap-2.5 bg-[#0C447C] hover:bg-[#185FA5] disabled:opacity-60 text-white py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm"
+        >
+          {pdfExporting ? (
+            <>
+              <svg className="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3" />
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+              Generating PDF…
+            </>
+          ) : (
+            <>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Download PDF
+            </>
+          )}
+        </button>
+        {pdfError && (
+          <div className="mt-2 flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-xs text-red-600">
+            <span className="shrink-0 mt-0.5">⚠</span>
+            <span className="flex-1">{pdfError}</span>
+            <button onClick={() => setPdfError(null)} className="shrink-0 text-red-400 hover:text-red-600 leading-none">×</button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Hidden divs for PDF chart capture ─────────────────────────────── */}
+      {latestLevel && outcomes.length > 0 && !isEras && (
+        <>
+          <div
+            aria-hidden="true"
+            style={{ position: 'fixed', left: '-9999px', top: 0, width: '680px', zIndex: -1 }}
+          >
+            <div ref={pdfChartsRef} style={{ backgroundColor: '#f8fafc', padding: '16px' }}>
+              <OutcomeChartsAll outcomes={outcomes} level={latestLevel} />
+            </div>
+          </div>
+          <div
+            aria-hidden="true"
+            style={{ position: 'fixed', left: '-9999px', top: 0, width: '680px', zIndex: -1 }}
+          >
+            <div ref={pdfSummaryRef} style={{ backgroundColor: '#ffffff', padding: '16px' }}>
+              <OutcomeSummaryDashboard outcomes={outcomes} level={latestLevel} />
+            </div>
+          </div>
+        </>
+      )}
+      {isEras && outcomes.length > 0 && (
+        <div
+          aria-hidden="true"
+          style={{ position: 'fixed', left: '-9999px', top: 0, width: '680px', zIndex: -1 }}
+        >
+          <div ref={pdfChartsRef} style={{ backgroundColor: '#f8fafc', padding: '16px' }}>
+            <ErasOutcomeCharts outcomes={outcomes} />
+          </div>
         </div>
       )}
 

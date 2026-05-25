@@ -1,7 +1,9 @@
 'use client'
 import { useState, useMemo, useRef, useEffect } from 'react'
-import type { Patient, Screening, OutcomeMeasurement } from '@/types'
+import type { Patient, Screening, OutcomeMeasurement, OutcomeSession } from '@/types'
 import { SESSION_SHORT, ERAS_PHASES, ERAS_PHASE_SHORT } from '@/lib/outcomeItems'
+import type { OtherDef, SessionDatum } from './OutcomeSummaryDashboard'
+import { OutcomeSummaryChartCore } from './OutcomeSummaryDashboard'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -9,8 +11,6 @@ interface Metric       { key: string; label: string; unit: string }
 interface PInfo        { id: string; firstName: string; lastName: string; hn: string; outcomes: OutcomeMeasurement[] }
 interface LineSeries   { id: string; label: string; color: string; points: (number | null)[] }
 interface MiniSeries   { label: string; points: (number | null)[]; color: string }
-interface BarItem      { key: string; shortLabel: string; groupLabel?: string; refMax: number; inverted?: boolean; unit: string }
-interface BarSeriesDef { sessionKey: string; sessionLabel: string; color: string; values: Record<string, number | null> }
 type ViewMode          = 'average' | 'single' | 'compare'
 type SingleCardDef     = { type: 'single'; key: string }
 type GroupCardDef      = { type: 'group'; label: string; unit: string; keys: string[]; subLabels: string[] }
@@ -85,34 +85,27 @@ const ERAS_CARD_DEFS: CardDef[] = [
   { type: 'single', key: 'erasTwoMWalk'    },
 ]
 
-// ── Bar chart metric definitions ──────────────────────────────────────────────
+// ── Admin-specific OtherDef arrays (real-value chart, English units) ──────────
 
-const STD_BAR_ITEMS: BarItem[] = [
-  { key: 'ampac_part1',        shortLabel: 'Pt1',   groupLabel: 'AMPAC',  refMax: 24,   unit: '/24'    },
-  { key: 'ampac_part2',        shortLabel: 'Pt2',   groupLabel: 'AMPAC',  refMax: 24,   unit: '/24'    },
-  { key: 'ampac_part3',        shortLabel: 'Pt3',   groupLabel: 'AMPAC',  refMax: 24,   unit: '/24'    },
-  { key: 'brfa_part1',         shortLabel: 'Pt1',   groupLabel: 'BRFA',   refMax: 100,  unit: '%'      },
-  { key: 'brfa_part2',         shortLabel: 'Pt2',   groupLabel: 'BRFA',   refMax: 100,  unit: '%'      },
-  { key: 'brfa_q20',           shortLabel: 'Q20',   groupLabel: 'BRFA',   refMax: 100,  unit: '%'      },
-  { key: 'brfa_q21',           shortLabel: 'Q21',   groupLabel: 'BRFA',   refMax: 100,  unit: '%'      },
-  { key: 'dyspneaScale',       shortLabel: 'mMRC',                         refMax: 4,    unit: '/4',    inverted: true },
-  { key: 'peakCoughFlow',      shortLabel: 'PCF',                          refMax: 500,  unit: 'L/min'  },
-  { key: 'wrightSpirometer',   shortLabel: 'Wright',                       refMax: 2500, unit: 'mL'     },
-  { key: 'cs30',               shortLabel: 'CS-30',                        refMax: 40,   unit: 'stands' },
-  { key: 'gripStrength_left',  shortLabel: 'L',     groupLabel: 'Grip',   refMax: 60,   unit: 'kg'     },
-  { key: 'gripStrength_right', shortLabel: 'R',     groupLabel: 'Grip',   refMax: 60,   unit: 'kg'     },
-  { key: 'sixMWT',             shortLabel: '6MWT',                         refMax: 700,  unit: 'm'      },
-  { key: 'twoMinMarching',     shortLabel: '2MST',                         refMax: 120,  unit: 'steps'  },
-  { key: 'twoMeterWalk',       shortLabel: '2MWT',                         refMax: 300,  unit: 'm'      },
+const ADMIN_STD_OTHER_DEFS: OtherDef[] = [
+  { key: 'dyspneaScale',       label: 'mMRC',       unit: '/4',     color: '#E85D04', maxRef: 4   },
+  { key: 'peakCoughFlow',      label: 'Cough Flow', unit: 'L/min',  color: '#378ADD', maxRef: 600 },
+  { key: 'wrightSpirometer',   label: 'Wright',     unit: 'mL',     color: '#0F6E56', maxRef: 600 },
+  { key: 'gripStrength_left',  label: 'Grip L',     unit: 'kg',     color: '#BA7517', maxRef: 60  },
+  { key: 'gripStrength_right', label: 'Grip R',     unit: 'kg',     color: '#EF9F27', maxRef: 60  },
+  { key: 'cs30',               label: 'CS-30',      unit: 'stands', color: '#639922', maxRef: 30  },
+  { key: 'twoMeterWalk',       label: '2MWT',       unit: 'm',      color: '#0891B2', maxRef: 500 },
+  { key: 'sixMWT',             label: '6MWT',       unit: 'm',      color: '#C77DFF', maxRef: 600 },
+  { key: 'twoMinMarching',     label: '2MST',       unit: 'steps',  color: '#E63946', maxRef: 120 },
 ]
 
-const ERAS_BAR_ITEMS: BarItem[] = [
-  { key: 'peakCoughFlow',      shortLabel: 'PCF',                          refMax: 500,  unit: 'L/min'  },
-  { key: 'wrightSpirometer',   shortLabel: 'Wright',                       refMax: 2500, unit: 'mL'     },
-  { key: 'gripStrength_left',  shortLabel: 'L',     groupLabel: 'Grip',   refMax: 60,   unit: 'kg'     },
-  { key: 'gripStrength_right', shortLabel: 'R',     groupLabel: 'Grip',   refMax: 60,   unit: 'kg'     },
-  { key: 'cs30',               shortLabel: 'CS-30',                        refMax: 40,   unit: 'stands' },
-  { key: 'erasTwoMWalk',       shortLabel: '2MW',                          refMax: 30,   unit: 'sec',   inverted: true },
+const ADMIN_ERAS_OTHER_DEFS: OtherDef[] = [
+  { key: 'peakCoughFlow',      label: 'Cough Flow', unit: 'L/min',  color: '#378ADD', maxRef: 600 },
+  { key: 'wrightSpirometer',   label: 'Wright',     unit: 'mL',     color: '#0F6E56', maxRef: 600 },
+  { key: 'gripStrength_left',  label: 'Grip L',     unit: 'kg',     color: '#BA7517', maxRef: 60  },
+  { key: 'gripStrength_right', label: 'Grip R',     unit: 'kg',     color: '#EF9F27', maxRef: 60  },
+  { key: 'cs30',               label: 'CS-30',      unit: 'stands', color: '#639922', maxRef: 30  },
+  { key: 'erasTwoMWalk',       label: '2-Meter',    unit: 'sec',    color: '#0891B2', maxRef: 30  },
 ]
 
 // ── PatientPicker ─────────────────────────────────────────────────────────────
@@ -353,157 +346,6 @@ function SessionSelector({ sessions, sessionLabels, selected, colorMap, onChange
   )
 }
 
-// ── Outcome summary bar chart ─────────────────────────────────────────────────
-
-interface BarTipState {
-  clientX: number; clientY: number
-  label: string
-  items: { sessLabel: string; color: string; rawVal: number | null; unit: string }[]
-}
-
-function OutcomeSummaryBarChart({ barItems, series }: {
-  barItems: BarItem[]
-  series: BarSeriesDef[]
-}) {
-  const [tip, setTip] = useState<BarTipState | null>(null)
-
-  const N = series.length
-  if (N === 0) return (
-    <div className="h-28 flex items-center justify-center text-slate-400 text-sm bg-white rounded-xl border border-slate-100">
-      Select at least one session above to display the chart
-    </div>
-  )
-
-  const barW    = 10
-  const barGap  = 2
-  const mGap    = 10
-  const slotW   = N * barW + (N - 1) * barGap + mGap
-  const PL = 42, PR = 16, PT = 36, PB = 30
-  const chartH  = 110
-  const H = PT + chartH + PB
-  const W = PL + barItems.length * slotW + PR
-
-  const normalize = (item: BarItem, val: number | null): number | null => {
-    if (val === null) return null
-    const pct = Math.max(0, Math.min(100, (val / item.refMax) * 100))
-    return item.inverted ? 100 - pct : pct
-  }
-  const toY = (pct: number) => PT + (1 - pct / 100) * chartH
-  const slotCX = (i: number) => PL + i * slotW + (N * barW + (N - 1) * barGap) / 2
-
-  // Group brackets
-  const groups: { label: string; si: number; ei: number }[] = []
-  barItems.forEach((item, i) => {
-    if (!item.groupLabel) return
-    const last = groups[groups.length - 1]
-    if (last && last.label === item.groupLabel) last.ei = i
-    else groups.push({ label: item.groupLabel, si: i, ei: i })
-  })
-
-  const yLines = [0, 25, 50, 75, 100]
-
-  return (
-    <div className="overflow-x-auto" onMouseLeave={() => setTip(null)}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ minWidth: Math.max(W, 360), height: H }} className="select-none">
-
-        {/* Y grid + labels */}
-        {yLines.map(pct => {
-          const y = toY(pct)
-          return (
-            <g key={pct}>
-              <line x1={PL} y1={y} x2={W - PR} y2={y} stroke={pct === 0 ? '#cbd5e1' : '#f1f5f9'} strokeWidth="1" />
-              <text x={PL - 5} y={y + 3.5} fontSize="9" fill="#94a3b8" textAnchor="end">{pct}</text>
-            </g>
-          )
-        })}
-        <text x={12} y={PT + chartH / 2} fontSize="8" fill="#94a3b8" textAnchor="middle"
-          transform={`rotate(-90,12,${PT + chartH / 2})`}>% ref</text>
-
-        {/* Group brackets */}
-        {groups.map(g => {
-          const x1 = PL + g.si * slotW + 2
-          const x2 = PL + (g.ei + 1) * slotW - mGap - 2
-          const bY = PT - 20
-          return (
-            <g key={g.label}>
-              <text x={(x1 + x2) / 2} y={bY} fontSize="8.5" fontWeight="600" fill="#475569" textAnchor="middle">{g.label}</text>
-              <line x1={x1} y1={bY + 4} x2={x2} y2={bY + 4} stroke="#cbd5e1" strokeWidth="1" />
-              <line x1={x1} y1={bY + 4} x2={x1} y2={bY + 8} stroke="#cbd5e1" strokeWidth="1" />
-              <line x1={x2} y1={bY + 4} x2={x2} y2={bY + 8} stroke="#cbd5e1" strokeWidth="1" />
-            </g>
-          )
-        })}
-
-        {/* Bars */}
-        {barItems.map((item, mi) => {
-          const baseX = PL + mi * slotW
-          return (
-            <g key={item.key}>
-              {series.map((s, si) => {
-                const pct = normalize(item, s.values[item.key] ?? null)
-                if (pct === null || pct <= 0) return null
-                const bH = (pct / 100) * chartH
-                return (
-                  <rect key={si}
-                    x={baseX + si * (barW + barGap)} y={PT + chartH - bH}
-                    width={barW} height={Math.max(bH, 0.5)}
-                    fill={s.color} rx="1.5" opacity="0.85"
-                    style={{ cursor: 'pointer' }}
-                    onMouseEnter={e => setTip({
-                      clientX: e.clientX, clientY: e.clientY,
-                      label: item.groupLabel ? `${item.groupLabel} ${item.shortLabel}` : item.shortLabel,
-                      items: series.map(ss => ({ sessLabel: ss.sessionLabel, color: ss.color, rawVal: ss.values[item.key] ?? null, unit: item.unit })),
-                    })}
-                  />
-                )
-              })}
-            </g>
-          )
-        })}
-
-        {/* X labels */}
-        {barItems.map((item, mi) => (
-          <text key={item.key} x={slotCX(mi)} y={PT + chartH + 12} fontSize="8.5" fill="#64748b" textAnchor="middle">
-            {item.shortLabel}
-          </text>
-        ))}
-
-        {/* Inverted indicator */}
-        {barItems.map((item, mi) => item.inverted ? (
-          <text key={`inv-${item.key}`} x={slotCX(mi)} y={PT + chartH + 22} fontSize="7" fill="#94a3b8" textAnchor="middle">↓</text>
-        ) : null)}
-      </svg>
-
-      {/* Session legend below chart */}
-      <div className="flex flex-wrap gap-3 mt-2 pl-10">
-        {series.map(s => (
-          <div key={s.sessionKey} className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: s.color }} />
-            <span className="text-xs text-slate-500">{s.sessionLabel}</span>
-          </div>
-        ))}
-        <span className="text-[10px] text-slate-400 ml-1 self-center">y = % of reference max</span>
-      </div>
-
-      {/* Tooltip fixed */}
-      {tip && (
-        <div className="fixed z-[300] bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-xs pointer-events-none"
-          style={{ left: Math.min(tip.clientX + 14, (typeof window !== 'undefined' ? window.innerWidth : 800) - 220), top: Math.max(tip.clientY - 80, 8) }}>
-          <p className="font-semibold text-slate-700 mb-1.5">{tip.label}</p>
-          {tip.items.map((it, i) => (
-            <div key={i} className="flex items-center gap-2 py-0.5">
-              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: it.color }} />
-              <span className="text-slate-500">{it.sessLabel}</span>
-              <span className="font-bold text-slate-800 ml-auto pl-3">
-                {it.rawVal !== null ? `${Number.isInteger(it.rawVal) ? it.rawVal : it.rawVal.toFixed(1)} ${it.unit}` : '—'}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ── Outcome card grid (avg + single patient modes) ────────────────────────────
 
@@ -569,7 +411,7 @@ function OutcomeCardGrid({ pointsData, sessionLabels, metrics, cardDefs, color }
 
 function OutcomeBlock({
   title, accent, patients, sessions, sessionLabels, metrics,
-  cardDefs, barItems, defaultSessions, blockType,
+  cardDefs, otherDefs, defaultSessions, blockType,
 }: {
   title: string
   accent: string
@@ -578,7 +420,7 @@ function OutcomeBlock({
   sessionLabels: string[]
   metrics: Metric[]
   cardDefs: CardDef[]
-  barItems: BarItem[]
+  otherDefs: OtherDef[]
   defaultSessions: string[]
   blockType: 'standard' | 'eras'
 }) {
@@ -604,27 +446,43 @@ function OutcomeBlock({
     return map
   }, [sessions])
 
-  // Bar chart series data
-  const barSeries = useMemo<BarSeriesDef[]>(() => {
+  // Chart sessions for OutcomeSummaryChartCore
+  const chartSessions = useMemo<SessionDatum[]>(() => {
     if (mode === 'compare') return []
-    return selectedSessions.map(sess => {
-      const sessIdx = (sessions as string[]).indexOf(sess)
-      const sessionLabel = sessionLabels[sessIdx] ?? sess
+    const allItemKeys = [
+      'ampac_part1', 'ampac_part2', 'ampac_part3',
+      'brfa_part1', 'brfa_part2', 'brfa_q20', 'brfa_q21',
+      ...otherDefs.map(d => d.key),
+    ]
+    const total = selectedSessions.length
+    return selectedSessions.map((sess, sessIdx) => {
+      const shadeIdx = total <= 1 ? 5 : Math.round((sessIdx / (total - 1)) * 11)
+      const labelIdx = (sessions as string[]).indexOf(sess)
+      const label = sessionLabels[labelIdx] ?? sess
       const color = sessColorMap[sess] ?? SESSION_COLORS[0]
-      const values: Record<string, number | null> = {}
-      barItems.forEach(item => {
+      const items: Record<string, { value: number }> = {}
+      allItemKeys.forEach(key => {
         if (mode === 'average') {
           const vals = patients
-            .map(p => p.outcomes.find(x => x.session === sess)?.items[item.key]?.value)
+            .map(p => p.outcomes.find(x => x.session === sess)?.items[key]?.value)
             .filter((v): v is number => v !== undefined)
-          values[item.key] = vals.length > 0 ? vals.reduce((a, b) => a + b) / vals.length : null
+          if (vals.length > 0) items[key] = { value: vals.reduce((a, b) => a + b) / vals.length }
         } else if (mode === 'single' && singlePatient) {
-          values[item.key] = singlePatient.outcomes.find(x => x.session === sess)?.items[item.key]?.value ?? null
+          const v = singlePatient.outcomes.find(x => x.session === sess)?.items[key]?.value
+          if (v !== undefined) items[key] = { value: v }
         }
       })
-      return { sessionKey: sess, sessionLabel, color, values }
+      const o: OutcomeMeasurement = {
+        id: `admin_${sess}_${sessIdx}`,
+        patientId: mode === 'single' && singlePatient ? singlePatient.id : 'avg',
+        patientHn: '',
+        session: sess as OutcomeSession,
+        level: 1,
+        items,
+      }
+      return { session: sess, label, color, shadeIdx, o }
     })
-  }, [mode, selectedSessions, patients, singlePatient, barItems, sessions, sessionLabels, sessColorMap])
+  }, [mode, selectedSessions, patients, singlePatient, otherDefs, sessions, sessionLabels, sessColorMap])
 
   // Card grid points data (avg or single)
   const cardGridData = useMemo<Record<string, (number | null)[]>>(() => {
@@ -921,7 +779,7 @@ function OutcomeBlock({
               {(mode === 'average' || showBarAndGrid) && (
                 <div ref={barChartRef} className="bg-slate-50 rounded-xl border border-slate-100 p-4">
                   <p className="text-xs font-semibold text-slate-600 mb-3">Outcome Summary — {mode === 'average' ? 'All patients (average)' : singlePatient ? `${singlePatient.firstName} ${singlePatient.lastName}` : ''}</p>
-                  <OutcomeSummaryBarChart barItems={barItems} series={barSeries} />
+                  <OutcomeSummaryChartCore sessions={chartSessions} otherDefs={otherDefs} />
                 </div>
               )}
 
@@ -1039,7 +897,7 @@ export function OutcomeSummarySection({ patients, screenings, outcomes }: {
         sessionLabels={STD_SUMMARY_LABELS}
         metrics={STD_METRICS}
         cardDefs={STD_CARD_DEFS}
-        barItems={STD_BAR_ITEMS}
+        otherDefs={ADMIN_STD_OTHER_DEFS}
         defaultSessions={STD_DEFAULT_SESSIONS}
         blockType="standard"
       />
@@ -1052,7 +910,7 @@ export function OutcomeSummarySection({ patients, screenings, outcomes }: {
         sessionLabels={ERAS_SUMMARY_LABELS}
         metrics={ERAS_METRICS}
         cardDefs={ERAS_CARD_DEFS}
-        barItems={ERAS_BAR_ITEMS}
+        otherDefs={ADMIN_ERAS_OTHER_DEFS}
         defaultSessions={ERAS_DEFAULT_SESSIONS}
         blockType="eras"
       />
