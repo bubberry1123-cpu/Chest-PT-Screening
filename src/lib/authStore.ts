@@ -4,6 +4,7 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   updatePassword as firebaseUpdatePassword,
+  sendPasswordResetEmail,
 } from 'firebase/auth'
 import {
   doc, getDoc, setDoc, getDocs, collection, query, orderBy, limit,
@@ -60,6 +61,14 @@ export async function signOut(): Promise<void> {
 export async function updatePassword(newPassword: string): Promise<void> {
   if (!auth.currentUser) throw new Error('Not authenticated')
   await firebaseUpdatePassword(auth.currentUser, newPassword)
+}
+
+export async function sendPasswordReset(email: string): Promise<void> {
+  await sendPasswordResetEmail(auth, email)
+}
+
+export async function clearMustChangePassword(uid: string): Promise<void> {
+  await setDoc(doc(db, 'users', uid), { mustChangePassword: false }, { merge: true })
 }
 
 // ── USER PROFILE ──────────────────────────────────────────────────────────────

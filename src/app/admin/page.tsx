@@ -518,9 +518,12 @@ function PatientModal({ row, onClose }: { row: PatientRow; onClose: () => void }
 
 // ── User Management Sub-component ─────────────────────────────────────────────
 function UserManagement() {
+  const { firebaseUser } = useAuth()
   const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [confirmAction, setConfirmAction] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null)
+  const [resetResult, setResetResult] = useState<{ email: string; tempPassword: string } | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -528,6 +531,26 @@ function UserManagement() {
   }
 
   useEffect(() => { load() }, [])
+
+  const handleResetPassword = (u: UserProfile) => {
+    setConfirmAction({
+      title: 'Reset Password',
+      message: `Reset password for "${u.displayName || u.email}"?\nA temporary password will be generated and they will be required to change it on next login.`,
+      onConfirm: async () => {
+        const idToken = await firebaseUser!.getIdToken()
+        const res = await fetch('/api/admin/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ uid: u.uid }),
+        })
+        const data = await res.json()
+        if (data.ok) {
+          setResetResult({ email: u.email, tempPassword: data.tempPassword })
+          setCopied(false)
+        }
+      },
+    })
+  }
 
   const STATUS_COLOR: Record<string, string> = {
     active: 'bg-green-100 text-green-700',
@@ -547,6 +570,34 @@ function UserManagement() {
           onConfirm={() => { const fn = confirmAction.onConfirm; setConfirmAction(null); fn() }}
           onCancel={() => setConfirmAction(null)}
         />
+      )}
+      {/* Reset password result modal */}
+      {resetResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={e => { if (e.target === e.currentTarget) setResetResult(null) }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <h3 className="text-base font-bold text-slate-800 mb-1">Temporary Password Generated</h3>
+            <p className="text-sm text-slate-500 mb-4">
+              For <span className="font-medium text-slate-700">{resetResult.email}</span>. Share this with the user — they must change it on next login.
+            </p>
+            <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-4 py-3 mb-4">
+              <span className="font-mono text-base font-bold text-slate-800 flex-1 select-all">{resetResult.tempPassword}</span>
+              <button
+                onClick={() => { navigator.clipboard.writeText(resetResult.tempPassword); setCopied(true) }}
+                className="text-xs bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 px-2.5 py-1 rounded-lg transition-colors shrink-0">
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mb-5">
+              <span className="text-amber-500 shrink-0 mt-0.5">⚠</span>
+              <p className="text-xs text-amber-700">This password is shown only once. The user will be forced to change it at next login.</p>
+            </div>
+            <button onClick={() => setResetResult(null)}
+              className="w-full bg-[#0C447C] hover:bg-[#185FA5] text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
+              Done
+            </button>
+          </div>
+        </div>
       )}
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-bold text-slate-800">User Management</h3>
@@ -595,6 +646,10 @@ function UserManagement() {
                     <button onClick={async () => { await changeUserRole(u.uid, u.role === 'admin' ? 'staff' : 'admin'); load() }}
                       className="text-xs border border-slate-300 text-slate-600 hover:bg-slate-50 px-3 py-1 rounded-lg transition-colors">
                       {`→ ${u.role === 'admin' ? 'Staff' : 'Admin'}`}
+                    </button>
+                    <button onClick={() => handleResetPassword(u)}
+                      className="text-xs border border-amber-300 text-amber-700 hover:bg-amber-50 px-3 py-1 rounded-lg transition-colors">
+                      Reset PW
                     </button>
                     <button onClick={() => setConfirmAction({
                         title: 'Deactivate User',

@@ -80,6 +80,7 @@ export interface UserProfile {
   role: 'admin' | 'staff'
   status: 'pending' | 'active' | 'rejected'
   createdAt?: Date
+  mustChangePassword?: boolean
 }
 
 export interface ActivityLog {

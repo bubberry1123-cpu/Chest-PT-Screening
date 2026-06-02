@@ -19,7 +19,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       router.replace('/login')
       return
     }
-  }, [loading, firebaseUser, isPublic, router, pathname])
+    if (userProfile?.mustChangePassword && pathname !== '/change-password') {
+      router.replace('/change-password')
+    }
+  }, [loading, firebaseUser, userProfile, isPublic, router, pathname])
 
   if (isPublic) return <>{children}</>
 
@@ -32,6 +35,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   if (!firebaseUser) return null
+
+  if (userProfile?.mustChangePassword && pathname !== '/change-password') return null
 
   if (userProfile?.status === 'pending') {
     return (
