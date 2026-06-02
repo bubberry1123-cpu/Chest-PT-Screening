@@ -688,6 +688,10 @@ export default function AdminPage() {
   const [exportYear, setExportYear] = useState(new Date().getFullYear())
   const [exportLoading, setExportLoading] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [syncAllConfirm, setSyncAllConfirm] = useState(false)
+  const [syncAllLoading, setSyncAllLoading] = useState(false)
+  const [syncAllError, setSyncAllError] = useState<string | null>(null)
+  const [syncAllResult, setSyncAllResult] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'logs'>('dashboard')
   const chartsRef = useRef<HTMLDivElement>(null)
 
@@ -718,6 +722,26 @@ export default function AdminPage() {
       setExportError(err instanceof Error ? err.message : 'Export failed — check the browser console for details.')
     } finally {
       setExportLoading(false)
+    }
+  }
+
+  const handleSyncAll = async () => {
+    setSyncAllLoading(true)
+    setSyncAllError(null)
+    setSyncAllResult(null)
+    try {
+      const res = await fetch('/api/sync-sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error ?? 'Sync failed')
+      setSyncAllResult(`Synced ${data.synced} rows from ${patients.length} patient${patients.length !== 1 ? 's' : ''}.`)
+    } catch (err) {
+      setSyncAllError(err instanceof Error ? err.message : 'Sync failed. Please try again.')
+    } finally {
+      setSyncAllLoading(false)
     }
   }
 
@@ -889,10 +913,35 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-5">
+      {syncAllConfirm && (
+        <ConfirmDialog
+          title="Sync ALL to Google Sheets"
+          message={`Sync ALL patients' outcomes to Google Sheets?\nThis may take a while if there are many patients.`}
+          confirmLabel="Sync All"
+          onConfirm={() => { setSyncAllConfirm(false); handleSyncAll() }}
+          onCancel={() => setSyncAllConfirm(false)}
+        />
+      )}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-slate-800">Admin Dashboard</h2>
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-400 hidden sm:block">{now.toLocaleDateString('th-TH', { dateStyle: 'long' })}</span>
+
+          {/* Sync ALL to Google Sheets */}
+          <button
+            onClick={() => setSyncAllConfirm(true)}
+            disabled={syncAllLoading}
+            className="text-xs bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white px-3 py-1.5 rounded-xl transition-colors flex items-center gap-1.5 shrink-0">
+            {syncAllLoading ? (
+              <>
+                <svg className="animate-spin w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3" />
+                  <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+                Syncing…
+              </>
+            ) : 'Sync All → Sheets'}
+          </button>
 
           {/* Export dropdown */}
           <div className="relative">
@@ -977,6 +1026,20 @@ export default function AdminPage() {
           <span className="text-red-500 mt-0.5 shrink-0">⚠</span>
           <p className="text-sm text-red-700 flex-1">{exportError}</p>
           <button onClick={() => setExportError(null)} className="text-red-300 hover:text-red-500 text-lg leading-none shrink-0">×</button>
+        </div>
+      )}
+      {syncAllResult && (
+        <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+          <span className="text-emerald-500 mt-0.5 shrink-0">✓</span>
+          <p className="text-sm text-emerald-700 flex-1">{syncAllResult}</p>
+          <button onClick={() => setSyncAllResult(null)} className="text-emerald-300 hover:text-emerald-500 text-lg leading-none shrink-0">×</button>
+        </div>
+      )}
+      {syncAllError && (
+        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <span className="text-red-500 mt-0.5 shrink-0">⚠</span>
+          <p className="text-sm text-red-700 flex-1">{syncAllError}</p>
+          <button onClick={() => setSyncAllError(null)} className="text-red-300 hover:text-red-500 text-lg leading-none shrink-0">×</button>
         </div>
       )}
 

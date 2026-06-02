@@ -324,6 +324,10 @@ export default function PatientPage() {
   const [editOpen, setEditOpen] = useState(false)
   const [pdfExporting, setPdfExporting] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
+  const [syncLoading, setSyncLoading] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [syncResult, setSyncResult] = useState<string | null>(null)
+  const [confirmSync, setConfirmSync] = useState(false)
   const [confirmDeletePatient, setConfirmDeletePatient] = useState(false)
   const [confirmDeleteScreening, setConfirmDeleteScreening] = useState<Screening | null>(null)
   const [confirmSwitchType, setConfirmSwitchType] = useState(false)
@@ -373,6 +377,26 @@ export default function PatientPage() {
       setPatient(prev => prev ? { ...prev, assessmentType: newType } : prev)
     } catch {
       showToast('Failed to switch type. Please try again.', 'error')
+    }
+  }
+
+  const handleSyncToSheets = async () => {
+    setSyncLoading(true)
+    setSyncError(null)
+    setSyncResult(null)
+    try {
+      const res = await fetch('/api/sync-sheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patientId: id }),
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error ?? 'Sync failed')
+      setSyncResult(`Synced ${data.synced} row${data.synced !== 1 ? 's' : ''} to Google Sheets.`)
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : 'Sync failed. Please try again.')
+    } finally {
+      setSyncLoading(false)
     }
   }
 
@@ -582,6 +606,15 @@ export default function PatientPage() {
           onCancel={() => setConfirmDeleteScreening(null)}
         />
       )}
+      {confirmSync && (
+        <ConfirmDialog
+          title="Sync to Google Sheets"
+          message="Sync this patient's outcomes to Google Sheets?"
+          confirmLabel="Sync"
+          onConfirm={() => { setConfirmSync(false); handleSyncToSheets() }}
+          onCancel={() => setConfirmSync(false)}
+        />
+      )}
       {confirmSwitchType && (
         <ConfirmDialog
           title="Switch assessment type"
@@ -767,6 +800,47 @@ export default function PatientPage() {
             <span className="shrink-0 mt-0.5">⚠</span>
             <span className="flex-1">{pdfError}</span>
             <button onClick={() => setPdfError(null)} className="shrink-0 text-red-400 hover:text-red-600 leading-none">×</button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Sync to Google Sheets button ──────────────────────────────────────── */}
+      <div className="mb-2">
+        <button
+          onClick={() => setConfirmSync(true)}
+          disabled={syncLoading}
+          className="w-full flex items-center justify-center gap-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white py-3 rounded-xl text-sm font-semibold transition-colors shadow-sm"
+        >
+          {syncLoading ? (
+            <>
+              <svg className="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.3" />
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+              Syncing…
+            </>
+          ) : (
+            <>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+              Sync to Google Sheets
+            </>
+          )}
+        </button>
+        {syncResult && (
+          <div className="mt-2 flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5 text-xs text-emerald-700">
+            <span className="shrink-0 mt-0.5">✓</span>
+            <span className="flex-1">{syncResult}</span>
+            <button onClick={() => setSyncResult(null)} className="shrink-0 text-emerald-400 hover:text-emerald-600 leading-none">×</button>
+          </div>
+        )}
+        {syncError && (
+          <div className="mt-2 flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-xs text-red-600">
+            <span className="shrink-0 mt-0.5">⚠</span>
+            <span className="flex-1">{syncError}</span>
+            <button onClick={() => setSyncError(null)} className="shrink-0 text-red-400 hover:text-red-600 leading-none">×</button>
           </div>
         )}
       </div>
