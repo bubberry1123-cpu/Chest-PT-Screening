@@ -1,11 +1,11 @@
 'use client'
 import {
   collection, doc, addDoc, setDoc, getDoc, getDocs,
-  query, where, orderBy, deleteDoc, serverTimestamp, Timestamp, writeBatch,
+  query, where, orderBy, limit, deleteDoc, serverTimestamp, Timestamp, writeBatch,
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { logActivity } from './authStore'
-import type { Patient, Screening, OutcomeMeasurement, OutcomeSession } from '@/types'
+import type { Patient, Screening, OutcomeMeasurement, OutcomeSession, LocationHistoryEntry } from '@/types'
 
 function toDate(val: unknown): Date | undefined {
   if (!val) return undefined
@@ -133,13 +133,15 @@ export async function getAllOutcomes(): Promise<OutcomeMeasurement[]> {
 // ── DELETE ────────────────────────────────────────────────────────────────────
 
 export async function deletePatient(id: string): Promise<void> {
-  const [screeningsSnap, outcomesSnap] = await Promise.all([
-    getDocs(query(collection(db, 'screenings'), where('patientId', '==', id))),
-    getDocs(query(collection(db, 'outcomes'),   where('patientId', '==', id))),
+  const [screeningsSnap, outcomesSnap, locationHistorySnap] = await Promise.all([
+    getDocs(query(collection(db, 'screenings'),       where('patientId', '==', id))),
+    getDocs(query(collection(db, 'outcomes'),          where('patientId', '==', id))),
+    getDocs(query(collection(db, 'locationHistory'),   where('patientId', '==', id))),
   ])
   const batch = writeBatch(db)
   screeningsSnap.docs.forEach(d => batch.delete(d.ref))
   outcomesSnap.docs.forEach(d => batch.delete(d.ref))
+  locationHistorySnap.docs.forEach(d => batch.delete(d.ref))
   batch.delete(doc(db, 'patients', id))
   await batch.commit()
 }
@@ -157,4 +159,65 @@ export async function deleteOutcomeSession(patientId: string, session: OutcomeSe
     )
   )
   await Promise.all(snap.docs.map(d => deleteDoc(d.ref)))
+}
+
+// ── LOCATION HISTORY ──────────────────────────────────────────────────────────
+
+export async function getLocationHistory(patientId: string): Promise<LocationHistoryEntry[]> {
+  const snap = await getDocs(
+    query(collection(db, 'locationHistory'), where('patientId', '==', patientId))
+  )
+  const results = snap.docs.map(d => {
+    const data = d.data()
+    return { ...data, id: d.id, changedAt: toDate(data.changedAt) } as LocationHistoryEntry
+  })
+  return results.sort((a, b) => (b.changedAt?.getTime() ?? 0) - (a.changedAt?.getTime() ?? 0))
+}
+
+export async function addLocationHistory(
+  entry: Omit<LocationHistoryEntry, 'id' | 'changedAt'>
+): Promise<string> {
+  const ref = await addDoc(collection(db, 'locationHistory'), {
+    ...entry,
+    changedAt: serverTimestamp(),
+  })
+  return ref.id
+}
+
+export async function ensureLocationHistory(
+  patientId: string,
+  patientHn: string,
+  currentLocation: string,
+  createdAt?: Date
+): Promise<void> {
+  const existing = await getDocs(
+    query(collection(db, 'locationHistory'), where('patientId', '==', patientId), limit(1))
+  )
+  if (!existing.empty) return
+  await addDoc(collection(db, 'locationHistory'), {
+    patientId,
+    patientHn,
+    from: null,
+    to: currentLocation,
+    changedAt: createdAt ? Timestamp.fromDate(createdAt) : serverTimestamp(),
+    changedBy: 'system (migration)',
+  })
+}
+
+export async function updatePatientLocation(
+  patientId: string,
+  patientHn: string,
+  newLocation: string,
+  changedBy: string,
+  previousLocation: string
+): Promise<void> {
+  await setDoc(doc(db, 'patients', patientId), { location: newLocation }, { merge: true })
+  await addDoc(collection(db, 'locationHistory'), {
+    patientId,
+    patientHn,
+    from: previousLocation || null,
+    to: newLocation,
+    changedAt: serverTimestamp(),
+    changedBy,
+  })
 }

@@ -14,6 +14,8 @@ getErasFlatItems().forEach(i => { ITEM_META[i.key] = { label: i.label, unit: i.u
 
 const HEADER = ['record_id', 'HN', 'patient_name', 'type', 'session_or_phase', 'outcome_name', 'value', 'unit', 'recorded_date']
 const SHEET_TAB = 'Outcomes'
+const LOC_TAB = 'Location History'
+const LOC_HEADER = ['record_id', 'HN', 'patient_name', 'from_location', 'to_location', 'changed_at', 'changed_by']
 
 // ── Firebase Admin singleton ─────────────────────────────────────────────────
 function getAdminDb() {
@@ -228,7 +230,96 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    return NextResponse.json({ ok: true, synced: rows.length, mode })
+    // ── Location History tab ──────────────────────────────────────────────────
+    const locSnap = mode === 'single'
+      ? await db.collection('locationHistory').where('patientId', '==', patientId!).get()
+      : await db.collection('locationHistory').get()
+
+    const locRows: string[][] = []
+    locSnap.docs.forEach(d => {
+      const entry = d.data()
+      const pid: string = entry.patientId
+      const pat = patientMap[pid]
+      if (!pat) return
+      const changedAtVal = entry.changedAt
+      const changedAtDate: Date | null = changedAtVal?.toDate?.() ?? null
+      const changedAtIso = changedAtDate ? changedAtDate.toISOString() : ''
+      const recordId = `${slug(pat.hn)}__${d.id}`
+      locRows.push([
+        recordId,
+        pat.hn,
+        pat.name,
+        entry.from ?? '',
+        entry.to ?? '',
+        changedAtIso,
+        entry.changedBy ?? '',
+      ])
+    })
+
+    // Ensure Location History tab
+    const locTabExists = spreadsheet.data.sheets?.some(s => s.properties?.title === LOC_TAB)
+    if (!locTabExists) {
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: sheetId,
+        requestBody: { requests: [{ addSheet: { properties: { title: LOC_TAB } } }] },
+      })
+    }
+
+    // Ensure header
+    const locHeaderRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: `${LOC_TAB}!A1:G1`,
+    })
+    if (locHeaderRes.data.values?.[0]?.[0] !== 'record_id') {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: `${LOC_TAB}!A1:G1`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [LOC_HEADER] },
+      })
+    }
+
+    // Read existing record_ids
+    const locColARes = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: `${LOC_TAB}!A2:A`,
+    })
+    const locIdToRow: Record<string, number> = {}
+    ;(locColARes.data.values ?? []).forEach((row, i) => {
+      if (row[0]) locIdToRow[row[0] as string] = i + 2
+    })
+
+    // Upsert location history rows
+    const locUpdateRanges: { range: string; values: string[][] }[] = []
+    const locAppendRows: string[][] = []
+    const locAppendedIds = new Set<string>()
+
+    locRows.forEach(row => {
+      const rid = row[0]
+      if (rid in locIdToRow) {
+        locUpdateRanges.push({ range: `${LOC_TAB}!A${locIdToRow[rid]}:G${locIdToRow[rid]}`, values: [row] })
+      } else if (!locAppendedIds.has(rid)) {
+        locAppendRows.push(row)
+        locAppendedIds.add(rid)
+      }
+    })
+
+    for (let i = 0; i < locUpdateRanges.length; i += 100) {
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: sheetId,
+        requestBody: { valueInputOption: 'RAW', data: locUpdateRanges.slice(i, i + 100) },
+      })
+    }
+    if (locAppendRows.length > 0) {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: sheetId,
+        range: `${LOC_TAB}!A:G`,
+        valueInputOption: 'RAW',
+        requestBody: { values: locAppendRows },
+      })
+    }
+
+    return NextResponse.json({ ok: true, synced: rows.length + locRows.length, mode })
 
   } catch (err) {
     console.error('[sync-sheets]', err)

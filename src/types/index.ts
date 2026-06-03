@@ -94,3 +94,13 @@ export interface ActivityLog {
   entityLabel: string
   timestamp?: Date
 }
+
+export interface LocationHistoryEntry {
+  id?: string
+  patientId: string
+  patientHn: string
+  from: string | null
+  to: string
+  changedAt?: Date
+  changedBy: string
+}

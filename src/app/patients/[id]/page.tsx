@@ -2,12 +2,12 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getPatientById, getScreeningsByPatient, getOutcomesByPatient, updatePatient, deletePatient, deleteScreening } from '@/lib/localstore'
+import { getPatientById, getScreeningsByPatient, getOutcomesByPatient, updatePatient, deletePatient, deleteScreening, getLocationHistory, addLocationHistory, ensureLocationHistory, updatePatientLocation } from '@/lib/localstore'
 import { OUTCOME_GROUPS, OUTCOME_SESSIONS, SESSION_SHORT, ERAS_PHASES, ERAS_PHASE_SHORT, ERAS_OUTCOME_GROUPS } from '@/lib/outcomeItems'
-import { useIsAdmin } from '@/lib/useIsAdmin'
-import type { Patient, Screening, OutcomeMeasurement, OverallLevel } from '@/types'
-import { WARDS } from '@/lib/wards'
+import { useAuth } from '@/lib/auth-context'
+import type { Patient, Screening, OutcomeMeasurement, OverallLevel, LocationHistoryEntry } from '@/types'
 import { useToast } from '@/lib/useToast'
+import LocationPicker from '@/components/LocationPicker'
 import Toast from '@/components/Toast'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import SeverityBadge from '@/components/SeverityBadge'
@@ -209,9 +209,14 @@ function ErasOutcomeTable({ outcomes }: { outcomes: OutcomeMeasurement[] }) {
 }
 
 // ── Edit Patient Modal ────────────────────────────────────────────────────────
-interface EditModalProps { patient: Patient; onSave: (p: Patient) => void; onClose: () => void }
+interface EditModalProps {
+  patient: Patient
+  onSave: (p: Patient) => void
+  onClose: () => void
+  changedBy: string
+}
 
-function EditPatientModal({ patient, onSave, onClose }: EditModalProps) {
+function EditPatientModal({ patient, onSave, onClose, changedBy }: EditModalProps) {
   const [form, setForm] = useState({ ...patient })
   const [saving, setSaving] = useState(false)
 
@@ -220,6 +225,7 @@ function EditPatientModal({ patient, onSave, onClose }: EditModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!form.location) { alert('Please select a location.'); return }
     setSaving(true)
     try {
       await updatePatient(patient.id!, {
@@ -230,6 +236,15 @@ function EditPatientModal({ patient, onSave, onClose }: EditModalProps) {
         nationality: form.nationality,
         location: form.location,
       })
+      if (form.location !== patient.location) {
+        await addLocationHistory({
+          patientId: patient.id!,
+          patientHn: patient.hn,
+          from: patient.location || null,
+          to: form.location,
+          changedBy,
+        })
+      }
       onSave({ ...patient, ...form, age: Number(form.age) })
     } catch {
       alert('บันทึกไม่สำเร็จ กรุณาลองใหม่')
@@ -285,11 +300,10 @@ function EditPatientModal({ patient, onSave, onClose }: EditModalProps) {
           </div>
           <div>
             <label className="text-xs text-slate-500 block mb-1">Location</label>
-            <select value={form.location} onChange={e => set('location', e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 bg-white">
-              <option value="">Select Ward</option>
-              {WARDS.map(w => <option key={w} value={w}>{w}</option>)}
-            </select>
+            <LocationPicker
+              value={form.location}
+              onChange={v => set('location', v)}
+            />
           </div>
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose}
@@ -313,15 +327,70 @@ function EditPatientModal({ patient, onSave, onClose }: EditModalProps) {
   )
 }
 
+// ── Edit Location Modal ───────────────────────────────────────────────────────
+interface EditLocationModalProps {
+  patient: Patient
+  onSave: (newLocation: string) => void
+  onClose: () => void
+  changedBy: string
+}
+
+function EditLocationModal({ patient, onSave, onClose, changedBy }: EditLocationModalProps) {
+  const [location, setLocation] = useState(patient.location)
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (!location) { alert('Please select a location.'); return }
+    if (location === patient.location) { onClose(); return }
+    setSaving(true)
+    try {
+      await updatePatientLocation(patient.id!, patient.hn, location, changedBy, patient.location)
+      onSave(location)
+    } catch {
+      alert('Save failed. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-slate-800">Edit Location</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none px-1">×</button>
+        </div>
+        <div className="mb-5">
+          <LocationPicker value={location} onChange={setLocation} />
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose}
+            className="flex-1 border border-slate-300 text-slate-600 py-2.5 rounded-xl text-sm hover:bg-slate-50 transition-colors">
+            Cancel
+          </button>
+          <button type="button" onClick={handleSave} disabled={saving || !location}
+            className="flex-1 bg-[#0C447C] hover:bg-[#185FA5] disabled:opacity-60 text-white py-2.5 rounded-xl text-sm font-semibold transition-colors">
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function PatientPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const isAdmin = useIsAdmin()
+  const { isAdmin, userProfile } = useAuth()
+  const changedBy = userProfile?.displayName || userProfile?.email || 'Unknown'
   const [patient, setPatient] = useState<Patient | null>(null)
   const [screenings, setScreenings] = useState<Screening[]>([])
   const [outcomes, setOutcomes] = useState<OutcomeMeasurement[]>([])
+  const [locationHistory, setLocationHistory] = useState<LocationHistoryEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [editOpen, setEditOpen] = useState(false)
+  const [editLocationOpen, setEditLocationOpen] = useState(false)
   const [pdfExporting, setPdfExporting] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
   const [syncLoading, setSyncLoading] = useState(false)
@@ -336,13 +405,23 @@ export default function PatientPage() {
   const { toast, showToast } = useToast()
 
   useEffect(() => {
-    Promise.all([
-      getPatientById(id),
-      getScreeningsByPatient(id),
-      getOutcomesByPatient(id),
-    ])
-      .then(([p, s, o]) => { setPatient(p); setScreenings(s); setOutcomes(o); setLoading(false) })
-      .catch(() => setLoading(false))
+    const load = async () => {
+      const [p, s, o] = await Promise.all([
+        getPatientById(id),
+        getScreeningsByPatient(id),
+        getOutcomesByPatient(id),
+      ])
+      setPatient(p)
+      setScreenings(s)
+      setOutcomes(o)
+      if (p) {
+        await ensureLocationHistory(p.id!, p.hn, p.location, p.createdAt)
+        const lh = await getLocationHistory(p.id!)
+        setLocationHistory(lh)
+      }
+      setLoading(false)
+    }
+    load().catch(() => setLoading(false))
   }, [id])
 
   const handleDeletePatient = async () => {
@@ -684,8 +763,16 @@ export default function PatientPage() {
             <div className="text-sm font-medium text-slate-700">{patient.nationality}</div>
           </div>
           <div className="bg-[#F8FAFC] rounded-[10px] p-2.5">
-            <div className="text-[10px] uppercase text-slate-400 tracking-wide">Location</div>
-            <div className="text-sm font-medium text-slate-700">{patient.location}</div>
+            <div className="text-[10px] uppercase text-slate-400 tracking-wide flex items-center justify-between">
+              <span>Location</span>
+              <button
+                onClick={() => setEditLocationOpen(true)}
+                className="text-[10px] text-teal-600 hover:text-teal-800 hover:underline font-semibold"
+              >
+                Edit
+              </button>
+            </div>
+            <div className="text-sm font-medium text-slate-700">{patient.location || '—'}</div>
           </div>
         </div>
       </div>
@@ -731,6 +818,58 @@ export default function PatientPage() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Location History */}
+      {locationHistory.length > 0 && (
+        <div className="bg-white rounded-2xl border border-teal-200 shadow-sm overflow-hidden mb-4">
+          <div className="px-5 py-3 border-b border-teal-100 bg-teal-50 flex items-center justify-between">
+            <h3 className="font-semibold text-teal-800 text-sm">Location History</h3>
+            <span className="text-xs text-teal-600">{locationHistory.length} {locationHistory.length === 1 ? 'entry' : 'entries'}</span>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {locationHistory.map((entry, i) => {
+              const isCurrent = i === 0
+              const activeFrom = entry.changedAt
+              const activeUntil = i > 0 ? locationHistory[i - 1].changedAt : null
+              const durationDays = activeFrom
+                ? Math.floor(((activeUntil ?? new Date()).getTime() - activeFrom.getTime()) / 86400000)
+                : null
+              return (
+                <div key={entry.id ?? i} className="flex items-start px-5 py-3 gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-slate-800 text-sm">{entry.to}</span>
+                      {isCurrent && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">Current</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      {entry.from ? `From: ${entry.from}` : 'Initial location'}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-0.5">Changed by: {entry.changedBy}</div>
+                  </div>
+                  <div className="text-right text-xs text-slate-500 shrink-0">
+                    <div>
+                      {activeFrom
+                        ? activeFrom.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                        : '—'}
+                      {' → '}
+                      {isCurrent
+                        ? <span className="text-teal-600 font-semibold">Current</span>
+                        : activeUntil
+                          ? activeUntil.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                          : '—'}
+                    </div>
+                    {durationDays !== null && (
+                      <div className="text-slate-400 mt-0.5">{durationDays} day{durationDays !== 1 ? 's' : ''}</div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       )}
 
@@ -882,12 +1021,27 @@ export default function PatientPage() {
       {editOpen && patient && (
         <EditPatientModal
           patient={patient}
+          changedBy={changedBy}
           onSave={updated => {
             setPatient(updated)
             setEditOpen(false)
             showToast('Patient updated successfully!', 'success')
+            getLocationHistory(id).then(setLocationHistory)
           }}
           onClose={() => setEditOpen(false)}
+        />
+      )}
+      {editLocationOpen && patient && (
+        <EditLocationModal
+          patient={patient}
+          changedBy={changedBy}
+          onSave={newLocation => {
+            setPatient(prev => prev ? { ...prev, location: newLocation } : prev)
+            setEditLocationOpen(false)
+            showToast('Location updated!', 'success')
+            getLocationHistory(id).then(setLocationHistory)
+          }}
+          onClose={() => setEditLocationOpen(false)}
         />
       )}
     </div>

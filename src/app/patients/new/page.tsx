@@ -5,8 +5,8 @@ import { createPatient, getPatientByHn } from '@/lib/localstore'
 import { createScreening } from '@/lib/localstore'
 import { calculateScreening, CFS_DESCRIPTIONS } from '@/lib/scoring'
 import type { O2Support, Cooperativeness, Sex, ScreeningInput, AssessmentType } from '@/types'
-import { WARDS } from '@/lib/wards'
 import { useToast } from '@/lib/useToast'
+import LocationPicker from '@/components/LocationPicker'
 import Toast from '@/components/Toast'
 import SeverityBadge from '@/components/SeverityBadge'
 
@@ -56,7 +56,7 @@ export default function NewPatientPage() {
     if (!patientForm.lastName.trim()) return 'กรุณากรอกนามสกุล'
     if (!patientForm.age || isNaN(Number(patientForm.age)) || Number(patientForm.age) <= 0) return 'กรุณากรอกอายุที่ถูกต้อง'
     if (!sex) return 'กรุณาเลือกเพศ'
-    if (!patientForm.location) return 'กรุณาเลือก Location (Ward)'
+    if (!patientForm.location) return 'กรุณาเลือก Location (OPD หรือ Ward)'
     return ''
   }
 
@@ -242,13 +242,12 @@ export default function NewPatientPage() {
               </div>
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Location (Ward) *</label>
-              <select value={patientForm.location}
-                onChange={e => setPatientForm(f => ({ ...f, location: e.target.value }))}
-                className={`${fieldCls(!patientForm.location)} bg-white`}>
-                <option value="">Select Ward</option>
-                {WARDS.map(w => <option key={w} value={w}>{w}</option>)}
-              </select>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Location *</label>
+              <LocationPicker
+                value={patientForm.location}
+                onChange={v => setPatientForm(f => ({ ...f, location: v }))}
+                touched={step1Attempted}
+              />
             </div>
           </div>
           <div className="mt-6 flex justify-end">
