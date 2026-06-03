@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getPatientById, getScreeningsByPatient, getOutcomesByPatient, updatePatient, deletePatient, deleteScreening, getLocationHistory, addLocationHistory, ensureLocationHistory, updatePatientLocation } from '@/lib/localstore'
-import { OUTCOME_GROUPS, OUTCOME_SESSIONS, SESSION_SHORT, ERAS_PHASES, ERAS_PHASE_SHORT, ERAS_OUTCOME_GROUPS } from '@/lib/outcomeItems'
+import { OUTCOME_GROUPS, OUTCOME_SESSIONS, SESSION_SHORT, ERAS_PHASES, ERAS_PHASE_SHORT, ERAS_OUTCOME_GROUPS, INBODY_GROUPS, INBODY_BALANCE_ITEMS, INBODY_BALANCE_OPTIONS } from '@/lib/outcomeItems'
 import { useAuth } from '@/lib/auth-context'
 import type { Patient, Screening, OutcomeMeasurement, OverallLevel, LocationHistoryEntry } from '@/types'
 import { useToast } from '@/lib/useToast'
@@ -124,10 +124,19 @@ function ErasOutcomeTable({ outcomes }: { outcomes: OutcomeMeasurement[] }) {
   if (filledPhases.length === 0) return null
 
   const firstPhase = filledPhases[0]
+  const prehabItems = byPhase['Prehabilitation']?.items ?? {}
+
+  // Check whether there is any InBody data in the Prehabilitation phase
+  const hasInBody = INBODY_GROUPS.some(g => g.items.some(i => prehabItems[i.key] !== undefined))
+    || INBODY_BALANCE_ITEMS.some(i => prehabItems[i.key] !== undefined)
 
   type Row =
     | { type: 'header'; key: string; label: string }
     | { type: 'item'; key: string; itemKey: string; label: string; unit: string; lowerIsBetter?: boolean; indent: boolean }
+    | { type: 'inbody_section' }
+    | { type: 'inbody_group_header'; key: string; label: string }
+    | { type: 'inbody_item'; key: string; itemKey: string; label: string; unit: string }
+    | { type: 'inbody_balance'; key: string; itemKey: string; label: string }
 
   const rows: Row[] = []
   for (const group of ERAS_OUTCOME_GROUPS) {
@@ -144,6 +153,23 @@ function ErasOutcomeTable({ outcomes }: { outcomes: OutcomeMeasurement[] }) {
         label: group.label, unit: item.unit, lowerIsBetter: item.lowerIsBetter, indent: false,
       })
     }
+  }
+
+  if (hasInBody) {
+    rows.push({ type: 'inbody_section' })
+    for (const group of INBODY_GROUPS) {
+      rows.push({ type: 'inbody_group_header', key: `inbody-gh-${group.groupKey}`, label: group.label })
+      group.items.forEach(item => {
+        if (prehabItems[item.key] !== undefined) {
+          rows.push({ type: 'inbody_item', key: item.key, itemKey: item.key, label: item.label, unit: item.unit })
+        }
+      })
+    }
+    INBODY_BALANCE_ITEMS.forEach(item => {
+      if (prehabItems[item.key] !== undefined) {
+        rows.push({ type: 'inbody_balance', key: item.key, itemKey: item.key, label: item.label })
+      }
+    })
   }
 
   return (
@@ -174,6 +200,60 @@ function ErasOutcomeTable({ outcomes }: { outcomes: OutcomeMeasurement[] }) {
                   <td colSpan={filledPhases.length + 1} className="px-4 pt-3 pb-1 text-xs font-bold text-slate-500 uppercase tracking-wider sticky left-0 bg-white">
                     {row.label}
                   </td>
+                </tr>
+              )
+            }
+            if (row.type === 'inbody_section') {
+              return (
+                <tr key="inbody-section-header" className="border-t-2 border-indigo-200">
+                  <td colSpan={filledPhases.length + 1} className="px-4 pt-3 pb-1 text-xs font-bold text-indigo-700 uppercase tracking-wider sticky left-0 bg-indigo-50">
+                    InBody (Prehabilitation)
+                  </td>
+                </tr>
+              )
+            }
+            if (row.type === 'inbody_group_header') {
+              return (
+                <tr key={row.key} className="border-t border-indigo-100">
+                  <td colSpan={filledPhases.length + 1} className="px-4 pt-2 pb-0.5 text-[11px] font-semibold text-indigo-500 sticky left-0 bg-indigo-50/40">
+                    {row.label}
+                  </td>
+                </tr>
+              )
+            }
+            if (row.type === 'inbody_item') {
+              const entry = prehabItems[row.itemKey]
+              return (
+                <tr key={row.key} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="py-2 pl-8 pr-4 sticky left-0 bg-white">
+                    <div className="text-slate-600 text-sm">{row.label}</div>
+                    <div className="text-xs text-slate-400">{row.unit}</div>
+                  </td>
+                  {filledPhases.map(p => (
+                    p === 'Prehabilitation'
+                      ? <td key={p} className="px-3 py-2 text-center">
+                          <span className="font-semibold text-slate-800">{entry?.value}</span>
+                        </td>
+                      : <td key={p} className="px-3 py-2 text-center text-slate-300 text-sm">–</td>
+                  ))}
+                </tr>
+              )
+            }
+            if (row.type === 'inbody_balance') {
+              const entry = prehabItems[row.itemKey]
+              const displayText = entry !== undefined ? (INBODY_BALANCE_OPTIONS[entry.value] ?? String(entry.value)) : undefined
+              return (
+                <tr key={row.key} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="py-2 pl-8 pr-4 sticky left-0 bg-white">
+                    <div className="text-slate-600 text-sm">{row.label} balance</div>
+                  </td>
+                  {filledPhases.map(p => (
+                    p === 'Prehabilitation' && displayText
+                      ? <td key={p} className="px-3 py-2 text-center">
+                          <span className="text-sm text-slate-700">{displayText}</span>
+                        </td>
+                      : <td key={p} className="px-3 py-2 text-center text-slate-300 text-sm">–</td>
+                  ))}
                 </tr>
               )
             }
@@ -572,6 +652,43 @@ export default function PatientPage() {
             columnStyles: { 0: { fontStyle: 'italic', cellWidth: 52 } },
             margin: { left: mg, right: mg },
           })
+
+          // InBody section (Prehabilitation only)
+          const prehabEntry = erasByPhase['Prehabilitation']
+          if (prehabEntry) {
+            const inBodyBody: any[][] = []
+            for (const group of INBODY_GROUPS) {
+              const groupRows = group.items
+                .filter(i => prehabEntry.items[i.key] !== undefined)
+                .map(i => [`  ${i.label} (${i.unit})`, String(prehabEntry.items[i.key]?.value ?? '')])
+              if (groupRows.length > 0) {
+                inBodyBody.push([{ content: group.label, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [238, 242, 255], textColor: [67, 56, 202] } }])
+                inBodyBody.push(...groupRows)
+              }
+            }
+            const balanceRows = INBODY_BALANCE_ITEMS
+              .filter(i => prehabEntry.items[i.key] !== undefined)
+              .map(i => [`  ${i.label} balance`, INBODY_BALANCE_OPTIONS[prehabEntry.items[i.key]?.value ?? -1] ?? ''])
+            if (balanceRows.length > 0) {
+              inBodyBody.push([{ content: 'Body Balance Evaluation', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [238, 242, 255], textColor: [67, 56, 202] } }])
+              inBodyBody.push(...balanceRows)
+            }
+            if (inBodyBody.length > 0) {
+              const inBodyY = (pdf as any).lastAutoTable.finalY + 5
+              pdf.setFont('helvetica', 'bold').setFontSize(9).setTextColor(67, 56, 202)
+              pdf.text('InBody (Prehabilitation)', mg, inBodyY)
+              autoTable(pdf, {
+                startY: inBodyY + 3,
+                head: [['Measurement', 'Value']],
+                body: inBodyBody,
+                styles: { fontSize: 7.5, cellPadding: 2 },
+                headStyles: { fillColor: [99, 102, 241], textColor: 255, fontStyle: 'bold' },
+                alternateRowStyles: { fillColor: [238, 242, 255] },
+                columnStyles: { 0: { fontStyle: 'italic', cellWidth: 80 } },
+                margin: { left: mg, right: mg },
+              })
+            }
+          }
         } else {
           const bySession: Record<string, OutcomeMeasurement> = {}
           outcomes.forEach(o => { bySession[o.session] = o })

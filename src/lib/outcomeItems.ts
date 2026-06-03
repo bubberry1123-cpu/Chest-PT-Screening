@@ -164,3 +164,42 @@ export const ERAS_OUTCOME_GROUPS: OutcomeGroupDef[] = [
 export function getErasFlatItems(): OutcomeItemDef[] {
   return ERAS_OUTCOME_GROUPS.flatMap(g => g.items)
 }
+
+// ── INBODY (ERAS — Prehabilitation phase only) ────────────────────────────────
+
+export const INBODY_BALANCE_OPTIONS = ['Balanced', 'Slightly unbalanced', 'Extremely unbalanced'] as const
+
+export const INBODY_GROUPS: OutcomeGroupDef[] = [
+  {
+    groupKey: 'inbody_general',
+    label: 'General',
+    items: [
+      { key: 'inbody_bmi',            label: 'BMI',             unit: 'kg/m²', step: 0.1 },
+      { key: 'inbody_bodyFatMass',    label: 'Body fat mass',   unit: 'kg',    step: 0.1 },
+      { key: 'inbody_skeletalMuscle', label: 'Skeletal muscle', unit: 'kg',    step: 0.1 },
+    ],
+  },
+  {
+    groupKey: 'inbody_segmentLean',
+    label: 'Segment Lean Analysis',
+    items: [
+      { key: 'inbody_legLeft',  label: 'Leg — Left',  unit: 'kg', step: 0.1 },
+      { key: 'inbody_legRight', label: 'Leg — Right', unit: 'kg', step: 0.1 },
+      { key: 'inbody_trunk',    label: 'Trunk',       unit: 'kg', step: 0.1 },
+      { key: 'inbody_armLeft',  label: 'Arm — Left',  unit: 'kg', step: 0.1 },
+      { key: 'inbody_armRight', label: 'Arm — Right', unit: 'kg', step: 0.1 },
+    ],
+  },
+]
+
+export const INBODY_BALANCE_ITEMS = [
+  { key: 'inbody_balanceUpper',      label: 'Upper' },
+  { key: 'inbody_balanceLower',      label: 'Lower' },
+  { key: 'inbody_balanceUpperLower', label: 'Upper-Lower' },
+] as const
+
+export const INBODY_BALANCE_KEYS: string[] = ['inbody_balanceUpper', 'inbody_balanceLower', 'inbody_balanceUpperLower']
+
+export function getInBodyFlatItems(): OutcomeItemDef[] {
+  return INBODY_GROUPS.flatMap(g => g.items)
+}

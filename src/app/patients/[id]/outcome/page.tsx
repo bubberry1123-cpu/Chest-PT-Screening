@@ -6,6 +6,7 @@ import { getPatientById, getScreeningsByPatient, saveOutcome, getOutcomesByPatie
 import {
   OUTCOME_GROUPS, OUTCOME_SESSIONS, SESSION_SHORT, getFlatItems,
   ERAS_PHASES, ERAS_OUTCOME_GROUPS, getErasFlatItems, ERAS_PHASE_SHORT,
+  INBODY_GROUPS, INBODY_BALANCE_ITEMS, INBODY_BALANCE_OPTIONS, getInBodyFlatItems,
 } from '@/lib/outcomeItems'
 import { useIsAdmin } from '@/lib/useIsAdmin'
 import { useToast } from '@/lib/useToast'
@@ -82,6 +83,22 @@ export default function OutcomePage() {
         const trimmedNote = notes[item.key]?.trim()
         filledItems[item.key] = trimmedNote ? { value: Number(raw), note: trimmedNote } : { value: Number(raw) }
         hasAny = true
+      }
+    }
+    if (isEras && session === 'Prehabilitation') {
+      for (const item of getInBodyFlatItems()) {
+        const raw = values[item.key]
+        if (raw !== undefined && raw !== '') {
+          filledItems[item.key] = { value: Number(raw) }
+          hasAny = true
+        }
+      }
+      for (const item of INBODY_BALANCE_ITEMS) {
+        const raw = values[item.key]
+        if (raw !== undefined && raw !== '') {
+          filledItems[item.key] = { value: Number(raw) }
+          hasAny = true
+        }
       }
     }
     if (!hasAny) {
@@ -310,6 +327,59 @@ export default function OutcomePage() {
             </div>
           )
         })}
+
+        {isEras && session === 'Prehabilitation' && (
+          <div className="bg-white rounded-2xl border border-indigo-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 bg-indigo-50 border-b border-indigo-200">
+              <h4 className="font-bold text-indigo-800 text-sm">InBody</h4>
+            </div>
+            {INBODY_GROUPS.map(group => (
+              <div key={group.groupKey}>
+                <div className="px-5 py-2 bg-indigo-50/40 border-b border-indigo-100">
+                  <p className="text-xs font-semibold text-indigo-600">{group.label}</p>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {group.items.map(item => (
+                    <div key={item.key} className="flex items-center px-5 py-3 gap-3">
+                      <label className="flex-1 text-sm text-slate-600 pl-2">{item.label}</label>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <input
+                          type="number"
+                          step={item.step ?? 1}
+                          value={values[item.key] ?? ''}
+                          onChange={e => setValues(v => ({ ...v, [item.key]: e.target.value }))}
+                          placeholder="–"
+                          className="w-20 text-right border border-slate-300 rounded-xl px-2 py-1.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+                        />
+                        <span className="text-sm text-slate-400 w-12 shrink-0">{item.unit}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div className="px-5 py-2 bg-indigo-50/40 border-t border-indigo-100 border-b border-indigo-100">
+              <p className="text-xs font-semibold text-indigo-600">Body Balance Evaluation</p>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {INBODY_BALANCE_ITEMS.map(item => (
+                <div key={item.key} className="flex items-center px-5 py-3 gap-3">
+                  <label className="flex-1 text-sm text-slate-600 pl-2">{item.label}</label>
+                  <select
+                    value={values[item.key] ?? ''}
+                    onChange={e => setValues(v => ({ ...v, [item.key]: e.target.value }))}
+                    className="border border-slate-300 rounded-xl px-2 py-1.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200 bg-white text-slate-700"
+                  >
+                    <option value="">–</option>
+                    {INBODY_BALANCE_OPTIONS.map((opt, i) => (
+                      <option key={i} value={String(i)}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-3 justify-between">

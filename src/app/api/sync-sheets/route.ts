@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { initializeApp, getApps, cert } from 'firebase-admin/app'
 import { getFirestore } from 'firebase-admin/firestore'
 import { google } from 'googleapis'
-import { getFlatItems, getErasFlatItems } from '@/lib/outcomeItems'
+import { getFlatItems, getErasFlatItems, getInBodyFlatItems, INBODY_BALANCE_ITEMS, INBODY_BALANCE_OPTIONS, INBODY_BALANCE_KEYS } from '@/lib/outcomeItems'
 import type { OverallLevel } from '@/types'
 
 // ── Item metadata: key → { label, unit } ─────────────────────────────────────
@@ -11,6 +11,8 @@ for (const level of [1, 2, 3, 4] as OverallLevel[]) {
   getFlatItems(level).forEach(i => { ITEM_META[i.key] = { label: i.label, unit: i.unit } })
 }
 getErasFlatItems().forEach(i => { ITEM_META[i.key] = { label: i.label, unit: i.unit } })
+getInBodyFlatItems().forEach(i => { ITEM_META[i.key] = { label: 'InBody: ' + i.label, unit: i.unit } })
+INBODY_BALANCE_ITEMS.forEach(i => { ITEM_META[i.key] = { label: 'InBody: ' + i.label + ' balance', unit: '' } })
 
 const HEADER = ['record_id', 'HN', 'patient_name', 'type', 'session_or_phase', 'outcome_name', 'value', 'unit', 'recorded_date']
 const SHEET_TAB = 'Outcomes'
@@ -135,6 +137,9 @@ export async function POST(req: NextRequest) {
       Object.entries(items).forEach(([key, entry]) => {
         const meta = ITEM_META[key]
         if (!meta) return
+        const displayValue = INBODY_BALANCE_KEYS.includes(key)
+          ? (INBODY_BALANCE_OPTIONS[entry.value] ?? String(entry.value))
+          : String(entry.value)
         rows.push([
           makeRecordId(pat.hn, meta.label, session),
           pat.hn,
@@ -142,7 +147,7 @@ export async function POST(req: NextRequest) {
           type,
           session,
           meta.label,
-          String(entry.value),
+          displayValue,
           meta.unit,
           recordedDate,
         ])
