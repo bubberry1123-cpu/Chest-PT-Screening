@@ -24,6 +24,47 @@ const LEVEL_BG: Record<number, string> = {
 }
 const ALL_SESSIONS: OutcomeSession[] = ['Initial','Reassessment 1','Reassessment 2','Reassessment 3','Reassessment 4','Reassessment 5','Reassessment 6','Reassessment 7','Reassessment 8','Reassessment 9','Reassessment 10','Discharge']
 
+// ── ERAS shared config ─────────────────────────────────────────────────────────
+// Single source of truth for the 4 surgical phases — order + colors used everywhere
+// (stat cards, charts, legends) so the ERAS section stays visually consistent.
+const ERAS_PHASE_ORDER = ['Prehabilitation', 'Pre-op', 'DC', 'Follow-up'] as const
+type ErasPhase = typeof ERAS_PHASE_ORDER[number]
+const ERAS_PHASE_COLORS: Record<ErasPhase, string> = {
+  'Prehabilitation': '#3b82f6',
+  'Pre-op': '#10b981',
+  'DC': '#f97316',
+  'Follow-up': '#8b5cf6',
+}
+const ERAS_PHASE_SHORT: Record<ErasPhase, string> = {
+  'Prehabilitation': 'Pre-hab', 'Pre-op': 'Pre-op', 'DC': 'D/C', 'Follow-up': 'F/U',
+}
+const ERAS_METRICS = [
+  { key: 'peakCoughFlow',      label: 'Peak CF',  unit: 'L/min' },
+  { key: 'wrightSpirometer',   label: 'Wright',   unit: 'mL' },
+  { key: 'gripStrength_right', label: 'Grip R',   unit: 'kg' },
+  { key: 'cs30',               label: 'CS-30',    unit: 'stands' },
+  { key: 'erasTwoMWalk',       label: '2-Meter',  unit: 'sec' },
+] as const
+
+function isErasPhase(s: OutcomeSession): s is ErasPhase {
+  return (ERAS_PHASE_ORDER as readonly string[]).includes(s)
+}
+
+// Month key (YYYY-MM) for an outcome — prefers the user-set assessmentDate,
+// falls back to recordedAt. Returns null if neither is available.
+function outcomeMonthKey(o: OutcomeMeasurement): string | null {
+  const ds = o.assessmentDate
+    ? o.assessmentDate
+    : o.recordedAt ? new Date(o.recordedAt).toISOString().slice(0, 10) : null
+  return ds ? ds.slice(0, 7) : null
+}
+
+// 'YYYY-MM' → 'Jun 2026'
+function monthLabel(key: string): string {
+  const [y, m] = key.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleString('en-US', { month: 'short', year: 'numeric' })
+}
+
 // ── Outcome schedule config ──────────────────────────────────────────────────
 // initDcOnly: true  = BRFA schedule (Initial + Discharge only, alert when no Discharge yet)
 // initDcOnly: false = every-15-days schedule (Initial + RA 1..N + Discharge)
@@ -316,59 +357,73 @@ function TrendChart({ data }: { data: { label: string; initial: number | null; d
 }
 
 // ── ERAS Grouped Bar Chart ────────────────────────────────────────────────────
+// Grouped bars: one group per outcome measure, one bar per surgical phase.
+// Each metric is normalized to its own max (units differ across metrics), so
+// units + value labels carry the magnitude rather than a shared y-scale.
 function ErasGroupedChart({ data }: {
   data: { label: string; unit: string; phaseAvgs: (number | null)[] }[]
 }) {
-  const PHASE_COLORS = ['#3b82f6', '#10b981', '#f97316', '#8b5cf6']
-  const PHASE_LABELS = ['Pre-hab', 'Pre-op', 'D/C', 'F/U']
-  const BAR_H = 84
+  const BAR_H = 96
 
   const hasAnyData = data.some(m => m.phaseAvgs.some(v => v !== null))
   if (!hasAnyData) return (
-    <div className="h-36 flex items-center justify-center text-slate-400 text-sm">No ERAS outcome data yet</div>
+    <div className="h-40 flex items-center justify-center text-slate-400 text-sm">No ERAS outcome data in this scope</div>
   )
 
   return (
     <div>
-      <div className="overflow-x-auto">
-        <div className="flex items-end gap-6 min-w-max px-2" style={{ height: BAR_H + 52 }}>
-          {data.map((metric, mi) => {
-            const vals = metric.phaseAvgs.filter((v): v is number => v !== null)
-            const maxV = vals.length > 0 ? Math.max(...vals, 1) : 1
-            return (
-              <div key={mi} className="flex flex-col items-center gap-1">
-                <div className="flex items-end gap-1" style={{ height: BAR_H }}>
-                  {metric.phaseAvgs.map((v, pi) => (
-                    <div key={pi} className="flex flex-col items-center justify-end" style={{ height: BAR_H }}>
-                      {v !== null && (
-                        <span className="text-[9px] font-semibold mb-0.5" style={{ color: PHASE_COLORS[pi] }}>
-                          {v % 1 === 0 ? v : v.toFixed(1)}
-                        </span>
-                      )}
-                      <div
-                        className="w-5 rounded-t"
-                        style={{
-                          backgroundColor: PHASE_COLORS[pi],
-                          height: v !== null && v > 0 ? `${Math.max((v / maxV) * (BAR_H - 20), 3)}px` : '0',
-                          opacity: v !== null ? 1 : 0.15,
-                          minHeight: v !== null ? '2px' : '0',
-                        }}
-                      />
-                    </div>
-                  ))}
+      <div className="flex">
+        {/* y-axis label */}
+        <div className="flex items-center justify-center pr-1 shrink-0">
+          <span className="text-[10px] text-slate-400 -rotate-90 whitespace-nowrap">Average value</span>
+        </div>
+        <div className="overflow-x-auto flex-1">
+          <div className="flex items-end gap-6 min-w-max px-2 pt-5" style={{ height: BAR_H + 56 }}>
+            {data.map((metric, mi) => {
+              const vals = metric.phaseAvgs.filter((v): v is number => v !== null)
+              const maxV = vals.length > 0 ? Math.max(...vals, 1) : 1
+              return (
+                <div key={mi} className="flex flex-col items-center gap-1">
+                  <div className="flex items-end gap-1.5" style={{ height: BAR_H }}>
+                    {metric.phaseAvgs.map((v, pi) => {
+                      const phase = ERAS_PHASE_ORDER[pi]
+                      const color = ERAS_PHASE_COLORS[phase]
+                      return (
+                        <div key={pi} className="flex flex-col items-center justify-end" style={{ height: BAR_H }}>
+                          {v !== null && (
+                            <span className="text-[9px] font-semibold mb-0.5" style={{ color }}>
+                              {v % 1 === 0 ? v : v.toFixed(1)}
+                            </span>
+                          )}
+                          <div
+                            className="w-5 rounded-t"
+                            style={{
+                              backgroundColor: color,
+                              height: v !== null && v > 0 ? `${Math.max((v / maxV) * (BAR_H - 22), 3)}px` : '0',
+                              opacity: v !== null ? 1 : 0.12,
+                              minHeight: v !== null ? '2px' : '0',
+                            }}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <span className="text-[11px] text-slate-700 font-semibold text-center leading-tight">{metric.label}</span>
+                  <span className="text-[9px] text-slate-400 text-center leading-none">({metric.unit})</span>
                 </div>
-                <span className="text-[10px] text-slate-700 font-semibold text-center leading-tight">{metric.label}</span>
-                <span className="text-[9px] text-slate-400 text-center leading-none">{metric.unit}</span>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       </div>
-      <div className="flex items-center gap-4 mt-2 px-2 flex-wrap">
-        {PHASE_LABELS.map((label, i) => (
-          <div key={i} className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: PHASE_COLORS[i] }} />
-            <span className="text-xs text-slate-500">{label}</span>
+      {/* x-axis label */}
+      <div className="text-center text-[10px] text-slate-400 mt-1">Outcome measure</div>
+      {/* legend — fixed phase order + consistent colors */}
+      <div className="flex items-center justify-center gap-4 mt-2 flex-wrap">
+        {ERAS_PHASE_ORDER.map(phase => (
+          <div key={phase} className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: ERAS_PHASE_COLORS[phase] }} />
+            <span className="text-xs text-slate-500">{phase}</span>
           </div>
         ))}
       </div>
@@ -748,6 +803,8 @@ export default function AdminPage() {
   const [syncAllError, setSyncAllError] = useState<string | null>(null)
   const [syncAllResult, setSyncAllResult] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'logs'>('dashboard')
+  const [erasView, setErasView] = useState<'overview' | 'monthly'>('overview')
+  const [erasMonth, setErasMonth] = useState<string>('')  // 'YYYY-MM'
   const chartsRef = useRef<HTMLDivElement>(null)
 
   if (!isAdmin) return <div className="text-center py-16 text-slate-400">Access denied.</div>
@@ -876,62 +933,88 @@ export default function AdminPage() {
     [rows]
   )
 
+  // Months (YYYY-MM, desc) that actually contain ERAS assessment data
+  const erasMonths = useMemo(() => {
+    const set = new Set<string>()
+    erasRows.forEach(r => r.outcomes.forEach(o => {
+      if (!isErasPhase(o.session)) return
+      const k = outcomeMonthKey(o)
+      if (k) set.add(k)
+    }))
+    return Array.from(set).sort((a, b) => b.localeCompare(a))
+  }, [erasRows])
+
+  // Keep the selected month valid + defaulted to the most recent month with data
+  useEffect(() => {
+    if (erasMonths.length > 0 && !erasMonths.includes(erasMonth)) {
+      setErasMonth(erasMonths[0])
+    }
+  }, [erasMonths, erasMonth])
+
+  // Active scope: null = Overview (all time), else a 'YYYY-MM' month
+  const erasMonthKey = erasView === 'monthly' ? erasMonth : null
+
+  // Scoped ERAS rows — every widget below derives from this single set so the
+  // chosen scope (Overview vs a month) applies consistently to ALL widgets.
+  // Overview keeps the original behavior (every ERAS patient, all outcomes).
+  // Monthly keeps only patients with ≥1 ERAS assessment in the selected month,
+  // and only those in-month assessments.
+  const erasScopedRows = useMemo(() => {
+    return erasRows
+      .map(r => ({
+        row: r,
+        outcomes: r.outcomes.filter(o => {
+          if (!isErasPhase(o.session)) return false
+          if (erasMonthKey) return outcomeMonthKey(o) === erasMonthKey
+          return true
+        }),
+      }))
+      .filter(s => erasMonthKey === null || s.outcomes.length > 0)
+  }, [erasRows, erasMonthKey])
+
+  const erasScopedCount = erasScopedRows.length
+
   const erasPhaseCounts = useMemo(() => {
-    const counts = { Prehabilitation: 0, 'Pre-op': 0, DC: 0, 'Follow-up': 0 }
-    const phaseOrder = ['Prehabilitation', 'Pre-op', 'DC', 'Follow-up'] as const
-    erasRows.forEach(r => {
-      const byP: Record<string, OutcomeMeasurement> = {}
-      r.outcomes.forEach(o => { byP[o.session] = o })
-      // Current phase = last phase with data recorded
-      let current: typeof phaseOrder[number] = 'Prehabilitation'
-      for (const p of phaseOrder) {
-        if (byP[p]) current = p
-      }
+    const counts: Record<ErasPhase, number> = { Prehabilitation: 0, 'Pre-op': 0, DC: 0, 'Follow-up': 0 }
+    erasScopedRows.forEach(({ outcomes }) => {
+      const present = new Set(outcomes.map(o => o.session))
+      // Current phase = last phase in order that has data (defaults to Prehab)
+      let current: ErasPhase = 'Prehabilitation'
+      for (const p of ERAS_PHASE_ORDER) if (present.has(p)) current = p
       counts[current]++
     })
     return counts
-  }, [erasRows])
+  }, [erasScopedRows])
 
   const erasLevelCounts = useMemo(() => {
     const c: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 }
-    erasRows.forEach(r => { if (r.latestScreening) c[r.latestScreening.overallLevel]++ })
+    erasScopedRows.forEach(({ row }) => { if (row.latestScreening) c[row.latestScreening.overallLevel]++ })
     return c
-  }, [erasRows])
+  }, [erasScopedRows])
 
+  // Avg LOS (Prehab → D/C). In Monthly mode, count discharges (D/C) that fall in
+  // the selected month — LOS spans phases, so we anchor on the discharge date.
   const erasAvgLos = useMemo(() => {
     const list: number[] = []
     erasRows.forEach(r => {
       const byP: Record<string, OutcomeMeasurement> = {}
       r.outcomes.forEach(o => { byP[o.session] = o })
-      const d0 = byP['Prehabilitation']?.assessmentDate
-      const d1 = byP['DC']?.assessmentDate
-      if (d0 && d1) {
-        const days = Math.round((new Date(d1).getTime() - new Date(d0).getTime()) / 86_400_000)
-        if (days >= 0) list.push(days)
-      }
+      const prehab = byP['Prehabilitation']
+      const dc = byP['DC']
+      if (!prehab?.assessmentDate || !dc?.assessmentDate) return
+      if (erasMonthKey && outcomeMonthKey(dc) !== erasMonthKey) return
+      const days = Math.round((new Date(dc.assessmentDate).getTime() - new Date(prehab.assessmentDate).getTime()) / 86_400_000)
+      if (days >= 0) list.push(days)
     })
     return list.length > 0 ? Math.round(list.reduce((a, b) => a + b) / list.length) : null
-  }, [erasRows])
-
-  const ERAS_METRICS = [
-    { key: 'peakCoughFlow',      label: 'Peak CF',  unit: 'L/min' },
-    { key: 'wrightSpirometer',   label: 'Wright',   unit: 'mL' },
-    { key: 'gripStrength_right', label: 'Grip (R)', unit: 'kg' },
-    { key: 'cs30',               label: 'CS-30',    unit: 'stands' },
-    { key: 'erasTwoMWalk',       label: '2-Meter',  unit: 'sec' },
-  ] as const
-
-  const ERAS_PHASES_LIST = ['Prehabilitation', 'Pre-op', 'DC', 'Follow-up'] as const
-  const ERAS_PHASE_SHORT_MAP: Record<string, string> = {
-    'Prehabilitation': 'Pre-hab', 'Pre-op': 'Pre-op', 'DC': 'D/C', 'Follow-up': 'F/U',
-  }
+  }, [erasRows, erasMonthKey])
 
   const erasTrendData = useMemo(() => {
     return ERAS_METRICS.map(m => {
-      const phaseAvgs = ERAS_PHASES_LIST.map(phase => {
+      const phaseAvgs = ERAS_PHASE_ORDER.map(phase => {
         const vals: number[] = []
-        erasRows.forEach(r => {
-          const o = r.outcomes.find(x => x.session === phase)
+        erasScopedRows.forEach(({ outcomes }) => {
+          const o = outcomes.find(x => x.session === phase)
           const v = o?.items[m.key]?.value
           if (v !== undefined) vals.push(v)
         })
@@ -939,7 +1022,7 @@ export default function AdminPage() {
       })
       return { label: m.label, unit: m.unit, phaseAvgs }
     })
-  }, [erasRows])
+  }, [erasScopedRows])
 
   // ── Filtered table rows ────────────────────────────────────────────────────
   const filteredRows = useMemo(() => {
@@ -1426,72 +1509,113 @@ export default function AdminPage() {
           {selectedRow && <PatientModal row={selectedRow} onClose={() => setSelectedRow(null)} />}
 
           {/* ── ERAS Section ── */}
-          <div className="bg-white rounded-2xl border border-purple-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-purple-100 bg-purple-50 flex items-center justify-between">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            {/* Header row: title left, Overview/Monthly toggle + month dropdown right */}
+            <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="font-bold text-purple-900">ERAS — Enhanced Recovery After Surgery</h3>
-                <p className="text-purple-600 text-xs mt-0.5">Prehabilitation → Pre-op → DC → Follow-up</p>
+                <h3 className="font-bold text-slate-800 text-base">ERAS Program</h3>
+                <p className="text-slate-500 text-xs mt-0.5">
+                  Enhanced Recovery After Surgery · Prehabilitation → Pre-op → DC → Follow-up
+                </p>
               </div>
-              <span className="text-2xl font-bold text-purple-700">{erasRows.length}</span>
+              <div className="flex items-center gap-2">
+                {/* Segmented toggle */}
+                <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+                  {(['overview', 'monthly'] as const).map(v => (
+                    <button key={v}
+                      onClick={() => setErasView(v)}
+                      disabled={v === 'monthly' && erasMonths.length === 0}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold capitalize transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                        erasView === v ? 'bg-white text-[#0C447C] shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                      }`}>
+                      {v}
+                    </button>
+                  ))}
+                </div>
+                {/* Month dropdown — only in Monthly mode, only months with data */}
+                {erasView === 'monthly' && erasMonths.length > 0 && (
+                  <select value={erasMonth} onChange={e => setErasMonth(e.target.value)}
+                    className="text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white text-slate-600 focus:outline-none focus:border-blue-400">
+                    {erasMonths.map(k => <option key={k} value={k}>{monthLabel(k)}</option>)}
+                  </select>
+                )}
+              </div>
             </div>
 
             {erasRows.length === 0 ? (
               <div className="py-10 text-center text-slate-400 text-sm">No ERAS patients yet</div>
+            ) : (erasView === 'monthly' && erasScopedRows.length === 0) ? (
+              <div className="py-14 text-center">
+                <div className="text-slate-300 text-3xl mb-2">📅</div>
+                <p className="text-slate-400 text-sm">No ERAS data for this month</p>
+              </div>
             ) : (
-              <div className="p-5 space-y-6">
+              <div className="p-5 space-y-5">
 
-                {/* a) Phase breakdown */}
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-700 mb-3">Patient Phase Distribution</h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    {(['Prehabilitation', 'Pre-op', 'DC', 'Follow-up'] as const).map(phase => (
-                      <div key={phase} className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-center">
-                        <div className="text-xs text-purple-600 font-medium mb-1">{ERAS_PHASE_SHORT_MAP[phase]}</div>
-                        <div className="text-2xl font-bold text-purple-800">{erasPhaseCounts[phase]}</div>
+                {/* Scope caption */}
+                <div className="text-xs text-slate-400">
+                  {erasView === 'overview'
+                    ? `Showing all ERAS data · ${erasScopedCount} patient${erasScopedCount !== 1 ? 's' : ''}`
+                    : `${monthLabel(erasMonth)} · ${erasScopedCount} patient${erasScopedCount !== 1 ? 's' : ''} with assessments this month`}
+                </div>
+
+                {/* Stat cards — equal height, consistent padding + gaps */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {ERAS_PHASE_ORDER.map(phase => (
+                    <div key={phase} className="rounded-xl border border-slate-200 p-3.5 flex flex-col bg-white">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: ERAS_PHASE_COLORS[phase] }} />
+                        <span className="text-xs text-slate-500 font-medium">{ERAS_PHASE_SHORT[phase]}</span>
                       </div>
-                    ))}
+                      <div className="text-2xl font-bold text-slate-800">{erasPhaseCounts[phase]}</div>
+                      <div className="text-[10px] text-slate-400 mt-auto pt-1">patients</div>
+                    </div>
+                  ))}
+                  {/* Avg LOS */}
+                  <div className="rounded-xl border border-slate-200 p-3.5 flex flex-col bg-white">
+                    <div className="text-xs text-slate-500 font-medium mb-1">Avg LOS</div>
+                    {erasAvgLos !== null
+                      ? <div><span className="text-2xl font-bold text-violet-600">{erasAvgLos}</span><span className="text-sm text-slate-400 ml-1">d</span></div>
+                      : <div className="text-slate-300 text-xs mt-1">No D/C data</div>}
+                    <div className="text-[10px] text-slate-400 mt-auto pt-1">Prehab → D/C</div>
+                  </div>
+                  {/* Total ERAS patients in scope */}
+                  <div className="rounded-xl border border-slate-200 p-3.5 flex flex-col bg-white">
+                    <div className="text-xs text-slate-500 font-medium mb-1">ERAS Patients</div>
+                    <div className="text-2xl font-bold text-slate-800">{erasScopedCount}</div>
+                    <div className="text-[10px] text-slate-400 mt-auto pt-1">in scope</div>
                   </div>
                 </div>
 
-                {/* b) Outcome trend across 4 phases */}
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-700 mb-3">ERAS Outcome Trend — across phases (avg across all patients)</h4>
+                {/* Charts — each in its own card, stacked on mobile */}
+                {/* Outcome Trend (full width) */}
+                <div className="rounded-2xl border border-slate-200 p-4 shadow-sm bg-white">
+                  <h4 className="text-sm font-semibold text-slate-700">ERAS Outcome Trend</h4>
+                  <p className="text-xs text-slate-400 mt-0.5 mb-4">
+                    Average outcome value at each surgical phase (higher = better, except 2-Meter where lower = faster)
+                  </p>
                   <ErasGroupedChart data={erasTrendData} />
                 </div>
 
-                {/* c) Level distribution */}
-                <div>
-                  <h4 className="text-sm font-semibold text-slate-700 mb-3">ERAS Patient Level Distribution</h4>
-                  <div className="space-y-1.5">
-                    {([1, 2, 3, 4] as const).map(l => (
-                      <div key={l} className="flex items-center gap-2">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${LEVEL_BG[l]}`}>L{l}</span>
-                        <div className="flex-1 bg-slate-100 rounded-full h-1.5">
-                          <div className="h-1.5 rounded-full transition-all" style={{
-                            width: `${erasRows.length > 0 ? (erasLevelCounts[l] / erasRows.length) * 100 : 0}%`,
-                            backgroundColor: LEVEL_COLOR[l],
-                          }} />
-                        </div>
-                        <span className="text-xs font-semibold text-slate-600 w-5 text-right">{erasLevelCounts[l]}</span>
-                        <span className="text-xs text-slate-400 w-8">
-                          {erasRows.length > 0 ? `${Math.round((erasLevelCounts[l] / erasRows.length) * 100)}%` : '0%'}
-                        </span>
-                      </div>
-                    ))}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Phase distribution */}
+                  <div className="rounded-2xl border border-slate-200 p-4 shadow-sm bg-white">
+                    <h4 className="text-sm font-semibold text-slate-700">Patient Phase Distribution</h4>
+                    <p className="text-xs text-slate-400 mt-0.5 mb-4">How many ERAS patients are currently in each phase</p>
+                    <BarChart data={ERAS_PHASE_ORDER.map(p => ({
+                      label: ERAS_PHASE_SHORT[p], value: erasPhaseCounts[p], color: ERAS_PHASE_COLORS[p],
+                    }))} />
+                    <div className="text-center text-[10px] text-slate-400 mt-1">Surgical phase · y = patients</div>
                   </div>
-                </div>
 
-                {/* d) Average LOS */}
-                <div className="flex items-center gap-4 pt-3 border-t border-slate-100">
-                  <div>
-                    <div className="text-xs text-slate-500 mb-0.5">Avg LOS (Prehab → DC)</div>
-                    {erasAvgLos !== null
-                      ? <><span className="text-2xl font-bold text-violet-600">{erasAvgLos}</span><span className="text-sm text-slate-400 ml-1">days</span></>
-                      : <span className="text-slate-300 text-sm">No discharge data yet</span>
-                    }
-                  </div>
-                  <div className="ml-auto text-xs text-slate-400 text-right">
-                    Based on patients with both<br />Prehabilitation + DC outcomes
+                  {/* Level distribution */}
+                  <div className="rounded-2xl border border-slate-200 p-4 shadow-sm bg-white">
+                    <h4 className="text-sm font-semibold text-slate-700">ERAS Level Distribution</h4>
+                    <p className="text-xs text-slate-400 mt-0.5 mb-4">ERAS patients grouped by screening Level 1–4</p>
+                    <BarChart data={([1, 2, 3, 4] as const).map(l => ({
+                      label: `L${l}`, value: erasLevelCounts[l], color: LEVEL_COLOR[l],
+                    }))} />
+                    <div className="text-center text-[10px] text-slate-400 mt-1">Screening level · y = patients</div>
                   </div>
                 </div>
 
