@@ -5,6 +5,7 @@ import {
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { logActivity } from './authStore'
+import { normalizeHn } from './hn'
 import type { Patient, Screening, OutcomeMeasurement, OutcomeSession, LocationHistoryEntry } from '@/types'
 
 function toDate(val: unknown): Date | undefined {
@@ -51,8 +52,9 @@ export async function getAllPatients(): Promise<Patient[]> {
 export async function searchPatients(term: string): Promise<Patient[]> {
   const all = await getAllPatients()
   const t = term.toLowerCase()
+  const tHn = normalizeHn(term) // dash-insensitive HN match: "01-26-006768" === "0126006768"
   return all.filter(p =>
-    p.hn.toLowerCase().includes(t) ||
+    (tHn !== '' && normalizeHn(p.hn).includes(tHn)) ||
     p.firstName.toLowerCase().includes(t) ||
     p.lastName.toLowerCase().includes(t)
   )

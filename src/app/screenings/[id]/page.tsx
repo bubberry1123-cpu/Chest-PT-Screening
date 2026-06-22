@@ -7,6 +7,7 @@ import { useIsAdmin } from '@/lib/useIsAdmin'
 import type { Screening } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import { formatHn } from '@/lib/hn'
 
 const O2_LABELS: Record<string, string> = {
   room_air: 'Room Air',
@@ -85,7 +86,7 @@ export default function ScreeningDetailPage() {
 
       {/* Patient info banner */}
       <div className="bg-[#F0F7FF] border border-[#BFDBFE] rounded-2xl p-4 mb-4 text-sm">
-        <div className="font-mono text-[#1D4ED8] font-semibold">HN: {screening.patientHn}</div>
+        <div className="font-mono text-[#1D4ED8] font-semibold">HN: {formatHn(screening.patientHn)}</div>
         <div className="mt-0.5 text-blue-600">Location: {screening.location} • {date}</div>
         {screening.assessedBy && <div className="mt-0.5 text-blue-600">ผู้ประเมิน: {screening.assessedBy}</div>}
       </div>

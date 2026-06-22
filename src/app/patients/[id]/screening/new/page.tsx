@@ -6,6 +6,7 @@ import { getPatientById, createScreening } from '@/lib/localstore'
 import { calculateScreening, CFS_DESCRIPTIONS } from '@/lib/scoring'
 import type { Patient, O2Support, Cooperativeness, ScreeningInput, AssessmentType } from '@/types'
 import SeverityBadge from '@/components/SeverityBadge'
+import { formatHn } from '@/lib/hn'
 
 const DRIVER_LABELS: Record<string, string> = {
   Functional: 'Functional (F > R)',
@@ -87,7 +88,7 @@ export default function NewScreeningPage() {
 
       <div className="bg-[#F0F7FF] border border-[#BFDBFE] rounded-2xl p-3 mb-5 text-sm">
         <span className="font-semibold text-[#1D4ED8]">{patient.firstName} {patient.lastName}</span>
-        <span className="text-blue-600 ml-2 font-mono">HN: {patient.hn}</span>
+        <span className="text-blue-600 ml-2 font-mono">HN: {formatHn(patient.hn)}</span>
         <span className="text-blue-600 ml-2">• {patient.location}</span>
       </div>
 
@@ -257,7 +258,7 @@ export default function NewScreeningPage() {
           {/* Patient info banner */}
           <div className="bg-[#F0F7FF] border border-[#BFDBFE] rounded-2xl p-3 text-sm">
             <span className="font-semibold text-[#1D4ED8]">{patient.firstName} {patient.lastName}</span>
-            <span className="text-blue-600 ml-2 font-mono">HN: {patient.hn}</span>
+            <span className="text-blue-600 ml-2 font-mono">HN: {formatHn(patient.hn)}</span>
             <span className="text-blue-600 ml-2">• {patient.location}</span>
           </div>
 

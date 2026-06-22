@@ -13,6 +13,7 @@ import { useToast } from '@/lib/useToast'
 import Toast from '@/components/Toast'
 import ConfirmDialog from '@/components/ConfirmDialog'
 import type { Patient, Screening, OutcomeMeasurement, OutcomeSession, OverallLevel } from '@/types'
+import { formatHn } from '@/lib/hn'
 
 type BtnState = 'idle' | 'saving' | 'saved'
 
@@ -89,7 +90,8 @@ export default function OutcomePage() {
       for (const item of getInBodyFlatItems()) {
         const raw = values[item.key]
         if (raw !== undefined && raw !== '') {
-          filledItems[item.key] = { value: Number(raw) }
+          const trimmedNote = notes[item.key]?.trim()
+          filledItems[item.key] = trimmedNote ? { value: Number(raw), note: trimmedNote } : { value: Number(raw) }
           hasAny = true
         }
       }
@@ -145,7 +147,7 @@ export default function OutcomePage() {
       <div className="bg-[#F0F7FF] border border-[#BFDBFE] rounded-2xl p-3 mb-5 text-sm flex items-center justify-between">
         <div>
           <span className="font-semibold text-[#1D4ED8]">{patient.firstName} {patient.lastName}</span>
-          <span className="text-blue-600 ml-2 font-mono">HN: {patient.hn}</span>
+          <span className="text-blue-600 ml-2 font-mono">HN: {formatHn(patient.hn)}</span>
         </div>
         <div className="flex items-center gap-2">
           {isEras && (
@@ -340,19 +342,32 @@ export default function OutcomePage() {
                 </div>
                 <div className="divide-y divide-slate-100">
                   {group.items.map(item => (
-                    <div key={item.key} className="flex items-center px-5 py-3 gap-3">
-                      <label className="flex-1 text-sm text-slate-600 pl-2">{item.label}</label>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <input
-                          type="number"
-                          step={item.step ?? 1}
-                          value={values[item.key] ?? ''}
-                          onChange={e => setValues(v => ({ ...v, [item.key]: e.target.value }))}
-                          placeholder="–"
-                          className="w-20 text-right border border-slate-300 rounded-xl px-2 py-1.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
-                        />
-                        <span className="text-sm text-slate-400 w-12 shrink-0">{item.unit}</span>
+                    <div key={item.key}>
+                      <div className="flex items-center px-5 py-3 gap-3">
+                        <label className="flex-1 text-sm text-slate-600 pl-2">{item.label}</label>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <input
+                            type="number"
+                            step={item.step ?? 1}
+                            value={values[item.key] ?? ''}
+                            onChange={e => setValues(v => ({ ...v, [item.key]: e.target.value }))}
+                            placeholder="–"
+                            className="w-20 text-right border border-slate-300 rounded-xl px-2 py-1.5 text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-200"
+                          />
+                          <span className="text-sm text-slate-400 w-12 shrink-0">{item.unit}</span>
+                        </div>
                       </div>
+                      {item.showNotes && (
+                        <div className="px-5 pb-3 -mt-1 pl-7">
+                          <input
+                            type="text"
+                            value={notes[item.key] ?? ''}
+                            onChange={e => setNotes(n => ({ ...n, [item.key]: e.target.value }))}
+                            placeholder="หมายเหตุ (optional)"
+                            className="w-full text-xs border border-slate-200 rounded-xl px-3 py-1.5 text-slate-500 placeholder-slate-300 focus:outline-none focus:border-indigo-400 bg-indigo-50/30"
+                          />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -14,6 +14,7 @@ import SeverityBadge from '@/components/SeverityBadge'
 import OutcomeCharts, { OutcomeChartsAll } from '@/components/OutcomeCharts'
 import OutcomeSummaryDashboard from '@/components/OutcomeSummaryDashboard'
 import ErasOutcomeCharts from '@/components/ErasOutcomeCharts'
+import { formatHn } from '@/lib/hn'
 
 function trendSymbol(diff: number, lowerIsBetter?: boolean) {
   if (diff === 0) return { symbol: '→', color: 'text-slate-400' }
@@ -596,7 +597,7 @@ export default function PatientPage() {
       pdf.setFont('helvetica', 'bold').setFontSize(13).setTextColor(15, 23, 42)
       pdf.text(`${patient.firstName} ${patient.lastName}`, mg + 5, curY + 9)
       pdf.setFont('helvetica', 'normal').setFontSize(9).setTextColor(71, 85, 105)
-      pdf.text(`HN: ${patient.hn}`, mg + 5, curY + 17)
+      pdf.text(`HN: ${formatHn(patient.hn)}`, mg + 5, curY + 17)
       pdf.text(
         `Age: ${patient.age}  ·  Sex: ${patient.sex}  ·  Nationality: ${patient.nationality}  ·  Location: ${patient.location || '—'}`,
         mg + 5, curY + 25
@@ -847,7 +848,7 @@ export default function PatientPage() {
                 </button>
               )}
             </div>
-            <p className="text-slate-500 text-sm mt-0.5 font-mono">HN: {patient.hn}</p>
+            <p className="text-slate-500 text-sm mt-0.5 font-mono">HN: {formatHn(patient.hn)}</p>
           </div>
           <div className="flex flex-col gap-2 shrink-0">
             <Link href={`/patients/${id}/screening/new`}

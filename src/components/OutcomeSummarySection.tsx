@@ -4,6 +4,7 @@ import type { Patient, Screening, OutcomeMeasurement, OutcomeSession } from '@/t
 import { SESSION_SHORT, ERAS_PHASES, ERAS_PHASE_SHORT } from '@/lib/outcomeItems'
 import type { OtherDef, SessionDatum } from './OutcomeSummaryDashboard'
 import { OutcomeSummaryChartCore } from './OutcomeSummaryDashboard'
+import { formatHn, normalizeHn } from '@/lib/hn'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -132,10 +133,14 @@ function PatientPicker({
     return () => document.removeEventListener('mousedown', fn)
   }, [open])
 
-  const filtered = useMemo(() =>
-    patients.filter(p =>
-      `${p.firstName} ${p.lastName} ${p.hn}`.toLowerCase().includes(search.toLowerCase())
-    ), [patients, search])
+  const filtered = useMemo(() => {
+    const term = search.toLowerCase()
+    const termHn = normalizeHn(search)
+    return patients.filter(p =>
+      `${p.firstName} ${p.lastName}`.toLowerCase().includes(term) ||
+      (termHn !== '' && normalizeHn(p.hn).includes(termHn))
+    )
+  }, [patients, search])
 
   const triggerLabel = mode === 'single'
     ? selected[0]
@@ -175,7 +180,7 @@ function PatientPicker({
                       )}
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-slate-800 truncate">{p.firstName} {p.lastName}</p>
-                        <p className="text-xs text-slate-400 font-mono">{p.hn}</p>
+                        <p className="text-xs text-slate-400 font-mono">{formatHn(p.hn)}</p>
                       </div>
                     </div>
                   )
@@ -606,7 +611,7 @@ function OutcomeBlock({
       pdf.text(headerTitle, mg, 10)
       pdf.setFont('helvetica', 'normal').setFontSize(8.5)
       const headerSub = mode === 'single' && singlePatient
-        ? `HN: ${singlePatient.hn}   |   ${title}`
+        ? `HN: ${formatHn(singlePatient.hn)}   |   ${title}`
         : `All patients (average)   |   ${selectedSessions.map(s => sessionLabels[(sessions as string[]).indexOf(s)] ?? s).join(', ')}`
       pdf.text(headerSub, mg, 17.5)
 

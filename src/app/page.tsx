@@ -5,6 +5,7 @@ import { getAllPatients, searchPatients, deletePatient } from '@/lib/localstore'
 import { useIsAdmin } from '@/lib/useIsAdmin'
 import type { Patient } from '@/types'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import { formatHn } from '@/lib/hn'
 
 export default function HomePage() {
   const isAdmin = useIsAdmin()
@@ -44,7 +45,7 @@ export default function HomePage() {
       {confirmTarget && (
         <ConfirmDialog
           title="ลบผู้ป่วย"
-          message={`ลบผู้ป่วย "${confirmTarget.firstName} ${confirmTarget.lastName}" (HN: ${confirmTarget.hn}) และข้อมูลทั้งหมด?\nการกระทำนี้ไม่สามารถกู้คืนได้`}
+          message={`ลบผู้ป่วย "${confirmTarget.firstName} ${confirmTarget.lastName}" (HN: ${formatHn(confirmTarget.hn)}) และข้อมูลทั้งหมด?\nการกระทำนี้ไม่สามารถกู้คืนได้`}
           confirmLabel="ลบ"
           onConfirm={confirmDelete}
           onCancel={() => setConfirmTarget(null)}
@@ -103,7 +104,7 @@ export default function HomePage() {
                   <td className="px-4 py-3 font-medium text-slate-800">
                     {p.firstName} {p.lastName}
                   </td>
-                  <td className="px-4 py-3 text-slate-600 font-mono">{p.hn}</td>
+                  <td className="px-4 py-3 text-slate-600 font-mono">{formatHn(p.hn)}</td>
                   <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{p.location}</td>
                   <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{p.age} ปี</td>
                   <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{p.nationality}</td>

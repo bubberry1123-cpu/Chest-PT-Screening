@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { createPatient, getPatientByHn } from '@/lib/localstore'
 import { createScreening } from '@/lib/localstore'
 import { calculateScreening, CFS_DESCRIPTIONS } from '@/lib/scoring'
+import { formatHn, digitsOnlyHn, normalizeHn } from '@/lib/hn'
 import type { O2Support, Cooperativeness, Sex, ScreeningInput, AssessmentType } from '@/types'
 import { useToast } from '@/lib/useToast'
 import LocationPicker from '@/components/LocationPicker'
@@ -68,11 +69,11 @@ export default function NewPatientPage() {
     setStep1Attempted(false)
     setStep1Loading(true)
     try {
-      const existing = await getPatientByHn(patientForm.hn.trim())
+      const existing = await getPatientByHn(normalizeHn(patientForm.hn))
       if (existing) {
         setExistingPatientId(existing.id!)
         setPatientForm({
-          hn: existing.hn,
+          hn: formatHn(existing.hn),
           firstName: existing.firstName,
           lastName: existing.lastName,
           age: String(existing.age),
@@ -106,7 +107,7 @@ export default function NewPatientPage() {
       let patientId = existingPatientId
       if (!patientId) {
         patientId = await createPatient({
-          hn: patientForm.hn.trim(),
+          hn: normalizeHn(patientForm.hn),
           firstName: patientForm.firstName.trim(),
           lastName: patientForm.lastName.trim(),
           age: Number(patientForm.age),
@@ -125,7 +126,7 @@ export default function NewPatientPage() {
       const res = calculateScreening(input)
       const sid = await createScreening({
         patientId,
-        patientHn: patientForm.hn.trim(),
+        patientHn: normalizeHn(patientForm.hn),
         location: patientForm.location,
         assessedBy: clinical.assessedBy || 'PT',
         notes: clinical.notes,
@@ -193,10 +194,10 @@ export default function NewPatientPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">HN (Hospital Number) *</label>
-              <input type="text" value={patientForm.hn}
-                onChange={e => setPatientForm(f => ({ ...f, hn: e.target.value }))}
+              <input type="text" inputMode="numeric" value={patientForm.hn}
+                onChange={e => setPatientForm(f => ({ ...f, hn: formatHn(digitsOnlyHn(e.target.value)) }))}
                 className={fieldCls(!patientForm.hn.trim())}
-                placeholder="เช่น 6500123" />
+                placeholder="เช่น 01-26-006768" />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">ชื่อ *</label>

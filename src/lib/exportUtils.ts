@@ -1,4 +1,5 @@
 import type { Patient, Screening, OutcomeMeasurement } from '@/types'
+import { formatHn } from './hn'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -63,7 +64,7 @@ export async function exportPatientList(
       const s = latestScreeningForPatient(p.id!, screenings, dateFrom, dateTo)
       if ((dateFrom || dateTo) && !s) return null
       return {
-        HN: p.hn,
+        HN: formatHn(p.hn),
         'First Name': p.firstName,
         'Last Name': p.lastName,
         Age: p.age,
@@ -127,7 +128,7 @@ export async function exportOutcomeData(
     const it = o.items
     const v = (key: string) => it[key]?.value ?? ''
     return {
-      HN: o.patientHn,
+      HN: formatHn(o.patientHn),
       'First Name': p?.firstName ?? '',
       'Last Name': p?.lastName ?? '',
       Session: o.session,
