@@ -174,9 +174,10 @@ export const INBODY_GROUPS: OutcomeGroupDef[] = [
     groupKey: 'inbody_general',
     label: 'General',
     items: [
-      { key: 'inbody_bmi',            label: 'BMI',             unit: 'kg/m²', step: 0.1 },
-      { key: 'inbody_bodyFatMass',    label: 'Body fat mass',   unit: 'kg',    step: 0.1 },
-      { key: 'inbody_skeletalMuscle', label: 'Skeletal muscle', unit: 'kg',    step: 0.1 },
+      { key: 'inbody_bmi',            label: 'BMI',                  unit: 'kg/m²', step: 0.1, showNotes: true },
+      { key: 'inbody_bodyFatMass',    label: 'Body fat mass',        unit: 'kg',    step: 0.1 },
+      { key: 'inbody_skeletalMuscle', label: 'Skeletal Muscle Mass', unit: 'kg',    step: 0.1, showNotes: true },
+      { key: 'inbody_bodyFatPct',     label: 'Body Fat %',           unit: '%',     step: 0.1, showNotes: true },
     ],
   },
   {

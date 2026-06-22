@@ -11,6 +11,7 @@ import { exportPatientList, exportOutcomeData, exportMonthlySummary, exportChart
 import { WARDS } from '@/lib/wards'
 import { OutcomeSummarySection } from '@/components/OutcomeSummarySection'
 import ConfirmDialog from '@/components/ConfirmDialog'
+import { formatHn } from '@/lib/hn'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const REASSESS_DAYS = 14
@@ -30,10 +31,10 @@ const ALL_SESSIONS: OutcomeSession[] = ['Initial','Reassessment 1','Reassessment
 const ERAS_PHASE_ORDER = ['Prehabilitation', 'Pre-op', 'DC', 'Follow-up'] as const
 type ErasPhase = typeof ERAS_PHASE_ORDER[number]
 const ERAS_PHASE_COLORS: Record<ErasPhase, string> = {
-  'Prehabilitation': '#3b82f6',
-  'Pre-op': '#10b981',
-  'DC': '#f97316',
-  'Follow-up': '#8b5cf6',
+  'Prehabilitation': '#378ADD', // blue
+  'Pre-op': '#1D9E75',          // teal
+  'DC': '#EF9F27',              // amber
+  'Follow-up': '#7F77DD',       // purple
 }
 const ERAS_PHASE_SHORT: Record<ErasPhase, string> = {
   'Prehabilitation': 'Pre-hab', 'Pre-op': 'Pre-op', 'DC': 'D/C', 'Follow-up': 'F/U',
@@ -363,7 +364,7 @@ function TrendChart({ data }: { data: { label: string; initial: number | null; d
 function ErasGroupedChart({ data }: {
   data: { label: string; unit: string; phaseAvgs: (number | null)[] }[]
 }) {
-  const BAR_H = 96
+  const BAR_H = 400 // plotting area height (px)
 
   const hasAnyData = data.some(m => m.phaseAvgs.some(v => v !== null))
   if (!hasAnyData) return (
@@ -375,41 +376,41 @@ function ErasGroupedChart({ data }: {
       <div className="flex">
         {/* y-axis label */}
         <div className="flex items-center justify-center pr-1 shrink-0">
-          <span className="text-[10px] text-slate-400 -rotate-90 whitespace-nowrap">Average value</span>
+          <span className="text-xs text-slate-500 font-medium -rotate-90 whitespace-nowrap">Average value</span>
         </div>
         <div className="overflow-x-auto flex-1">
-          <div className="flex items-end gap-6 min-w-max px-2 pt-5" style={{ height: BAR_H + 56 }}>
+          <div className="flex items-end gap-8 min-w-max px-2 pt-6" style={{ height: BAR_H + 64 }}>
             {data.map((metric, mi) => {
               const vals = metric.phaseAvgs.filter((v): v is number => v !== null)
               const maxV = vals.length > 0 ? Math.max(...vals, 1) : 1
               return (
-                <div key={mi} className="flex flex-col items-center gap-1">
-                  <div className="flex items-end gap-1.5" style={{ height: BAR_H }}>
+                <div key={mi} className="flex flex-col items-center gap-1.5">
+                  <div className="flex items-end gap-2" style={{ height: BAR_H }}>
                     {metric.phaseAvgs.map((v, pi) => {
                       const phase = ERAS_PHASE_ORDER[pi]
                       const color = ERAS_PHASE_COLORS[phase]
                       return (
                         <div key={pi} className="flex flex-col items-center justify-end" style={{ height: BAR_H }}>
                           {v !== null && (
-                            <span className="text-[9px] font-semibold mb-0.5" style={{ color }}>
+                            <span className="text-[13px] font-bold mb-1" style={{ color }}>
                               {v % 1 === 0 ? v : v.toFixed(1)}
                             </span>
                           )}
                           <div
-                            className="w-5 rounded-t"
+                            className="w-8 rounded-t-md"
                             style={{
                               backgroundColor: color,
-                              height: v !== null && v > 0 ? `${Math.max((v / maxV) * (BAR_H - 22), 3)}px` : '0',
+                              height: v !== null && v > 0 ? `${Math.max((v / maxV) * (BAR_H - 36), 4)}px` : '0',
                               opacity: v !== null ? 1 : 0.12,
-                              minHeight: v !== null ? '2px' : '0',
+                              minHeight: v !== null ? '3px' : '0',
                             }}
                           />
                         </div>
                       )
                     })}
                   </div>
-                  <span className="text-[11px] text-slate-700 font-semibold text-center leading-tight">{metric.label}</span>
-                  <span className="text-[9px] text-slate-400 text-center leading-none">({metric.unit})</span>
+                  <span className="text-sm text-slate-700 font-semibold text-center leading-tight">{metric.label}</span>
+                  <span className="text-xs text-slate-400 text-center leading-none">({metric.unit})</span>
                 </div>
               )
             })}
@@ -417,16 +418,70 @@ function ErasGroupedChart({ data }: {
         </div>
       </div>
       {/* x-axis label */}
-      <div className="text-center text-[10px] text-slate-400 mt-1">Outcome measure</div>
+      <div className="text-center text-xs text-slate-400 mt-1.5">Outcome measure</div>
       {/* legend — fixed phase order + consistent colors */}
-      <div className="flex items-center justify-center gap-4 mt-2 flex-wrap">
+      <div className="flex items-center justify-center gap-5 mt-3 flex-wrap">
         {ERAS_PHASE_ORDER.map(phase => (
           <div key={phase} className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: ERAS_PHASE_COLORS[phase] }} />
-            <span className="text-xs text-slate-500">{phase}</span>
+            <div className="w-3.5 h-3.5 rounded-sm" style={{ backgroundColor: ERAS_PHASE_COLORS[phase] }} />
+            <span className="text-xs font-medium text-slate-600">{ERAS_PHASE_SHORT[phase]}</span>
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+// ── ERAS InBody averages (Prehabilitation only) ───────────────────────────────
+const INBODY_COLOR = '#378ADD'
+const INBODY_TREND_DEFS = [
+  { key: 'inbody_bmi',            label: 'BMI',                  unit: 'kg/m²', maxRef: 40 },
+  { key: 'inbody_skeletalMuscle', label: 'Skeletal Muscle Mass', unit: 'kg',    maxRef: 50 },
+  { key: 'inbody_bodyFatPct',     label: 'Body Fat %',           unit: '%',     maxRef: 50 },
+] as const
+
+function InBodyAvgChart({ rows }: { rows: { outcomes: OutcomeMeasurement[] }[] }) {
+  const PLOT_H = 200
+  const stats = INBODY_TREND_DEFS.map(d => {
+    const vals: number[] = []
+    rows.forEach(({ outcomes }) => {
+      const v = outcomes.find(o => o.session === 'Prehabilitation')?.items[d.key]?.value
+      if (v !== undefined) vals.push(v)
+    })
+    const avg = vals.length > 0 ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null
+    return { ...d, avg, n: vals.length }
+  })
+
+  if (!stats.some(s => s.avg !== null)) return (
+    <div className="h-32 flex items-center justify-center text-slate-400 text-sm">No InBody data in this scope</div>
+  )
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {stats.map(s => (
+        <div key={s.key} className="rounded-xl border border-slate-200 p-4 bg-white flex flex-col">
+          <div className="text-sm font-semibold text-slate-700">{s.label}</div>
+          <div className="text-xs text-slate-400 mb-2">
+            {s.unit} · avg of {s.n} patient{s.n !== 1 ? 's' : ''}
+          </div>
+          <div className="flex items-end justify-center" style={{ height: PLOT_H }}>
+            {s.avg !== null ? (
+              <div className="flex flex-col items-center justify-end h-full">
+                <span className="text-[13px] font-bold mb-1" style={{ color: INBODY_COLOR }}>{s.avg}</span>
+                <div
+                  className="w-14 rounded-t-md"
+                  style={{
+                    backgroundColor: INBODY_COLOR,
+                    height: `${Math.max((s.avg / s.maxRef) * (PLOT_H - 28), 4)}px`,
+                  }}
+                />
+              </div>
+            ) : (
+              <span className="text-slate-300 text-sm self-center">No data</span>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -466,7 +521,7 @@ function PatientModal({ row, onClose }: { row: PatientRow; onClose: () => void }
         <div className="flex items-start justify-between p-5 border-b border-slate-200">
           <div>
             <h3 className="font-bold text-slate-800 text-lg">{patient.firstName} {patient.lastName}</h3>
-            <p className="text-slate-500 text-sm font-mono">HN: {patient.hn}</p>
+            <p className="text-slate-500 text-sm font-mono">HN: {formatHn(patient.hn)}</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-2xl leading-none px-1">×</button>
         </div>
@@ -1295,7 +1350,7 @@ export default function AdminPage() {
                           {row.patient.firstName} {row.patient.lastName}
                         </div>
                         <div className="text-xs text-slate-500 flex gap-2 mt-0.5 flex-wrap">
-                          <span className="font-mono">{row.patient.hn}</span>
+                          <span className="font-mono">{formatHn(row.patient.hn)}</span>
                           <span>{row.patient.location}</span>
                           {row.latestScreening && (
                             <span className={`px-1.5 rounded font-semibold ${LEVEL_BG[row.latestScreening.overallLevel]}`}>
@@ -1359,7 +1414,7 @@ export default function AdminPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-slate-800 text-sm">{row.patient.firstName} {row.patient.lastName}</span>
-                          <span className="font-mono text-xs text-slate-400">{row.patient.hn}</span>
+                          <span className="font-mono text-xs text-slate-400">{formatHn(row.patient.hn)}</span>
                           {row.latestScreening && (
                             <span className={`px-1.5 rounded text-xs font-semibold ${LEVEL_BG[row.latestScreening.overallLevel]}`}>
                               L{row.latestScreening.overallLevel}
@@ -1465,7 +1520,7 @@ export default function AdminPage() {
                       <tr key={row.patient.id}
                         className="hover:bg-slate-50 cursor-pointer transition-colors"
                         onClick={() => setSelectedRow(row)}>
-                        <td className="px-4 py-2.5 font-mono text-slate-600 text-xs">{row.patient.hn}</td>
+                        <td className="px-4 py-2.5 font-mono text-slate-600 text-xs">{formatHn(row.patient.hn)}</td>
                         <td className="px-4 py-2.5 font-medium text-slate-800">
                           {row.patient.firstName} {row.patient.lastName}
                         </td>
@@ -1595,6 +1650,15 @@ export default function AdminPage() {
                     Average outcome value at each surgical phase (higher = better, except 2-Meter where lower = faster)
                   </p>
                   <ErasGroupedChart data={erasTrendData} />
+                </div>
+
+                {/* InBody averages (Prehabilitation) */}
+                <div className="rounded-2xl border border-slate-200 p-4 shadow-sm bg-white">
+                  <h4 className="text-sm font-semibold text-slate-700">InBody — Prehabilitation</h4>
+                  <p className="text-xs text-slate-400 mt-0.5 mb-4">
+                    Average InBody values across ERAS patients with Prehabilitation data
+                  </p>
+                  <InBodyAvgChart rows={erasScopedRows} />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
