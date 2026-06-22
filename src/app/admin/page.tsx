@@ -385,19 +385,19 @@ function ErasGroupedChart({ data }: {
               const maxV = vals.length > 0 ? Math.max(...vals, 1) : 1
               return (
                 <div key={mi} className="flex flex-col items-center gap-1.5">
-                  <div className="flex items-end gap-2" style={{ height: BAR_H }}>
+                  <div className="flex items-end gap-1.5" style={{ height: BAR_H }}>
                     {metric.phaseAvgs.map((v, pi) => {
                       const phase = ERAS_PHASE_ORDER[pi]
                       const color = ERAS_PHASE_COLORS[phase]
                       return (
                         <div key={pi} className="flex flex-col items-center justify-end" style={{ height: BAR_H }}>
                           {v !== null && (
-                            <span className="text-[13px] font-bold mb-1" style={{ color }}>
+                            <span className="text-[13px] font-semibold mb-1" style={{ color }}>
                               {v % 1 === 0 ? v : v.toFixed(1)}
                             </span>
                           )}
                           <div
-                            className="w-8 rounded-t-md"
+                            className="w-12 rounded-t-md"
                             style={{
                               backgroundColor: color,
                               height: v !== null && v > 0 ? `${Math.max((v / maxV) * (BAR_H - 36), 4)}px` : '0',
@@ -433,11 +433,10 @@ function ErasGroupedChart({ data }: {
 }
 
 // ── ERAS InBody averages (Prehabilitation only) ───────────────────────────────
-const INBODY_COLOR = '#378ADD'
 const INBODY_TREND_DEFS = [
-  { key: 'inbody_bmi',            label: 'BMI',                  unit: 'kg/m²', maxRef: 40 },
-  { key: 'inbody_skeletalMuscle', label: 'Skeletal Muscle Mass', unit: 'kg',    maxRef: 50 },
-  { key: 'inbody_bodyFatPct',     label: 'Body Fat %',           unit: '%',     maxRef: 50 },
+  { key: 'inbody_bmi',            label: 'BMI',                  unit: 'kg/m²', maxRef: 40, color: '#378ADD' },
+  { key: 'inbody_skeletalMuscle', label: 'Skeletal Muscle Mass', unit: 'kg',    maxRef: 50, color: '#1D9E75' },
+  { key: 'inbody_bodyFatPct',     label: 'Body Fat %',           unit: '%',     maxRef: 50, color: '#EF9F27' },
 ] as const
 
 function InBodyAvgChart({ rows }: { rows: { outcomes: OutcomeMeasurement[] }[] }) {
@@ -467,11 +466,11 @@ function InBodyAvgChart({ rows }: { rows: { outcomes: OutcomeMeasurement[] }[] }
           <div className="flex items-end justify-center" style={{ height: PLOT_H }}>
             {s.avg !== null ? (
               <div className="flex flex-col items-center justify-end h-full">
-                <span className="text-[13px] font-bold mb-1" style={{ color: INBODY_COLOR }}>{s.avg}</span>
+                <span className="text-[13px] font-semibold mb-1" style={{ color: s.color }}>{s.avg}</span>
                 <div
-                  className="w-14 rounded-t-md"
+                  className="w-16 rounded-t-md"
                   style={{
-                    backgroundColor: INBODY_COLOR,
+                    backgroundColor: s.color,
                     height: `${Math.max((s.avg / s.maxRef) * (PLOT_H - 28), 4)}px`,
                   }}
                 />
@@ -1654,7 +1653,7 @@ export default function AdminPage() {
 
                 {/* InBody averages (Prehabilitation) */}
                 <div className="rounded-2xl border border-slate-200 p-4 shadow-sm bg-white">
-                  <h4 className="text-sm font-semibold text-slate-700">InBody — Prehabilitation</h4>
+                  <h4 className="text-sm font-semibold text-slate-700">Inbody — Pre-hab</h4>
                   <p className="text-xs text-slate-400 mt-0.5 mb-4">
                     Average InBody values across ERAS patients with Prehabilitation data
                   </p>
