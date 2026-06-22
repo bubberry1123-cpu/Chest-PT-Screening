@@ -53,6 +53,19 @@ const COLORS         = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '
 const CARD_COLORS    = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6']
 const SESSION_COLORS = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6']
 
+// ERAS phase → bright bar colors (used by the ERAS-only grouped bar chart + InBody)
+const ERAS_PHASE_COLORS: Record<string, string> = {
+  'Prehabilitation': '#378ADD', // Pre-hab
+  'Pre-op':          '#1D9E75',
+  'DC':              '#EF9F27', // D/C
+  'Follow-up':       '#7F77DD', // F/U
+}
+const ERAS_INBODY_DEFS = [
+  { key: 'inbody_bmi',            label: 'BMI',                  unit: 'kg/m²', maxRef: 40, color: '#378ADD' },
+  { key: 'inbody_skeletalMuscle', label: 'Skeletal Muscle Mass', unit: 'kg',    maxRef: 50, color: '#1D9E75' },
+  { key: 'inbody_bodyFatPct',     label: 'Body Fat %',           unit: '%',     maxRef: 50, color: '#EF9F27' },
+] as const
+
 // ── Session timelines (5 key points for Standard, 4 for ERAS) ─────────────────
 
 const STD_SUMMARY_SESSIONS  = ['Initial', 'Reassessment 1', 'Reassessment 2', 'Reassessment 3', 'Discharge'] as const
@@ -410,6 +423,119 @@ function OutcomeCardGrid({ pointsData, sessionLabels, metrics, cardDefs, color }
     return <div className="py-8 text-center text-slate-400 text-sm">No outcome data recorded for the selected sessions</div>
 
   return <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{cards}</div>
+}
+
+// ── ERAS-only grouped bar chart (phase colors, 400px, horizontal value labels) ─
+
+function ErasOutcomeBarChart({ sessions, defs }: { sessions: SessionDatum[]; defs: OtherDef[] }) {
+  const PLOT_H = 400
+  const present = defs.filter(d => sessions.some(sd => sd.o?.items[d.key]?.value !== undefined))
+
+  if (present.length === 0)
+    return <div className="py-8 text-center text-slate-400 text-sm">No data for selected sessions</div>
+
+  return (
+    <div>
+      {/* Legend — phase colors */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-3 pb-3 border-b border-slate-100">
+        {sessions.map(sd => (
+          <div key={sd.session} className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: ERAS_PHASE_COLORS[sd.session] ?? sd.color }} />
+            <span className="text-[11px] text-slate-500">{sd.label}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="overflow-x-auto">
+        <div className="flex items-end gap-8 min-w-max px-2 pt-6" style={{ height: PLOT_H + 64 }}>
+          {present.map(def => {
+            const vals = sessions
+              .map(sd => sd.o?.items[def.key]?.value)
+              .filter((v): v is number => v !== undefined)
+            const maxV = vals.length > 0 ? Math.max(...vals, 1) : 1
+            return (
+              <div key={def.key} className="flex flex-col items-center gap-1.5">
+                <div className="flex items-end gap-1.5" style={{ height: PLOT_H }}>
+                  {sessions.map(sd => {
+                    const v = sd.o?.items[def.key]?.value
+                    const color = ERAS_PHASE_COLORS[sd.session] ?? sd.color
+                    return (
+                      <div key={sd.session} className="flex flex-col items-center justify-end" style={{ height: PLOT_H }}>
+                        {v !== undefined && (
+                          <span className="text-[13px] font-bold mb-1" style={{ color: '#1a1a1a' }}>
+                            {v % 1 === 0 ? v : v.toFixed(1)}
+                          </span>
+                        )}
+                        <div
+                          className="w-12 rounded-t-md"
+                          style={{
+                            backgroundColor: color,
+                            height: v !== undefined && v > 0 ? `${Math.max((v / maxV) * (PLOT_H - 36), 4)}px` : '0',
+                            opacity: v !== undefined ? 1 : 0.12,
+                            minHeight: v !== undefined ? '3px' : '0',
+                          }}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+                <span className="text-sm text-slate-700 font-semibold text-center leading-tight">{def.label}</span>
+                <span className="text-xs text-slate-400 text-center leading-none">({def.unit})</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── ERAS InBody averages (Prehabilitation only) ───────────────────────────────
+
+function ErasInBodySection({ patients }: { patients: PInfo[] }) {
+  const PLOT_H = 200
+  const stats = ERAS_INBODY_DEFS.map(d => {
+    const vals: number[] = []
+    patients.forEach(p => {
+      const v = p.outcomes.find(o => o.session === 'Prehabilitation')?.items[d.key]?.value
+      if (v !== undefined) vals.push(v)
+    })
+    const avg = vals.length > 0 ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null
+    return { ...d, avg, n: vals.length }
+  })
+
+  return (
+    <div className="bg-slate-50 rounded-xl border border-slate-100 p-4">
+      <p className="text-xs font-semibold text-slate-600 mb-3">Inbody — Pre-hab</p>
+      {stats.some(s => s.avg !== null) ? (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {stats.map(s => (
+            <div key={s.key} className="rounded-xl border border-slate-200 p-4 bg-white flex flex-col">
+              <div className="text-sm font-semibold text-slate-700">{s.label}</div>
+              <div className="text-xs text-slate-400 mb-2">
+                {s.unit} · avg of {s.n} patient{s.n !== 1 ? 's' : ''}
+              </div>
+              <div className="flex items-end justify-center" style={{ height: PLOT_H }}>
+                {s.avg !== null ? (
+                  <div className="flex flex-col items-center justify-end h-full">
+                    <span className="text-[13px] font-bold mb-1" style={{ color: '#1a1a1a' }}>{s.avg}</span>
+                    <div
+                      className="w-16 rounded-t-md"
+                      style={{ backgroundColor: s.color, height: `${Math.max((s.avg / s.maxRef) * (PLOT_H - 28), 4)}px` }}
+                    />
+                  </div>
+                ) : (
+                  <span className="text-slate-300 text-sm self-center">No data</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="py-6 text-center text-slate-400 text-sm">No InBody data recorded</div>
+      )}
+    </div>
+  )
 }
 
 // ── One block (Standard or ERAS) ──────────────────────────────────────────────
@@ -784,8 +910,15 @@ function OutcomeBlock({
               {(mode === 'average' || showBarAndGrid) && (
                 <div ref={barChartRef} className="bg-slate-50 rounded-xl border border-slate-100 p-4">
                   <p className="text-xs font-semibold text-slate-600 mb-3">Outcome Summary — {mode === 'average' ? 'All patients (average)' : singlePatient ? `${singlePatient.firstName} ${singlePatient.lastName}` : ''}</p>
-                  <OutcomeSummaryChartCore sessions={chartSessions} otherDefs={otherDefs} />
+                  {blockType === 'eras'
+                    ? <ErasOutcomeBarChart sessions={chartSessions} defs={otherDefs} />
+                    : <OutcomeSummaryChartCore sessions={chartSessions} otherDefs={otherDefs} />}
                 </div>
+              )}
+
+              {/* ERAS InBody section (Pre-hab averages) */}
+              {blockType === 'eras' && (mode === 'average' || showBarAndGrid) && (
+                <ErasInBodySection patients={patients} />
               )}
 
               {/* Trend card grid */}
