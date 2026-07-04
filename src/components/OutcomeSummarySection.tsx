@@ -504,30 +504,35 @@ function ErasInBodySection({ patients }: { patients: PInfo[] }) {
     return { ...d, avg, n: vals.length }
   })
 
+  const BAR_COLOR = '#378ADD' // Pre-hab blue — single color, no session comparison
+
   return (
     <div className="bg-slate-50 rounded-xl border border-slate-100 p-4">
       <p className="text-xs font-semibold text-slate-600 mb-3">Inbody — Pre-hab</p>
       {stats.some(s => s.avg !== null) ? (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="flex items-end justify-center gap-10 px-2 pt-6">
           {stats.map(s => (
-            <div key={s.key} className="rounded-xl border border-slate-200 p-4 bg-white flex flex-col">
-              <div className="text-sm font-semibold text-slate-700">{s.label}</div>
-              <div className="text-xs text-slate-400 mb-2">
-                {s.unit} · avg of {s.n} patient{s.n !== 1 ? 's' : ''}
-              </div>
-              <div className="flex items-end justify-center" style={{ height: PLOT_H }}>
+            <div key={s.key} className="flex flex-col items-center gap-1.5">
+              <div className="flex flex-col items-center justify-end" style={{ height: PLOT_H }}>
                 {s.avg !== null ? (
-                  <div className="flex flex-col items-center justify-end h-full">
-                    <span className="text-[13px] font-bold mb-1" style={{ color: '#1a1a1a' }}>{s.avg}</span>
+                  <>
+                    <span className="text-[13px] font-semibold mb-1" style={{ color: '#1a1a1a' }}>{s.avg}</span>
                     <div
                       className="w-16 rounded-t-md"
-                      style={{ backgroundColor: s.color, height: `${Math.max((s.avg / s.maxRef) * (PLOT_H - 28), 4)}px` }}
+                      style={{ backgroundColor: BAR_COLOR, height: `${Math.max((s.avg / s.maxRef) * (PLOT_H - 28), 4)}px` }}
                     />
-                  </div>
+                  </>
                 ) : (
-                  <span className="text-slate-300 text-sm self-center">No data</span>
+                  <span className="text-slate-300 text-sm">No data</span>
                 )}
               </div>
+              <span className="text-sm text-slate-700 font-semibold text-center leading-tight">{s.label}</span>
+              <span className="text-xs text-slate-400 text-center leading-none">({s.unit})</span>
+              {s.key === 'inbody_bmi' && (
+                <span className="text-[11px] text-slate-400 text-center leading-none mt-0.5">
+                  {s.n} patient{s.n !== 1 ? 's' : ''}
+                </span>
+              )}
             </div>
           ))}
         </div>
