@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { createPatient, getPatientByHn } from '@/lib/localstore'
 import { createScreening } from '@/lib/localstore'
@@ -47,6 +47,12 @@ export default function NewPatientPage() {
   })
 
   const [assessmentType, setAssessmentType] = useState<AssessmentType>('Standard')
+  // Preselect ERAS when opened from the ERAS tab (/patients/new?type=eras)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('type') === 'eras') {
+      setAssessmentType('ERAS')
+    }
+  }, [])
   const [step1Loading, setStep1Loading] = useState(false)
   const [screeningId, setScreeningId] = useState<string | null>(null)
   const [savedPatientId, setSavedPatientId] = useState<string | null>(null)
@@ -114,6 +120,7 @@ export default function NewPatientPage() {
           sex: sex as Sex,
           nationality: patientForm.nationality,
           location: patientForm.location,
+          assessmentType, // tag patient record so the Patients tab split works without a screening
         })
       }
       setSavedPatientId(patientId)
