@@ -493,7 +493,9 @@ function ErasOutcomeBarChart({ sessions, defs }: { sessions: SessionDatum[]; def
 // ── ERAS InBody averages (Prehabilitation only) ───────────────────────────────
 
 function ErasInBodySection({ patients }: { patients: PInfo[] }) {
-  const PLOT_H = 200
+  // Same visual language as ErasOutcomeBarChart above — just a taller single-session (Pre-hab) chart.
+  const PLOT_H = 300
+  const BAR_COLOR = ERAS_PHASE_COLORS['Prehabilitation'] // #378ADD — Pre-hab, single color, no session comparison
   const stats = ERAS_INBODY_DEFS.map(d => {
     const vals: number[] = []
     patients.forEach(p => {
@@ -504,37 +506,46 @@ function ErasInBodySection({ patients }: { patients: PInfo[] }) {
     return { ...d, avg, n: vals.length }
   })
 
-  const BAR_COLOR = '#378ADD' // Pre-hab blue — single color, no session comparison
-
   return (
     <div className="bg-slate-50 rounded-xl border border-slate-100 p-4">
       <p className="text-xs font-semibold text-slate-600 mb-3">Inbody — Pre-hab</p>
       {stats.some(s => s.avg !== null) ? (
-        <div className="flex items-end justify-center gap-10 px-2 pt-6">
-          {stats.map(s => (
-            <div key={s.key} className="flex flex-col items-center gap-1.5">
-              <div className="flex flex-col items-center justify-end" style={{ height: PLOT_H }}>
-                {s.avg !== null ? (
-                  <>
+        <div>
+          {/* Legend — phase color (same as main chart) */}
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-3 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: BAR_COLOR }} />
+              <span className="text-[11px] text-slate-500">Pre-hab</span>
+            </div>
+          </div>
+
+          <div className="flex items-end justify-center gap-8 px-2 pt-6" style={{ height: PLOT_H + 64 }}>
+            {stats.map(s => (
+              <div key={s.key} className="flex flex-col items-center gap-1.5">
+                <div className="flex flex-col items-center justify-end" style={{ height: PLOT_H }}>
+                  {s.avg !== null && (
                     <span className="text-[13px] font-semibold mb-1" style={{ color: '#1a1a1a' }}>{s.avg}</span>
-                    <div
-                      className="w-16 rounded-t-md"
-                      style={{ backgroundColor: BAR_COLOR, height: `${Math.max((s.avg / s.maxRef) * (PLOT_H - 28), 4)}px` }}
-                    />
-                  </>
-                ) : (
-                  <span className="text-slate-300 text-sm">No data</span>
+                  )}
+                  <div
+                    className="w-12 rounded-t-md"
+                    style={{
+                      backgroundColor: BAR_COLOR,
+                      height: s.avg !== null && s.avg > 0 ? `${Math.max((s.avg / s.maxRef) * (PLOT_H - 36), 4)}px` : '0',
+                      opacity: s.avg !== null ? 1 : 0.12,
+                      minHeight: s.avg !== null ? '3px' : '0',
+                    }}
+                  />
+                </div>
+                <span className="text-sm text-slate-700 font-semibold text-center leading-tight">{s.label}</span>
+                <span className="text-xs text-slate-400 text-center leading-none">({s.unit})</span>
+                {s.key === 'inbody_bmi' && (
+                  <span className="text-[11px] text-slate-400 text-center leading-none mt-0.5">
+                    {s.n} patient{s.n !== 1 ? 's' : ''}
+                  </span>
                 )}
               </div>
-              <span className="text-sm text-slate-700 font-semibold text-center leading-tight">{s.label}</span>
-              <span className="text-xs text-slate-400 text-center leading-none">({s.unit})</span>
-              {s.key === 'inbody_bmi' && (
-                <span className="text-[11px] text-slate-400 text-center leading-none mt-0.5">
-                  {s.n} patient{s.n !== 1 ? 's' : ''}
-                </span>
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       ) : (
         <div className="py-6 text-center text-slate-400 text-sm">No InBody data recorded</div>
