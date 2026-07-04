@@ -425,75 +425,10 @@ function OutcomeCardGrid({ pointsData, sessionLabels, metrics, cardDefs, color }
   return <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{cards}</div>
 }
 
-// ── ERAS-only grouped bar chart (phase colors, 400px, horizontal value labels) ─
-
-function ErasOutcomeBarChart({ sessions, defs }: { sessions: SessionDatum[]; defs: OtherDef[] }) {
-  const PLOT_H = 400
-  const present = defs.filter(d => sessions.some(sd => sd.o?.items[d.key]?.value !== undefined))
-
-  if (present.length === 0)
-    return <div className="py-8 text-center text-slate-400 text-sm">No data for selected sessions</div>
-
-  return (
-    <div>
-      {/* Legend — phase colors */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-3 pb-3 border-b border-slate-100">
-        {sessions.map(sd => (
-          <div key={sd.session} className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: ERAS_PHASE_COLORS[sd.session] ?? sd.color }} />
-            <span className="text-[11px] text-slate-500">{sd.label}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="overflow-x-auto">
-        <div className="flex items-end gap-8 min-w-max px-2 pt-6" style={{ height: PLOT_H + 64 }}>
-          {present.map(def => {
-            const vals = sessions
-              .map(sd => sd.o?.items[def.key]?.value)
-              .filter((v): v is number => v !== undefined)
-            const maxV = vals.length > 0 ? Math.max(...vals, 1) : 1
-            return (
-              <div key={def.key} className="flex flex-col items-center gap-1.5">
-                <div className="flex items-end gap-1.5" style={{ height: PLOT_H }}>
-                  {sessions.map(sd => {
-                    const v = sd.o?.items[def.key]?.value
-                    const color = ERAS_PHASE_COLORS[sd.session] ?? sd.color
-                    return (
-                      <div key={sd.session} className="flex flex-col items-center justify-end" style={{ height: PLOT_H }}>
-                        {v !== undefined && (
-                          <span className="text-[13px] font-bold mb-1" style={{ color: '#1a1a1a' }}>
-                            {v % 1 === 0 ? v : v.toFixed(1)}
-                          </span>
-                        )}
-                        <div
-                          className="w-12 rounded-t-md"
-                          style={{
-                            backgroundColor: color,
-                            height: v !== undefined && v > 0 ? `${Math.max((v / maxV) * (PLOT_H - 36), 4)}px` : '0',
-                            opacity: v !== undefined ? 1 : 0.12,
-                            minHeight: v !== undefined ? '3px' : '0',
-                          }}
-                        />
-                      </div>
-                    )
-                  })}
-                </div>
-                <span className="text-sm text-slate-700 font-semibold text-center leading-tight">{def.label}</span>
-                <span className="text-xs text-slate-400 text-center leading-none">({def.unit})</span>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── ERAS InBody averages (Prehabilitation only) ───────────────────────────────
 
 function ErasInBodySection({ patients }: { patients: PInfo[] }) {
-  // Same visual language as ErasOutcomeBarChart above — just a taller single-session (Pre-hab) chart.
+  // Single-session (Pre-hab) averages shown as a simple div-based bar chart.
   const PLOT_H = 300
   const BAR_COLOR = ERAS_PHASE_COLORS['Prehabilitation'] // #378ADD — Pre-hab, single color, no session comparison
   const stats = ERAS_INBODY_DEFS.map(d => {
@@ -926,9 +861,8 @@ function OutcomeBlock({
               {(mode === 'average' || showBarAndGrid) && (
                 <div ref={barChartRef} className="bg-slate-50 rounded-xl border border-slate-100 p-4">
                   <p className="text-xs font-semibold text-slate-600 mb-3">Outcome Summary — {mode === 'average' ? 'All patients (average)' : singlePatient ? `${singlePatient.firstName} ${singlePatient.lastName}` : ''}</p>
-                  {blockType === 'eras'
-                    ? <ErasOutcomeBarChart sessions={chartSessions} defs={otherDefs} />
-                    : <OutcomeSummaryChartCore sessions={chartSessions} otherDefs={otherDefs} />}
+                  {/* Standard and ERAS share the same chart core so both render identically */}
+                  <OutcomeSummaryChartCore sessions={chartSessions} otherDefs={otherDefs} />
                 </div>
               )}
 
