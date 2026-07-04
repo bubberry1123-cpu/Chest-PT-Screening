@@ -88,9 +88,31 @@ const BRFA_SVG_SEGS = [
   { key: 'brfa_part1', short: 'P1',  fullLabel: 'Part 1 Functional', segColor: '#085041', maxVal: 100, unit: '%' },
 ] as const
 
+// Clinical interpretation of a BRFA segment score (%) — shown in the segment tooltip.
+function brfaInterpretation(key: string, val: number): string {
+  switch (key) {
+    case 'brfa_part1': // Part 1 Functional (ข้อ 1–15)
+      if (val <= 33.30) return 'ต้องการความช่วยเหลืออย่างใกล้ชิด'
+      if (val <= 66.70) return 'ต้องการความช่วยเหลือบางกิจกรรม'
+      return 'สามารถทำกิจกรรมได้ด้วยตนเอง'
+    case 'brfa_part2': // Part 2 Confidence (ข้อ 16–19)
+      if (val <= 33.30) return 'ความมั่นใจต่ำ ควรได้รับแรงเสริม'
+      if (val <= 66.70) return 'ความมั่นใจปานกลาง ควรประเมิน Work Hardening'
+      return 'มีความพร้อมและมั่นใจสูง ควรแนะนำหลักการยศาสตร์ (Ergonomics) เพื่อป้องกันการบาดเจ็บซ้ำ'
+    case 'brfa_q20': // Q20 Environment
+      if (val <= 50) return 'ที่พักไม่เหมาะสม ควรปรับเปลี่ยน'
+      return 'ที่พักเหมาะสม ควรประเมิน Safety in House'
+    case 'brfa_q21': // Q21 Satisfaction
+      if (val <= 50) return 'ความพึงพอใจต่อสุขภาพแย่ ควรให้กำลังใจ'
+      return 'ความพึงพอใจดีมาก ควรสนับสนุนต่อเนื่อง'
+    default:
+      return ''
+  }
+}
+
 type SegTooltip = {
   fullLabel: string
-  entries: { label: string; value: string; color: string }[]
+  entries: { label: string; value: string; color: string; interpretation?: string }[]
   segMidY: number
 }
 
@@ -122,7 +144,12 @@ export function BrfaSegmentBar({ sessions }: { sessions: SessionDatum[] }) {
           const anyVal = sessionVals.some(sv => sv.val !== undefined)
           const tooltipEntries = sessionVals
             .filter(sv => sv.val !== undefined)
-            .map(sv => ({ label: sv.label, value: `${sv.val!.toFixed(0)}${p.unit}`, color: sv.color }))
+            .map(sv => ({
+              label: sv.label,
+              value: `${sv.val!.toFixed(0)}${p.unit}`,
+              color: sv.color,
+              interpretation: brfaInterpretation(p.key, sv.val!),
+            }))
 
           return (
             <g key={p.key} onMouseEnter={() => anyVal && setTooltip({ fullLabel: p.fullLabel, entries: tooltipEntries, segMidY })}>
@@ -158,16 +185,25 @@ export function BrfaSegmentBar({ sessions }: { sessions: SessionDatum[] }) {
         <div style={{
           position: 'absolute', top: tooltip.segMidY - 14, left: W + 6,
           background: 'white', border: '1px solid #e2e8f0', borderRadius: 6,
-          padding: '4px 8px', fontSize: 11, color: '#1e293b',
-          whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+          padding: '6px 9px', fontSize: 11, color: '#1e293b',
+          width: tooltip.entries.some(e => e.interpretation) ? 210 : undefined,
+          whiteSpace: tooltip.entries.some(e => e.interpretation) ? 'normal' : 'nowrap',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
           zIndex: 20, pointerEvents: 'none',
         }}>
-          <div style={{ fontWeight: 600, marginBottom: 2, fontSize: 10, color: '#64748b' }}>{tooltip.fullLabel}</div>
+          <div style={{ fontWeight: 600, marginBottom: 3, fontSize: 10, color: '#64748b' }}>{tooltip.fullLabel}</div>
           {tooltip.entries.map((e, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <div style={{ width: 8, height: 8, borderRadius: 2, background: e.color, flexShrink: 0 }} />
-              <span style={{ color: '#64748b' }}>{e.label}:</span>
-              <span style={{ fontWeight: 700 }}>{e.value}</span>
+            <div key={i} style={{ marginTop: i > 0 ? 5 : 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: e.color, flexShrink: 0 }} />
+                <span style={{ color: '#64748b' }}>{e.label}:</span>
+                <span style={{ fontWeight: 700 }}>{e.value}</span>
+              </div>
+              {e.interpretation && (
+                <div style={{ marginLeft: 13, marginTop: 1, fontSize: 10, lineHeight: 1.35, color: '#0C447C' }}>
+                  → {e.interpretation}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -248,16 +284,25 @@ export function AmpacSegmentBar({ sessions }: { sessions: SessionDatum[] }) {
         <div style={{
           position: 'absolute', top: tooltip.segMidY - 14, left: W + 6,
           background: 'white', border: '1px solid #e2e8f0', borderRadius: 6,
-          padding: '4px 8px', fontSize: 11, color: '#1e293b',
-          whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+          padding: '6px 9px', fontSize: 11, color: '#1e293b',
+          width: tooltip.entries.some(e => e.interpretation) ? 210 : undefined,
+          whiteSpace: tooltip.entries.some(e => e.interpretation) ? 'normal' : 'nowrap',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
           zIndex: 20, pointerEvents: 'none',
         }}>
-          <div style={{ fontWeight: 600, marginBottom: 2, fontSize: 10, color: '#64748b' }}>{tooltip.fullLabel}</div>
+          <div style={{ fontWeight: 600, marginBottom: 3, fontSize: 10, color: '#64748b' }}>{tooltip.fullLabel}</div>
           {tooltip.entries.map((e, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <div style={{ width: 8, height: 8, borderRadius: 2, background: e.color, flexShrink: 0 }} />
-              <span style={{ color: '#64748b' }}>{e.label}:</span>
-              <span style={{ fontWeight: 700 }}>{e.value}</span>
+            <div key={i} style={{ marginTop: i > 0 ? 5 : 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: e.color, flexShrink: 0 }} />
+                <span style={{ color: '#64748b' }}>{e.label}:</span>
+                <span style={{ fontWeight: 700 }}>{e.value}</span>
+              </div>
+              {e.interpretation && (
+                <div style={{ marginLeft: 13, marginTop: 1, fontSize: 10, lineHeight: 1.35, color: '#0C447C' }}>
+                  → {e.interpretation}
+                </div>
+              )}
             </div>
           ))}
         </div>
