@@ -456,31 +456,43 @@ function InBodyAvgChart({ rows }: { rows: { outcomes: OutcomeMeasurement[] }[] }
   )
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      {stats.map(s => (
-        <div key={s.key} className="rounded-xl border border-slate-200 p-4 bg-white flex flex-col">
-          <div className="text-sm font-semibold text-slate-700">{s.label}</div>
-          <div className="text-xs text-slate-400 mb-2">
-            {s.unit} · avg of {s.n} patient{s.n !== 1 ? 's' : ''}
-          </div>
-          <div className="flex items-end justify-center" style={{ height: PLOT_H }}>
+    <div className="w-full">
+      {/* Bars — 3 categories spread evenly across the full width.
+          Bar width = 40% of each column ≈ categoryPercentage 0.5 × barPercentage 0.8 */}
+      <div className="flex w-full items-end pt-6 px-2" style={{ height: PLOT_H }}>
+        {stats.map(s => (
+          <div key={s.key} className="flex-1 flex flex-col items-center justify-end h-full">
             {s.avg !== null ? (
-              <div className="flex flex-col items-center justify-end h-full">
+              <>
                 <span className="text-[13px] font-semibold mb-1" style={{ color: s.color }}>{s.avg}</span>
                 <div
-                  className="w-16 rounded-t-md"
+                  className="rounded-t-md"
                   style={{
+                    width: '40%',
                     backgroundColor: s.color,
                     height: `${Math.max((s.avg / s.maxRef) * (PLOT_H - 28), 4)}px`,
                   }}
                 />
-              </div>
+              </>
             ) : (
-              <span className="text-slate-300 text-sm self-center">No data</span>
+              <span className="text-slate-300 text-sm">No data</span>
             )}
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
+
+      {/* Labels under each bar: name / unit / patient count */}
+      <div className="flex w-full mt-1.5 px-2">
+        {stats.map(s => (
+          <div key={s.key} className="flex-1 flex flex-col items-center text-center px-1">
+            <span className="text-sm text-slate-700 font-semibold leading-tight">{s.label}</span>
+            <span className="text-xs text-slate-400 leading-none mt-0.5">{s.unit}</span>
+            <span className="text-[11px] text-slate-400 leading-none mt-0.5">
+              avg of {s.n} patient{s.n !== 1 ? 's' : ''}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

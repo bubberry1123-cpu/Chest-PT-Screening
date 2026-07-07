@@ -1,7 +1,7 @@
 'use client'
 import { useState, useMemo, useRef, useEffect } from 'react'
 import type { Patient, Screening, OutcomeMeasurement, OutcomeSession } from '@/types'
-import { SESSION_SHORT, ERAS_PHASES, ERAS_PHASE_SHORT } from '@/lib/outcomeItems'
+import { SESSION_SHORT, ERAS_PHASES, ERAS_PHASE_SHORT, peakCoughFlowInterpretation } from '@/lib/outcomeItems'
 import type { OtherDef, SessionDatum } from './OutcomeSummaryDashboard'
 import { OutcomeSummaryChartCore } from './OutcomeSummaryDashboard'
 import { formatHn, normalizeHn } from '@/lib/hn'
@@ -261,7 +261,9 @@ function OutcomeLineChart({ series, xLabels, metric }: {
                   onMouseEnter={e => {
                     const bRect = boxRef.current?.getBoundingClientRect()
                     if (!bRect) return
-                    setTip({ x: e.clientX - bRect.left + 10, y: e.clientY - bRect.top - 52, lines: [xLabels[pt.xi], `${s.label}: ${fmt(pt.val)} ${metric.unit}`] })
+                    const lines = [xLabels[pt.xi], `${s.label}: ${fmt(pt.val)} ${metric.unit}`]
+                    if (metric.key === 'peakCoughFlow') lines.push(`→ ${peakCoughFlowInterpretation(pt.val)}`)
+                    setTip({ x: e.clientX - bRect.left + 10, y: e.clientY - bRect.top - 52, lines })
                   }}
                   onMouseLeave={() => setTip(null)} />
               ))}
@@ -464,30 +466,37 @@ function ErasInBodyBars({ patients, mode, singlePatient }: {
         </div>
       </div>
 
-      <div className="flex items-end justify-center gap-8 px-2 pt-6" style={{ height: PLOT_H + 64 }}>
+      {/* Bars — 3 categories spread evenly across the full width.
+          Bar width = 40% of each column ≈ categoryPercentage 0.5 × barPercentage 0.8 */}
+      <div className="flex w-full items-end pt-6 px-2" style={{ height: PLOT_H }}>
         {stats.map(s => (
-          <div key={s.key} className="flex flex-col items-center gap-1.5">
-            <div className="flex flex-col items-center justify-end" style={{ height: PLOT_H }}>
-              {s.avg !== null && (
-                <span className="text-[13px] font-semibold mb-1" style={{ color: '#1a1a1a' }}>{s.avg}</span>
-              )}
-              <div
-                className="w-12 rounded-t-md"
-                style={{
-                  backgroundColor: BAR_COLOR,
-                  height: s.avg !== null && s.avg > 0 ? `${Math.max((s.avg / s.maxRef) * (PLOT_H - 36), 4)}px` : '0',
-                  opacity: s.avg !== null ? 1 : 0.12,
-                  minHeight: s.avg !== null ? '3px' : '0',
-                }}
-              />
-            </div>
-            <span className="text-sm text-slate-700 font-semibold text-center leading-tight">{s.label}</span>
-            <span className="text-xs text-slate-400 text-center leading-none">({s.unit})</span>
-            {s.key === 'inbody_bmi' && mode === 'average' && (
-              <span className="text-[11px] text-slate-400 text-center leading-none mt-0.5">
-                {s.n} patient{s.n !== 1 ? 's' : ''}
-              </span>
+          <div key={s.key} className="flex-1 flex flex-col items-center justify-end h-full">
+            {s.avg !== null && (
+              <span className="text-[13px] font-semibold mb-1" style={{ color: '#1a1a1a' }}>{s.avg}</span>
             )}
+            <div
+              className="rounded-t-md"
+              style={{
+                width: '40%',
+                backgroundColor: BAR_COLOR,
+                height: s.avg !== null && s.avg > 0 ? `${Math.max((s.avg / s.maxRef) * (PLOT_H - 36), 4)}px` : '0',
+                opacity: s.avg !== null ? 1 : 0.12,
+                minHeight: s.avg !== null ? '3px' : '0',
+              }}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Labels under each bar: name / unit / patient count */}
+      <div className="flex w-full mt-1.5 px-2">
+        {stats.map(s => (
+          <div key={s.key} className="flex-1 flex flex-col items-center text-center px-1">
+            <span className="text-sm text-slate-700 font-semibold leading-tight">{s.label}</span>
+            <span className="text-xs text-slate-400 leading-none mt-0.5">{s.unit}</span>
+            <span className="text-[11px] text-slate-400 leading-none mt-0.5">
+              {s.n} patient{s.n !== 1 ? 's' : ''}
+            </span>
           </div>
         ))}
       </div>

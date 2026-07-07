@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef } from 'react'
 import type { OutcomeMeasurement, OverallLevel } from '@/types'
-import { OUTCOME_SESSIONS, SESSION_SHORT } from '@/lib/outcomeItems'
+import { OUTCOME_SESSIONS, SESSION_SHORT, peakCoughFlowInterpretation } from '@/lib/outcomeItems'
 
 const LEVEL_COLOR: Record<number, string> = {
   1: '#22c55e',
@@ -101,7 +101,7 @@ interface TooltipState {
   mouseY: number
   sessionLabel: string
   dateStr: string | null
-  items: { label: string; val: number; color: string; unit: string }[]
+  items: { label: string; val: number; color: string; unit: string; key: string }[]
 }
 
 function LineChartSVG({ chartDef, outcomes }: { chartDef: ChartDef; outcomes: OutcomeMeasurement[] }) {
@@ -159,8 +159,8 @@ function LineChartSVG({ chartDef, outcomes }: { chartDef: ChartDef; outcomes: Ou
     const sess = OUTCOME_SESSIONS[idx]
     const o = bySession[sess]
     const items = series
-      .map(s => ({ label: s.label, val: s.points[idx].val, color: s.color, unit: s.unit ?? chartDef.unit }))
-      .filter((it): it is { label: string; val: number; color: string; unit: string } => it.val !== null)
+      .map(s => ({ label: s.label, val: s.points[idx].val, color: s.color, unit: s.unit ?? chartDef.unit, key: s.key }))
+      .filter((it): it is { label: string; val: number; color: string; unit: string; key: string } => it.val !== null)
     if (!items.length) { setTooltip(null); return }
     const dateStr = o?.recordedAt
       ? new Date(o.recordedAt as Date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' })
@@ -254,13 +254,23 @@ function LineChartSVG({ chartDef, outcomes }: { chartDef: ChartDef; outcomes: Ou
             {tooltip.sessionLabel}
             {tooltip.dateStr && <span className="font-normal text-slate-400 ml-1.5">· {tooltip.dateStr}</span>}
           </p>
-          {tooltip.items.map((item, ti) => (
-            <div key={ti} className="flex items-center gap-2 py-0.5">
-              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-              <span className="text-slate-500">{item.label}</span>
-              <span className="font-bold text-slate-800 ml-auto pl-3">{item.val}{item.unit ? ` ${item.unit}` : ''}</span>
-            </div>
-          ))}
+          {tooltip.items.map((item, ti) => {
+            const interp = item.key === 'peakCoughFlow' ? peakCoughFlowInterpretation(item.val) : null
+            return (
+              <div key={ti} className="py-0.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                  <span className="text-slate-500">{item.label}</span>
+                  <span className="font-bold text-slate-800 ml-auto pl-3">{item.val}{item.unit ? ` ${item.unit}` : ''}</span>
+                </div>
+                {interp && (
+                  <div className="ml-[18px] mt-0.5 text-[10px] leading-snug" style={{ color: '#0C447C' }}>
+                    → {interp}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </>

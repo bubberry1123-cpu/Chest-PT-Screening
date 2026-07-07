@@ -165,6 +165,19 @@ export function getErasFlatItems(): OutcomeItemDef[] {
   return ERAS_OUTCOME_GROUPS.flatMap(g => g.items)
 }
 
+// ── Peak Cough Flow clinical interpretation ───────────────────────────────────
+// Shown inside chart tooltips wherever a Peak Cough Flow value appears.
+//   ≥ 400 L/min    → Effective cough
+//   271–399 L/min  → Strong cough
+//   160–270 L/min  → Moderate cough
+//   < 160 L/min    → Ineffective / weak cough
+export function peakCoughFlowInterpretation(val: number): string {
+  if (val >= 400) return 'Effective cough'
+  if (val >= 271) return 'Strong cough'
+  if (val >= 160) return 'Moderate cough'
+  return 'Ineffective / weak cough'
+}
+
 // ── INBODY (ERAS — Prehabilitation phase only) ────────────────────────────────
 
 export const INBODY_BALANCE_OPTIONS = ['Balanced', 'Slightly unbalanced', 'Extremely unbalanced'] as const

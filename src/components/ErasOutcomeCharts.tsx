@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import type { OutcomeMeasurement } from '@/types'
-import { ERAS_PHASES, ERAS_PHASE_SHORT, ERAS_OUTCOME_GROUPS } from '@/lib/outcomeItems'
+import { ERAS_PHASES, ERAS_PHASE_SHORT, ERAS_OUTCOME_GROUPS, peakCoughFlowInterpretation } from '@/lib/outcomeItems'
 
 const ERAS_COLORS = ['#7c3aed', '#2563eb', '#059669', '#d97706']
 
@@ -20,11 +20,13 @@ function ErasLineChart({
   unit,
   color,
   lowerIsBetter,
+  itemKey,
 }: {
   data: { phase: string; value: number | null; date?: string }[]
   unit: string
   color: string
   lowerIsBetter?: boolean
+  itemKey?: string
 }) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
@@ -162,6 +164,11 @@ function ErasLineChart({
             <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tooltip.color }} />
             <span className="font-bold text-slate-800">{tooltip.val}{tooltip.unit ? ` ${tooltip.unit}` : ''}</span>
           </div>
+          {itemKey === 'peakCoughFlow' && (
+            <div className="mt-0.5 text-[10px] leading-snug" style={{ color: '#0C447C' }}>
+              → {peakCoughFlowInterpretation(tooltip.val)}
+            </div>
+          )}
         </div>
       )}
     </>
@@ -196,7 +203,7 @@ export default function ErasOutcomeCharts({ outcomes }: { outcomes: OutcomeMeasu
               <span className="text-xs font-bold text-slate-700">{item.label}</span>
               <span className="text-xs text-slate-400">{item.unit}</span>
             </div>
-            <ErasLineChart data={data} unit={item.unit} color={color} lowerIsBetter={item.lowerIsBetter} />
+            <ErasLineChart data={data} unit={item.unit} color={color} lowerIsBetter={item.lowerIsBetter} itemKey={item.key} />
           </div>
         ))}
       </div>
