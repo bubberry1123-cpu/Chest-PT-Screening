@@ -569,17 +569,25 @@ function OutcomeBlock({
       if (mode === 'single') {
         if (!singlePatient) { res[key] = null; return }
         const { firstVal, lastVal } = sessionFirstLast(singlePatient.outcomes, key, order, dischargeSession)
-        res[key] = gripInterpretationSingle({ nationality: singlePatient.nationality, sex: singlePatient.sex, firstVal, lastVal })
+        const r = gripInterpretationSingle({ nationality: singlePatient.nationality, sex: singlePatient.sex, firstVal, lastVal })
+        // eslint-disable-next-line no-console
+        console.log('[grip-debug]', key, { blockType, mode, branch: 'single', sex: JSON.stringify(singlePatient.sex), nationality: JSON.stringify(singlePatient.nationality), firstVal, lastVal, result: r?.text })
+        res[key] = r
       } else if (mode === 'average') {
         const withData = patients
           .map(p => ({ p, ...sessionFirstLast(p.outcomes, key, order, dischargeSession) }))
           .filter(x => x.lastVal !== undefined)
         if (withData.length === 1) {
           const { p, firstVal, lastVal } = withData[0]
-          res[key] = gripInterpretationSingle({ nationality: p.nationality, sex: p.sex, firstVal, lastVal })
+          const r = gripInterpretationSingle({ nationality: p.nationality, sex: p.sex, firstVal, lastVal })
+          // eslint-disable-next-line no-console
+          console.log('[grip-debug]', key, { blockType, mode: 'average', branch: 'n=1', sex: JSON.stringify(p.sex), nationality: JSON.stringify(p.nationality), firstVal, lastVal, result: r?.text })
+          res[key] = r
         } else {
           const firsts = withData.map(x => x.firstVal).filter((v): v is number => v !== undefined)
           const lasts  = withData.map(x => x.lastVal!).filter((v): v is number => v !== undefined)
+          // eslint-disable-next-line no-console
+          console.log('[grip-debug]', key, { blockType, mode: 'average', branch: `n=${withData.length}`, patientsWithData: withData.map(x => ({ sex: JSON.stringify(x.p.sex), nationality: JSON.stringify(x.p.nationality), lastVal: x.lastVal })), totalPatients: patients.length })
           res[key] = gripInterpretationAverage({
             firstAvg: firsts.length ? firsts.reduce((a, b) => a + b, 0) / firsts.length : undefined,
             lastAvg:  lasts.length  ? lasts.reduce((a, b) => a + b, 0) / lasts.length   : undefined,
