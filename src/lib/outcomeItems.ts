@@ -278,6 +278,63 @@ export function pcfBarInterpretation(o: { firstVal?: number; lastVal?: number })
   return { text: trend ? `${level.text} · ${trend}` : level.text, color: level.color }
 }
 
+// ── CS-30 (30-second chair stand) — Rikli & Jones norms (age 60–94) ───────────
+const CS30_GREEN = '#16A34A'
+const CS30_BLUE  = '#0C447C'
+const CS30_RED   = '#DC2626'
+
+// Average range [lo, hi] (inclusive) per sex, 5-yr bands 60-64 … 90-94.
+// below: val < lo · average: lo ≤ val ≤ hi · above: val > hi
+const CS30_NORMS: Record<'M' | 'F', [number, number][]> = {
+  M: [[14, 19], [12, 18], [12, 17], [11, 17], [10, 15], [8, 14], [7, 12]],
+  F: [[12, 17], [11, 16], [10, 15], [10, 15], [9, 14], [8, 13], [4, 11]],
+}
+const CS30_BANDS = ['60-64', '65-69', '70-74', '75-79', '80-84', '85-89', '90-94']
+
+function normSexMF(sex: string): 'M' | 'F' | null {
+  const s = (sex ?? '').trim().toLowerCase()
+  if (s === 'male'   || s === 'm' || s === 'ชาย')  return 'M'
+  if (s === 'female' || s === 'f' || s === 'หญิง') return 'F'
+  return null
+}
+
+function cs30TrendText(firstVal?: number, lastVal?: number): string {
+  if (firstVal === undefined || lastVal === undefined) return ''
+  const diff = Math.round(lastVal - firstVal)
+  if (diff >= 1)  return `improved +${diff}`
+  if (diff <= -1) return `declined ${diff}`
+  return 'stable'
+}
+
+// Uses the Discharge/latest value vs the Rikli & Jones norm for the patient's
+// age band + sex. Falls back to trend-only + a note when norms don't apply
+// (age <60 or >94, missing age/sex, or a real multi-patient average).
+export function cs30Interpretation(o: {
+  age?: number; sex?: string; firstVal?: number; lastVal?: number; averageMode?: boolean
+}): GripInterp | null {
+  if (o.lastVal === undefined) return null
+  const trend = cs30TrendText(o.firstVal, o.lastVal)
+  const sx = o.sex ? normSexMF(o.sex) : null
+  const inBand = o.age !== undefined && o.age >= 60 && o.age <= 94
+
+  if (o.averageMode || !inBand || !sx) {
+    const note = o.averageMode ? 'norms per case'
+      : (o.age === undefined || !sx) ? 'norms need age + sex'
+      : 'norms age 60+ only'
+    return { text: (trend ? `${trend} · ` : '') + note, color: CS30_BLUE }
+  }
+
+  const idx = Math.floor((o.age! - 60) / 5)
+  const [lo, hi] = CS30_NORMS[sx][idx]
+  const band = CS30_BANDS[idx]
+  let text: string, color: string
+  if (o.lastVal < lo)      { text = `Below average (< ${lo}, ${sx} ${band})`; color = CS30_RED }
+  else if (o.lastVal > hi) { text = `Above average (> ${hi}, ${sx} ${band})`; color = CS30_BLUE }
+  else                     { text = `Average (${lo}–${hi}, ${sx} ${band})`;   color = CS30_GREEN }
+  if (trend) text += ` · ${trend}`
+  return { text, color }
+}
+
 // ── INBODY (ERAS — Prehabilitation phase only) ────────────────────────────────
 
 export const INBODY_BALANCE_OPTIONS = ['Balanced', 'Slightly unbalanced', 'Extremely unbalanced'] as const

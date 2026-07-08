@@ -1,7 +1,7 @@
 'use client'
 import { useMemo, useState } from 'react'
 import type { OutcomeMeasurement, OverallLevel, OutcomeSession } from '@/types'
-import { OUTCOME_SESSIONS, SESSION_SHORT, GRIP_KEYS, sessionFirstLast, gripInterpretationSingle, pcfBarInterpretation, type GripInterp } from '@/lib/outcomeItems'
+import { OUTCOME_SESSIONS, SESSION_SHORT, GRIP_KEYS, sessionFirstLast, gripInterpretationSingle, pcfBarInterpretation, cs30Interpretation, type GripInterp } from '@/lib/outcomeItems'
 
 // ── Session gradient palette: Initial (idx 0) = lightest, Discharge (idx 11) = darkest
 const SHADE_FILLS = [
@@ -588,11 +588,13 @@ export default function OutcomeSummaryDashboard({
   level: _level,
   nationality,
   sex,
+  age,
 }: {
   outcomes: OutcomeMeasurement[]
   level: OverallLevel
   nationality?: string
   sex?: string
+  age?: number
 }) {
   const filledSessions = useMemo(() => getFilledSessions(outcomes), [outcomes])
   const [selectedSessions, setSelectedSessions] = useState<string[]>(() => filledSessions.slice())
@@ -623,8 +625,10 @@ export default function OutcomeSummaryDashboard({
     })
     const pcf = sessionFirstLast(outcomes, 'peakCoughFlow', OUTCOME_SESSIONS, 'Discharge')
     res['peakCoughFlow'] = pcfBarInterpretation({ firstVal: pcf.firstVal, lastVal: pcf.lastVal })
+    const cs = sessionFirstLast(outcomes, 'cs30', OUTCOME_SESSIONS, 'Discharge')
+    res['cs30'] = cs30Interpretation({ age, sex, firstVal: cs.firstVal, lastVal: cs.lastVal })
     return res
-  }, [outcomes, nationality, sex])
+  }, [outcomes, nationality, sex, age])
 
   const selectedSessionData: SessionDatum[] = useMemo(() =>
     selectedSessions.map(s => ({

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useMemo, useRef, useEffect } from 'react'
 import type { Patient, Screening, OutcomeMeasurement, OutcomeSession } from '@/types'
-import { SESSION_SHORT, ERAS_PHASES, ERAS_PHASE_SHORT, OUTCOME_SESSIONS, GRIP_KEYS, peakCoughFlowInterpretation, sessionFirstLast, gripInterpretationSingle, gripInterpretationAverage, pcfBarInterpretation, type GripInterp } from '@/lib/outcomeItems'
+import { SESSION_SHORT, ERAS_PHASES, ERAS_PHASE_SHORT, OUTCOME_SESSIONS, GRIP_KEYS, peakCoughFlowInterpretation, sessionFirstLast, gripInterpretationSingle, gripInterpretationAverage, pcfBarInterpretation, cs30Interpretation, type GripInterp } from '@/lib/outcomeItems'
 import type { OtherDef, SessionDatum } from './OutcomeSummaryDashboard'
 import { OutcomeSummaryChartCore } from './OutcomeSummaryDashboard'
 import { formatHn, normalizeHn } from '@/lib/hn'
@@ -9,7 +9,7 @@ import { formatHn, normalizeHn } from '@/lib/hn'
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Metric       { key: string; label: string; unit: string }
-interface PInfo        { id: string; firstName: string; lastName: string; hn: string; nationality: string; sex: string; outcomes: OutcomeMeasurement[] }
+interface PInfo        { id: string; firstName: string; lastName: string; hn: string; nationality: string; sex: string; age: number; outcomes: OutcomeMeasurement[] }
 interface LineSeries   { id: string; label: string; color: string; points: (number | null)[] }
 interface MiniSeries   { label: string; points: (number | null)[]; color: string }
 type ViewMode          = 'average' | 'single' | 'compare'
@@ -530,6 +530,38 @@ function OutcomeBlock({
       }
     }
 
+    // CS-30 — Rikli & Jones norm by age + sex.
+    // Single (or average of exactly one patient): compare vs norm + trend.
+    // Average of ≥2 patients: trend only + "norms per case".
+    {
+      const key = 'cs30'
+      if (mode === 'single') {
+        if (!singlePatient) { res[key] = null }
+        else {
+          const { firstVal, lastVal } = sessionFirstLast(singlePatient.outcomes, key, order, dischargeSession)
+          res[key] = cs30Interpretation({ age: singlePatient.age, sex: singlePatient.sex, firstVal, lastVal })
+        }
+      } else if (mode === 'average') {
+        const withData = patients
+          .map(p => ({ p, ...sessionFirstLast(p.outcomes, key, order, dischargeSession) }))
+          .filter(x => x.lastVal !== undefined)
+        if (withData.length === 1) {
+          const { p, firstVal, lastVal } = withData[0]
+          res[key] = cs30Interpretation({ age: p.age, sex: p.sex, firstVal, lastVal })
+        } else {
+          const firsts = withData.map(x => x.firstVal).filter((v): v is number => v !== undefined)
+          const lasts  = withData.map(x => x.lastVal!).filter((v): v is number => v !== undefined)
+          res[key] = cs30Interpretation({
+            averageMode: true,
+            firstVal: firsts.length ? firsts.reduce((a, b) => a + b, 0) / firsts.length : undefined,
+            lastVal:  lasts.length  ? lasts.reduce((a, b) => a + b, 0) / lasts.length   : undefined,
+          })
+        }
+      } else {
+        res[key] = null
+      }
+    }
+
     // Grip L / Grip R — cut-off by sex + nationality.
     // Single (or average of exactly one patient): full cut-off + trend.
     // Average of ≥2 patients: trend only (mixed sex/nationality → per-case note).
@@ -958,7 +990,7 @@ export function OutcomeSummarySection({ patients, screenings, outcomes }: {
     const std: PInfo[] = [], eras: PInfo[] = []
     patients.forEach(p => {
       if (!p.id) return
-      const info: PInfo = { id: p.id, firstName: p.firstName, lastName: p.lastName, hn: p.hn, nationality: p.nationality, sex: p.sex, outcomes: outcomesByPat[p.id] ?? [] }
+      const info: PInfo = { id: p.id, firstName: p.firstName, lastName: p.lastName, hn: p.hn, nationality: p.nationality, sex: p.sex, age: p.age, outcomes: outcomesByPat[p.id] ?? [] }
       if ((p.assessmentType ?? latestScreening[p.id]?.assessmentType) === 'ERAS') eras.push(info)
       else std.push(info)
     })
