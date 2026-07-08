@@ -1,7 +1,7 @@
 'use client'
 import { useMemo, useState } from 'react'
 import type { OutcomeMeasurement, OverallLevel, OutcomeSession } from '@/types'
-import { OUTCOME_SESSIONS, SESSION_SHORT } from '@/lib/outcomeItems'
+import { OUTCOME_SESSIONS, SESSION_SHORT, GRIP_KEYS, gripFirstLast, gripInterpretationSingle, type GripInterp } from '@/lib/outcomeItems'
 
 // ── Session gradient palette: Initial (idx 0) = lightest, Discharge (idx 11) = darkest
 const SHADE_FILLS = [
@@ -332,16 +332,46 @@ const INBODY_LABELS: Record<string, string[]> = {
   inbody_bodyFatPct:     ['Body Fat'],
 }
 
-export function CustomBarChart({ defs, sessions, inbodyDefs }: {
+// Grip L / Grip R tooltip — same box/style as the BRFA/AMPAC SegTooltip, but
+// mouse-anchored (fixed) since this chart lives inside an overflow-x container.
+type GripTip = {
+  x: number; y: number
+  title: string
+  entries: { label: string; value: string; color: string }[]
+  interp: GripInterp | null
+}
+
+export function CustomBarChart({ defs, sessions, inbodyDefs, gripInterp }: {
   defs: OtherDef[]
   sessions: SessionDatum[]
   // ERAS only: InBody measures appended after the normal groups. Each renders a
   // single Pre-hab bar (#378ADD); the group is dropped when Pre-hab isn't shown.
   inbodyDefs?: OtherDef[]
+  // Grip L / Grip R clinical interpretation line, keyed by grip item key.
+  // Only groups present here become hoverable; all other bars stay non-interactive.
+  gripInterp?: Record<string, GripInterp | null>
 }) {
+  const [gripTip, setGripTip] = useState<GripTip | null>(null)
   const N = sessions.length
   const BAR_W = Math.min(40, Math.max(14, Math.floor(64 / N)))
   const groupW = N * BAR_W + Math.max(0, N - 1) * GAP_WITHIN
+
+  const showGripTip = (e: React.MouseEvent, def: OtherDef) => {
+    const entries = sessions
+      .filter(sd => sd.o?.items[def.key]?.value !== undefined)
+      .map(sd => ({
+        label: sd.label,
+        value: fmtVal(sd.o!.items[def.key]!.value, def.unit),
+        color: getShade(sd.session, sd.shadeIdx).stroke,
+      }))
+    setGripTip({
+      x: Math.min(e.clientX + 14, (typeof window !== 'undefined' ? window.innerWidth : 1000) - 240),
+      y: Math.max(e.clientY - 12, 8),
+      title: def.label,
+      entries,
+      interp: gripInterp?.[def.key] ?? null,
+    })
+  }
 
   // InBody: Prehabilitation session only, and only defs that actually have a value.
   const prehab = sessions.find(s => s.session === 'Prehabilitation')
@@ -409,6 +439,17 @@ export function CustomBarChart({ defs, sessions, inbodyDefs }: {
               >
                 {def.unit}
               </text>
+
+              {/* Grip L / Grip R only: transparent overlay to catch hover (on top). */}
+              {gripInterp?.[def.key] !== undefined && (
+                <rect
+                  x={groupX} y={0} width={groupW} height={VAL_PAD + MAX_H}
+                  fill="transparent" style={{ cursor: 'pointer' }}
+                  onMouseEnter={e => showGripTip(e, def)}
+                  onMouseMove={e => showGripTip(e, def)}
+                  onMouseLeave={() => setGripTip(null)}
+                />
+              )}
             </g>
           )
         })}
@@ -458,6 +499,31 @@ export function CustomBarChart({ defs, sessions, inbodyDefs }: {
           )
         })}
       </svg>
+
+      {/* Grip L / Grip R tooltip — same box + "→" line style as the BRFA/AMPAC tooltip */}
+      {gripTip && (
+        <div style={{
+          position: 'fixed', top: gripTip.y, left: gripTip.x,
+          background: 'white', border: '1px solid #e2e8f0', borderRadius: 6,
+          padding: '6px 9px', fontSize: 11, color: '#1e293b',
+          width: 220, whiteSpace: 'normal',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.12)', zIndex: 300, pointerEvents: 'none',
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 3, fontSize: 10, color: '#64748b' }}>{gripTip.title}</div>
+          {gripTip.entries.map((e, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: i > 0 ? 3 : 0 }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: e.color, flexShrink: 0 }} />
+              <span style={{ color: '#64748b' }}>{e.label}:</span>
+              <span style={{ fontWeight: 700 }}>{e.value}</span>
+            </div>
+          ))}
+          {gripTip.interp && (
+            <div style={{ marginTop: 4, fontSize: 10, lineHeight: 1.35, color: gripTip.interp.color }}>
+              → {gripTip.interp.text}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -468,10 +534,12 @@ export function OutcomeSummaryChartCore({
   sessions,
   otherDefs,
   inbodyDefs,
+  gripInterp,
 }: {
   sessions: SessionDatum[]
   otherDefs: OtherDef[]
   inbodyDefs?: OtherDef[]
+  gripInterp?: Record<string, GripInterp | null>
 }) {
   const showBrfa  = sessions.some(sd => BRFA_PARTS.some(p => sd.o?.items[p.key]?.value !== undefined))
   const showAmpac = sessions.some(sd => AMPAC_PARTS.some(p => sd.o?.items[p.key]?.value !== undefined))
@@ -506,7 +574,7 @@ export function OutcomeSummaryChartCore({
         {showBrfa  && <BrfaSegmentBar  sessions={sessions} />}
         {showAmpac && <AmpacSegmentBar sessions={sessions} />}
         {(showOther || showInbody) && (
-          <CustomBarChart defs={presentOthers} sessions={sessions} inbodyDefs={inbodyDefs} />
+          <CustomBarChart defs={presentOthers} sessions={sessions} inbodyDefs={inbodyDefs} gripInterp={gripInterp} />
         )}
       </div>
     </div>
@@ -518,9 +586,13 @@ export function OutcomeSummaryChartCore({
 export default function OutcomeSummaryDashboard({
   outcomes,
   level: _level,
+  nationality,
+  sex,
 }: {
   outcomes: OutcomeMeasurement[]
   level: OverallLevel
+  nationality?: string
+  sex?: string
 }) {
   const filledSessions = useMemo(() => getFilledSessions(outcomes), [outcomes])
   const [selectedSessions, setSelectedSessions] = useState<string[]>(() => filledSessions.slice())
@@ -541,6 +613,16 @@ export default function OutcomeSummaryDashboard({
     () => OTHER_DEFS.filter(d => outcomes.some(o => o.items[d.key]?.value !== undefined)),
     [outcomes]
   )
+
+  // Grip L / Grip R interpretation — single patient (patient page).
+  const gripInterp = useMemo<Record<string, GripInterp | null>>(() => {
+    const res: Record<string, GripInterp | null> = {}
+    GRIP_KEYS.forEach(key => {
+      const { firstVal, lastVal } = gripFirstLast(outcomes, key, OUTCOME_SESSIONS, 'Discharge')
+      res[key] = gripInterpretationSingle({ nationality: nationality ?? '', sex: sex ?? '', firstVal, lastVal })
+    })
+    return res
+  }, [outcomes, nationality, sex])
 
   const selectedSessionData: SessionDatum[] = useMemo(() =>
     selectedSessions.map(s => ({
@@ -645,7 +727,7 @@ export default function OutcomeSummaryDashboard({
           {showBrfaSvg  && <BrfaSegmentBar  sessions={selectedSessionData} />}
           {showAmpacSvg && <AmpacSegmentBar sessions={selectedSessionData} />}
           {showChart && (
-            <CustomBarChart defs={presentOthers} sessions={selectedSessionData} />
+            <CustomBarChart defs={presentOthers} sessions={selectedSessionData} gripInterp={gripInterp} />
           )}
         </div>
       </div>

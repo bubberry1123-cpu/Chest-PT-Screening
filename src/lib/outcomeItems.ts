@@ -178,6 +178,75 @@ export function peakCoughFlowInterpretation(val: number): string {
   return 'Ineffective / weak cough'
 }
 
+// ── Grip strength (sarcopenia) interpretation ─────────────────────────────────
+// Shown as the "→ ..." line inside the Grip L / Grip R tooltips.
+export const GRIP_KEYS = ['gripStrength_left', 'gripStrength_right'] as const
+const GRIP_RED = '#DC2626'   // below cut-off
+const GRIP_GREEN = '#16A34A' // within normal range
+const GRIP_BLUE = '#0C447C'  // neutral (matches the BRFA "→" color)
+
+export interface GripInterp { text: string; color: string }
+
+// Cut-off (kg) by nationality standard + sex.
+//   AWGS 2019 (Thai, CLMV, Asia): Male < 28, Female < 18
+//   EWGSOP2   (Inter, Arab):      Male < 27, Female < 16
+function gripCutoff(nationality: string, sex: string): number | null {
+  const ewgsop2 = nationality === 'Inter' || nationality === 'Arab'
+  if (sex === 'Male')   return ewgsop2 ? 27 : 28
+  if (sex === 'Female') return ewgsop2 ? 16 : 18
+  return null // 'Other' → cannot pick a cut-off
+}
+
+// First (Initial) and last (Discharge, else latest) grip value for one key,
+// following the given session order.
+export function gripFirstLast(
+  outcomes: { session: string; items: Record<string, { value: number } | undefined> }[],
+  key: string,
+  order: readonly string[],
+  dischargeSession: string,
+): { firstVal?: number; lastVal?: number } {
+  const bySess: Record<string, number> = {}
+  outcomes.forEach(o => { const v = o.items[key]?.value; if (v !== undefined) bySess[o.session] = v })
+  const firstVal = order.map(s => bySess[s]).find(v => v !== undefined)
+  const lastVal = bySess[dischargeSession] ?? [...order].reverse().map(s => bySess[s]).find(v => v !== undefined)
+  return { firstVal, lastVal }
+}
+
+function gripTrendText(firstVal?: number, lastVal?: number): string {
+  if (firstVal === undefined || lastVal === undefined) return ''
+  const diff = Math.round((lastVal - firstVal) * 10) / 10
+  if (diff >= 1)  return `ดีขึ้น +${diff.toFixed(1)} kg`
+  if (diff <= -1) return `ลดลง ${diff.toFixed(1)} kg ควรติดตาม`
+  return ''
+}
+
+// Single patient: compare the Discharge/latest value against the cut-off + trend.
+export function gripInterpretationSingle(o: {
+  nationality: string; sex: string; firstVal?: number; lastVal?: number
+}): GripInterp | null {
+  if (o.lastVal === undefined) return null
+  const cutoff = gripCutoff(o.nationality, o.sex)
+  const trend = gripTrendText(o.firstVal, o.lastVal)
+  let text: string, color: string
+  if (cutoff === null) {
+    text = 'เทียบเกณฑ์ราย case (ระบุเพศเพื่อเทียบ cut-off)'; color = GRIP_BLUE
+  } else if (o.lastVal < cutoff) {
+    text = `แรงบีบมือต่ำกว่าเกณฑ์ (< ${cutoff} kg) — possible sarcopenia ควรประเมินเพิ่มเติม`; color = GRIP_RED
+  } else {
+    text = 'แรงบีบมืออยู่ในเกณฑ์ปกติ'; color = GRIP_GREEN
+  }
+  if (trend) text += ` · ${trend}`
+  return { text, color }
+}
+
+// All patients (average): trend only, never compare the cut-off (mixed sex/nationality).
+export function gripInterpretationAverage(o: { firstAvg?: number; lastAvg?: number }): GripInterp | null {
+  if (o.lastAvg === undefined && o.firstAvg === undefined) return null
+  const trend = gripTrendText(o.firstAvg, o.lastAvg)
+  const text = (trend ? `${trend} · ` : '') + 'เทียบเกณฑ์ราย case'
+  return { text, color: GRIP_BLUE }
+}
+
 // ── INBODY (ERAS — Prehabilitation phase only) ────────────────────────────────
 
 export const INBODY_BALANCE_OPTIONS = ['Balanced', 'Slightly unbalanced', 'Extremely unbalanced'] as const

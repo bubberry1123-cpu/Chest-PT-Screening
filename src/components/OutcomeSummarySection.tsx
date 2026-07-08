@@ -1,7 +1,7 @@
 'use client'
 import { useState, useMemo, useRef, useEffect } from 'react'
 import type { Patient, Screening, OutcomeMeasurement, OutcomeSession } from '@/types'
-import { SESSION_SHORT, ERAS_PHASES, ERAS_PHASE_SHORT, peakCoughFlowInterpretation } from '@/lib/outcomeItems'
+import { SESSION_SHORT, ERAS_PHASES, ERAS_PHASE_SHORT, OUTCOME_SESSIONS, GRIP_KEYS, peakCoughFlowInterpretation, gripFirstLast, gripInterpretationSingle, gripInterpretationAverage, type GripInterp } from '@/lib/outcomeItems'
 import type { OtherDef, SessionDatum } from './OutcomeSummaryDashboard'
 import { OutcomeSummaryChartCore } from './OutcomeSummaryDashboard'
 import { formatHn, normalizeHn } from '@/lib/hn'
@@ -9,7 +9,7 @@ import { formatHn, normalizeHn } from '@/lib/hn'
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface Metric       { key: string; label: string; unit: string }
-interface PInfo        { id: string; firstName: string; lastName: string; hn: string; outcomes: OutcomeMeasurement[] }
+interface PInfo        { id: string; firstName: string; lastName: string; hn: string; nationality: string; sex: string; outcomes: OutcomeMeasurement[] }
 interface LineSeries   { id: string; label: string; color: string; points: (number | null)[] }
 interface MiniSeries   { label: string; points: (number | null)[]; color: string }
 type ViewMode          = 'average' | 'single' | 'compare'
@@ -500,6 +500,36 @@ function OutcomeBlock({
     })
   }, [mode, selectedSessions, patients, singlePatient, otherDefs, sessions, sessionLabels, sessColorMap])
 
+  // Grip L / Grip R interpretation line for the bar-chart tooltip.
+  // Single: compare Discharge/latest vs cut-off (nationality + sex) + trend.
+  // Average: trend only (no cut-off across mixed sex/nationality).
+  const gripInterp = useMemo<Record<string, GripInterp | null>>(() => {
+    const order = blockType === 'eras' ? ERAS_PHASES : OUTCOME_SESSIONS
+    const dischargeSession = blockType === 'eras' ? 'DC' : 'Discharge'
+    const res: Record<string, GripInterp | null> = {}
+    GRIP_KEYS.forEach(key => {
+      if (mode === 'single') {
+        if (!singlePatient) { res[key] = null; return }
+        const { firstVal, lastVal } = gripFirstLast(singlePatient.outcomes, key, order, dischargeSession)
+        res[key] = gripInterpretationSingle({ nationality: singlePatient.nationality, sex: singlePatient.sex, firstVal, lastVal })
+      } else if (mode === 'average') {
+        const firsts: number[] = [], lasts: number[] = []
+        patients.forEach(p => {
+          const { firstVal, lastVal } = gripFirstLast(p.outcomes, key, order, dischargeSession)
+          if (firstVal !== undefined) firsts.push(firstVal)
+          if (lastVal !== undefined) lasts.push(lastVal)
+        })
+        res[key] = gripInterpretationAverage({
+          firstAvg: firsts.length ? firsts.reduce((a, b) => a + b, 0) / firsts.length : undefined,
+          lastAvg:  lasts.length  ? lasts.reduce((a, b) => a + b, 0) / lasts.length   : undefined,
+        })
+      } else {
+        res[key] = null
+      }
+    })
+    return res
+  }, [mode, singlePatient, patients, blockType])
+
   // Card grid points data (avg or single)
   const cardGridData = useMemo<Record<string, (number | null)[]>>(() => {
     if (mode === 'compare') return {}
@@ -801,6 +831,7 @@ function OutcomeBlock({
                     sessions={chartSessions}
                     otherDefs={otherDefs}
                     inbodyDefs={blockType === 'eras' ? ERAS_INBODY_OTHER_DEFS : undefined}
+                    gripInterp={gripInterp}
                   />
                 </div>
               )}
@@ -897,7 +928,7 @@ export function OutcomeSummarySection({ patients, screenings, outcomes }: {
     const std: PInfo[] = [], eras: PInfo[] = []
     patients.forEach(p => {
       if (!p.id) return
-      const info: PInfo = { id: p.id, firstName: p.firstName, lastName: p.lastName, hn: p.hn, outcomes: outcomesByPat[p.id] ?? [] }
+      const info: PInfo = { id: p.id, firstName: p.firstName, lastName: p.lastName, hn: p.hn, nationality: p.nationality, sex: p.sex, outcomes: outcomesByPat[p.id] ?? [] }
       if ((p.assessmentType ?? latestScreening[p.id]?.assessmentType) === 'ERAS') eras.push(info)
       else std.push(info)
     })

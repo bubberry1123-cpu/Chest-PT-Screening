@@ -1012,7 +1012,7 @@ export default function PatientPage() {
             <>
               <OutcomeTable outcomes={outcomes} level={latestLevel} />
               <OutcomeCharts outcomes={outcomes} level={latestLevel} isAdmin={isAdmin} />
-              <OutcomeSummaryDashboard outcomes={outcomes} level={latestLevel} />
+              <OutcomeSummaryDashboard outcomes={outcomes} level={latestLevel} nationality={patient.nationality} sex={patient.sex} />
             </>
           )}
         </div>
@@ -1118,7 +1118,7 @@ export default function PatientPage() {
             style={{ position: 'fixed', left: '-9999px', top: 0, width: '680px', zIndex: -1 }}
           >
             <div ref={pdfSummaryRef} style={{ backgroundColor: '#ffffff', padding: '16px' }}>
-              <OutcomeSummaryDashboard outcomes={outcomes} level={latestLevel} />
+              <OutcomeSummaryDashboard outcomes={outcomes} level={latestLevel} nationality={patient.nationality} sex={patient.sex} />
             </div>
           </div>
         </>
