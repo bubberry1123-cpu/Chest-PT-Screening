@@ -323,6 +323,14 @@ const GAP_BETWEEN = 14
 
 // Pre-hab bar color for the appended ERAS InBody groups.
 const INBODY_COLOR = '#378ADD'
+// Wider slot per InBody group so the (multi-line) x-axis labels don't overlap.
+const INBODY_SLOT_W = 58
+// Short, wrap-friendly x-axis labels for the InBody groups (name lines only; unit shown below).
+const INBODY_LABELS: Record<string, string[]> = {
+  inbody_bmi:            ['BMI'],
+  inbody_skeletalMuscle: ['Skeletal', 'Muscle'],
+  inbody_bodyFatPct:     ['Body Fat'],
+}
 
 export function CustomBarChart({ defs, sessions, inbodyDefs }: {
   defs: OtherDef[]
@@ -343,7 +351,7 @@ export function CustomBarChart({ defs, sessions, inbodyDefs }: {
   const totalGroups = defs.length + presentInbody.length
   const svgW = SIDE_PAD * 2
     + defs.length * groupW
-    + presentInbody.length * BAR_W
+    + presentInbody.length * INBODY_SLOT_W
     + Math.max(0, totalGroups - 1) * GAP_BETWEEN
   const svgH = VAL_PAD + MAX_H + LBL_PAD
 
@@ -405,13 +413,17 @@ export function CustomBarChart({ defs, sessions, inbodyDefs }: {
           )
         })}
 
-        {/* ERAS InBody — appended after 2-Meter, single Pre-hab bar each (#378ADD) */}
+        {/* ERAS InBody — appended after 2-Meter, single Pre-hab bar each (#378ADD).
+            Rendered in a wider slot with a centered bar + multi-line label so the
+            BMI / Skeletal Muscle / Body Fat labels never overlap. */}
         {presentInbody.map((def, ii) => {
           const val = prehab!.o!.items[def.key]!.value
-          const barX = inbodyBase + ii * (BAR_W + GAP_BETWEEN)
-          const groupCenterX = barX + BAR_W / 2
+          const slotX = inbodyBase + ii * (INBODY_SLOT_W + GAP_BETWEEN)
+          const groupCenterX = slotX + INBODY_SLOT_W / 2
+          const barX = slotX + (INBODY_SLOT_W - BAR_W) / 2
           const barH = Math.max(MIN_H, (val / def.maxRef) * MAX_H)
           const barY = VAL_PAD + MAX_H - barH
+          const nameLines = INBODY_LABELS[def.key] ?? [def.label]
 
           return (
             <g key={def.key}>
@@ -423,19 +435,22 @@ export function CustomBarChart({ defs, sessions, inbodyDefs }: {
               />
               <text
                 transform={`translate(${barX + BAR_W / 2},${barY - 4}) rotate(-90)`}
-                textAnchor="start" fontSize="8.5" fill="#334155" fontWeight="600"
+                textAnchor="start" fontSize="8.5" fill={INBODY_COLOR} fontWeight="600"
               >
                 {fmtVal(val, def.unit)}
               </text>
+              {nameLines.map((ln, li) => (
+                <text
+                  key={li}
+                  x={groupCenterX} y={VAL_PAD + MAX_H + 13 + li * 10}
+                  textAnchor="middle" fontSize="9" fill="#475569" fontWeight="600"
+                >
+                  {ln}
+                </text>
+              ))}
               <text
-                x={groupCenterX} y={VAL_PAD + MAX_H + 16}
-                textAnchor="middle" fontSize="10" fill="#475569" fontWeight="600"
-              >
-                {def.label}
-              </text>
-              <text
-                x={groupCenterX} y={VAL_PAD + MAX_H + 28}
-                textAnchor="middle" fontSize="8.5" fill="#94a3b8"
+                x={groupCenterX} y={VAL_PAD + MAX_H + 13 + nameLines.length * 10}
+                textAnchor="middle" fontSize="8" fill="#94a3b8"
               >
                 {def.unit}
               </text>

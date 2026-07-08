@@ -362,7 +362,7 @@ function TrendChart({ data }: { data: { label: string; initial: number | null; d
 // Each metric is normalized to its own max (units differ across metrics), so
 // units + value labels carry the magnitude rather than a shared y-scale.
 function ErasGroupedChart({ data }: {
-  data: { label: string; unit: string; phaseAvgs: (number | null)[]; prehabOnly?: boolean; maxRef?: number }[]
+  data: { label: string; unit: string; phaseAvgs: (number | null)[]; prehabOnly?: boolean; maxRef?: number; labelLines?: string[] }[]
 }) {
   const BAR_H = 400 // plotting area height (px)
 
@@ -410,7 +410,11 @@ function ErasGroupedChart({ data }: {
                       </div>
                     ))}
                   </div>
-                  <span className="text-sm text-slate-700 font-semibold text-center leading-tight">{metric.label}</span>
+                  <div className="flex flex-col items-center leading-tight">
+                    {(metric.labelLines ?? [metric.label]).map((ln, li) => (
+                      <span key={li} className="text-sm text-slate-700 font-semibold text-center leading-tight">{ln}</span>
+                    ))}
+                  </div>
                   <span className="text-xs text-slate-400 text-center leading-none">({metric.unit})</span>
                 </div>
               )
@@ -437,9 +441,9 @@ function ErasGroupedChart({ data }: {
 // Appended to the ERAS Outcome Trend chart after 2-Meter. Pre-hab bar color.
 const INBODY_COLOR = '#378ADD'
 const INBODY_TREND_DEFS = [
-  { key: 'inbody_bmi',            label: 'BMI',                  unit: 'kg/m²', maxRef: 40 },
-  { key: 'inbody_skeletalMuscle', label: 'Skeletal Muscle Mass', unit: 'kg',    maxRef: 50 },
-  { key: 'inbody_bodyFatPct',     label: 'Body Fat %',           unit: '%',     maxRef: 50 },
+  { key: 'inbody_bmi',            label: 'BMI',                  labelLines: ['BMI'],                unit: 'kg/m²', maxRef: 40 },
+  { key: 'inbody_skeletalMuscle', label: 'Skeletal Muscle Mass', labelLines: ['Skeletal', 'Muscle'], unit: 'kg',    maxRef: 50 },
+  { key: 'inbody_bodyFatPct',     label: 'Body Fat %',           labelLines: ['Body Fat'],           unit: '%',     maxRef: 50 },
 ] as const
 
 // ── Patient Detail Modal ──────────────────────────────────────────────────────
@@ -1041,7 +1045,7 @@ export default function AdminPage() {
         if (v !== undefined) vals.push(v)
       })
       const avg = vals.length > 0 ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null
-      return { label: d.label, unit: d.unit, phaseAvgs: [avg], prehabOnly: true, maxRef: d.maxRef }
+      return { label: d.label, unit: d.unit, phaseAvgs: [avg], prehabOnly: true, maxRef: d.maxRef, labelLines: [...d.labelLines] }
     }).filter(m => m.phaseAvgs[0] !== null)
     return [...base, ...inbody]
   }, [erasScopedRows])
