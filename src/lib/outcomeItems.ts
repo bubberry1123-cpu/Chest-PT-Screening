@@ -199,9 +199,9 @@ function gripCutoff(nationality: string, sex: string): number | null {
   return null // 'Other'/unknown → cannot pick a cut-off
 }
 
-// First (Initial) and last (Discharge, else latest) grip value for one key,
-// following the given session order.
-export function gripFirstLast(
+// First (Initial) and last (Discharge, else latest) value for one outcome key,
+// following the given session order. Used by both Grip and Peak Cough Flow.
+export function sessionFirstLast(
   outcomes: { session: string; items: Record<string, { value: number } | undefined> }[],
   key: string,
   order: readonly string[],
@@ -247,6 +247,35 @@ export function gripInterpretationAverage(o: { firstAvg?: number; lastAvg?: numb
   const trend = gripTrendText(o.firstAvg, o.lastAvg)
   const text = (trend ? `${trend} · ` : '') + 'เทียบเกณฑ์ราย case'
   return { text, color: GRIP_BLUE }
+}
+
+// ── Peak Cough Flow (Outcome Summary bar chart) interpretation ────────────────
+// Single fixed threshold (L/min) — no sex/nationality — so the average mode can
+// compare directly too. Reuses the GripInterp { text, color } shape + tooltip.
+const PCF_GREEN = '#16A34A'
+const PCF_AMBER = '#D97706'
+const PCF_RED = '#DC2626'
+
+function pcfLevel(val: number): { text: string; color: string } {
+  if (val >= 270) return { text: 'Effective cough (> 270 L/min)',   color: PCF_GREEN }
+  if (val >= 160) return { text: 'Impaired cough (160–270 L/min)',  color: PCF_AMBER }
+  return { text: 'Ineffective cough (< 160 L/min)', color: PCF_RED }
+}
+
+function pcfTrendText(firstVal?: number, lastVal?: number): string {
+  if (firstVal === undefined || lastVal === undefined) return ''
+  const diff = Math.round(lastVal - firstVal)
+  if (diff >= 10)  return `improved +${diff} L/min`
+  if (diff <= -10) return `declined ${diff} L/min`
+  return '' // change < 10 L/min → no trend appended
+}
+
+// Compares the Discharge/latest value (or the average of them) vs the threshold.
+export function pcfBarInterpretation(o: { firstVal?: number; lastVal?: number }): GripInterp | null {
+  if (o.lastVal === undefined) return null
+  const level = pcfLevel(o.lastVal)
+  const trend = pcfTrendText(o.firstVal, o.lastVal)
+  return { text: trend ? `${level.text} · ${trend}` : level.text, color: level.color }
 }
 
 // ── INBODY (ERAS — Prehabilitation phase only) ────────────────────────────────

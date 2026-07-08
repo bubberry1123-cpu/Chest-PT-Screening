@@ -1,7 +1,7 @@
 'use client'
 import { useState, useMemo, useRef, useEffect } from 'react'
 import type { Patient, Screening, OutcomeMeasurement, OutcomeSession } from '@/types'
-import { SESSION_SHORT, ERAS_PHASES, ERAS_PHASE_SHORT, OUTCOME_SESSIONS, GRIP_KEYS, peakCoughFlowInterpretation, gripFirstLast, gripInterpretationSingle, gripInterpretationAverage, type GripInterp } from '@/lib/outcomeItems'
+import { SESSION_SHORT, ERAS_PHASES, ERAS_PHASE_SHORT, OUTCOME_SESSIONS, GRIP_KEYS, peakCoughFlowInterpretation, sessionFirstLast, gripInterpretationSingle, gripInterpretationAverage, pcfBarInterpretation, type GripInterp } from '@/lib/outcomeItems'
 import type { OtherDef, SessionDatum } from './OutcomeSummaryDashboard'
 import { OutcomeSummaryChartCore } from './OutcomeSummaryDashboard'
 import { formatHn, normalizeHn } from '@/lib/hn'
@@ -500,31 +500,50 @@ function OutcomeBlock({
     })
   }, [mode, selectedSessions, patients, singlePatient, otherDefs, sessions, sessionLabels, sessColorMap])
 
-  // Grip L / Grip R interpretation line for the bar-chart tooltip.
-  // Single: compare Discharge/latest vs cut-off (nationality + sex) + trend.
-  // Average: trend only (no cut-off across mixed sex/nationality).
-  const gripInterp = useMemo<Record<string, GripInterp | null>>(() => {
+  // Clinical interpretation line for the bar-chart tooltip (Grip L/R + Cough Flow).
+  const interpByKey = useMemo<Record<string, GripInterp | null>>(() => {
     const order = blockType === 'eras' ? ERAS_PHASES : OUTCOME_SESSIONS
     const dischargeSession = blockType === 'eras' ? 'DC' : 'Discharge'
     const res: Record<string, GripInterp | null> = {}
+
+    // Peak Cough Flow — fixed threshold (no sex/nationality); average compares too.
+    {
+      const key = 'peakCoughFlow'
+      if (mode === 'single') {
+        if (!singlePatient) { res[key] = null }
+        else {
+          const { firstVal, lastVal } = sessionFirstLast(singlePatient.outcomes, key, order, dischargeSession)
+          res[key] = pcfBarInterpretation({ firstVal, lastVal })
+        }
+      } else if (mode === 'average') {
+        const withData = patients
+          .map(p => sessionFirstLast(p.outcomes, key, order, dischargeSession))
+          .filter(x => x.lastVal !== undefined)
+        const firsts = withData.map(x => x.firstVal).filter((v): v is number => v !== undefined)
+        const lasts  = withData.map(x => x.lastVal!).filter((v): v is number => v !== undefined)
+        res[key] = pcfBarInterpretation({
+          firstVal: firsts.length ? firsts.reduce((a, b) => a + b, 0) / firsts.length : undefined,
+          lastVal:  lasts.length  ? lasts.reduce((a, b) => a + b, 0) / lasts.length   : undefined,
+        })
+      } else {
+        res[key] = null
+      }
+    }
+
+    // Grip L / Grip R — cut-off by sex + nationality.
+    // Single (or average of exactly one patient): full cut-off + trend.
+    // Average of ≥2 patients: trend only (mixed sex/nationality → per-case note).
     GRIP_KEYS.forEach(key => {
       if (mode === 'single') {
         if (!singlePatient) { res[key] = null; return }
-        const { firstVal, lastVal } = gripFirstLast(singlePatient.outcomes, key, order, dischargeSession)
-        // eslint-disable-next-line no-console
-        console.log('[grip]', key, { mode, sex: singlePatient.sex, nationality: singlePatient.nationality, firstVal, lastVal })
+        const { firstVal, lastVal } = sessionFirstLast(singlePatient.outcomes, key, order, dischargeSession)
         res[key] = gripInterpretationSingle({ nationality: singlePatient.nationality, sex: singlePatient.sex, firstVal, lastVal })
       } else if (mode === 'average') {
-        // Per-patient first/last, keeping only those with data.
         const withData = patients
-          .map(p => ({ p, ...gripFirstLast(p.outcomes, key, order, dischargeSession) }))
+          .map(p => ({ p, ...sessionFirstLast(p.outcomes, key, order, dischargeSession) }))
           .filter(x => x.lastVal !== undefined)
         if (withData.length === 1) {
-          // "Average" of a single patient is not really an average — no mixing of
-          // sex/nationality — so interpret it fully with the cut-off.
           const { p, firstVal, lastVal } = withData[0]
-          // eslint-disable-next-line no-console
-          console.log('[grip]', key, { mode: 'average(n=1)', sex: p.sex, nationality: p.nationality, firstVal, lastVal })
           res[key] = gripInterpretationSingle({ nationality: p.nationality, sex: p.sex, firstVal, lastVal })
         } else {
           const firsts = withData.map(x => x.firstVal).filter((v): v is number => v !== undefined)
@@ -842,7 +861,7 @@ function OutcomeBlock({
                     sessions={chartSessions}
                     otherDefs={otherDefs}
                     inbodyDefs={blockType === 'eras' ? ERAS_INBODY_OTHER_DEFS : undefined}
-                    gripInterp={gripInterp}
+                    interpByKey={interpByKey}
                   />
                 </div>
               )}

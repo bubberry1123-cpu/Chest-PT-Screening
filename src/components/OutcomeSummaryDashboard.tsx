@@ -1,7 +1,7 @@
 'use client'
 import { useMemo, useState } from 'react'
 import type { OutcomeMeasurement, OverallLevel, OutcomeSession } from '@/types'
-import { OUTCOME_SESSIONS, SESSION_SHORT, GRIP_KEYS, gripFirstLast, gripInterpretationSingle, type GripInterp } from '@/lib/outcomeItems'
+import { OUTCOME_SESSIONS, SESSION_SHORT, GRIP_KEYS, sessionFirstLast, gripInterpretationSingle, pcfBarInterpretation, type GripInterp } from '@/lib/outcomeItems'
 
 // ── Session gradient palette: Initial (idx 0) = lightest, Discharge (idx 11) = darkest
 const SHADE_FILLS = [
@@ -332,7 +332,7 @@ const INBODY_LABELS: Record<string, string[]> = {
   inbody_bodyFatPct:     ['Body Fat'],
 }
 
-// Grip L / Grip R tooltip — same box/style as the BRFA/AMPAC SegTooltip, but
+// Grip / Cough Flow tooltip — same box/style as the BRFA/AMPAC SegTooltip, but
 // mouse-anchored (fixed) since this chart lives inside an overflow-x container.
 type GripTip = {
   x: number; y: number
@@ -341,15 +341,15 @@ type GripTip = {
   interp: GripInterp | null
 }
 
-export function CustomBarChart({ defs, sessions, inbodyDefs, gripInterp }: {
+export function CustomBarChart({ defs, sessions, inbodyDefs, interpByKey }: {
   defs: OtherDef[]
   sessions: SessionDatum[]
   // ERAS only: InBody measures appended after the normal groups. Each renders a
   // single Pre-hab bar (#378ADD); the group is dropped when Pre-hab isn't shown.
   inbodyDefs?: OtherDef[]
-  // Grip L / Grip R clinical interpretation line, keyed by grip item key.
+  // Clinical interpretation line keyed by outcome item key (Grip L/R + Cough Flow).
   // Only groups present here become hoverable; all other bars stay non-interactive.
-  gripInterp?: Record<string, GripInterp | null>
+  interpByKey?: Record<string, GripInterp | null>
 }) {
   const [gripTip, setGripTip] = useState<GripTip | null>(null)
   const N = sessions.length
@@ -369,7 +369,7 @@ export function CustomBarChart({ defs, sessions, inbodyDefs, gripInterp }: {
       y: Math.max(e.clientY - 12, 8),
       title: def.label,
       entries,
-      interp: gripInterp?.[def.key] ?? null,
+      interp: interpByKey?.[def.key] ?? null,
     })
   }
 
@@ -440,8 +440,8 @@ export function CustomBarChart({ defs, sessions, inbodyDefs, gripInterp }: {
                 {def.unit}
               </text>
 
-              {/* Grip L / Grip R only: transparent overlay to catch hover (on top). */}
-              {gripInterp?.[def.key] !== undefined && (
+              {/* Grip L/R + Cough Flow only: transparent overlay to catch hover (on top). */}
+              {interpByKey?.[def.key] !== undefined && (
                 <rect
                   x={groupX} y={0} width={groupW} height={VAL_PAD + MAX_H}
                   fill="transparent" style={{ cursor: 'pointer' }}
@@ -534,12 +534,12 @@ export function OutcomeSummaryChartCore({
   sessions,
   otherDefs,
   inbodyDefs,
-  gripInterp,
+  interpByKey,
 }: {
   sessions: SessionDatum[]
   otherDefs: OtherDef[]
   inbodyDefs?: OtherDef[]
-  gripInterp?: Record<string, GripInterp | null>
+  interpByKey?: Record<string, GripInterp | null>
 }) {
   const showBrfa  = sessions.some(sd => BRFA_PARTS.some(p => sd.o?.items[p.key]?.value !== undefined))
   const showAmpac = sessions.some(sd => AMPAC_PARTS.some(p => sd.o?.items[p.key]?.value !== undefined))
@@ -574,7 +574,7 @@ export function OutcomeSummaryChartCore({
         {showBrfa  && <BrfaSegmentBar  sessions={sessions} />}
         {showAmpac && <AmpacSegmentBar sessions={sessions} />}
         {(showOther || showInbody) && (
-          <CustomBarChart defs={presentOthers} sessions={sessions} inbodyDefs={inbodyDefs} gripInterp={gripInterp} />
+          <CustomBarChart defs={presentOthers} sessions={sessions} inbodyDefs={inbodyDefs} interpByKey={interpByKey} />
         )}
       </div>
     </div>
@@ -614,13 +614,15 @@ export default function OutcomeSummaryDashboard({
     [outcomes]
   )
 
-  // Grip L / Grip R interpretation — single patient (patient page).
-  const gripInterp = useMemo<Record<string, GripInterp | null>>(() => {
+  // Grip L/R + Cough Flow interpretation — single patient (patient page).
+  const interpByKey = useMemo<Record<string, GripInterp | null>>(() => {
     const res: Record<string, GripInterp | null> = {}
     GRIP_KEYS.forEach(key => {
-      const { firstVal, lastVal } = gripFirstLast(outcomes, key, OUTCOME_SESSIONS, 'Discharge')
+      const { firstVal, lastVal } = sessionFirstLast(outcomes, key, OUTCOME_SESSIONS, 'Discharge')
       res[key] = gripInterpretationSingle({ nationality: nationality ?? '', sex: sex ?? '', firstVal, lastVal })
     })
+    const pcf = sessionFirstLast(outcomes, 'peakCoughFlow', OUTCOME_SESSIONS, 'Discharge')
+    res['peakCoughFlow'] = pcfBarInterpretation({ firstVal: pcf.firstVal, lastVal: pcf.lastVal })
     return res
   }, [outcomes, nationality, sex])
 
@@ -727,7 +729,7 @@ export default function OutcomeSummaryDashboard({
           {showBrfaSvg  && <BrfaSegmentBar  sessions={selectedSessionData} />}
           {showAmpacSvg && <AmpacSegmentBar sessions={selectedSessionData} />}
           {showChart && (
-            <CustomBarChart defs={presentOthers} sessions={selectedSessionData} gripInterp={gripInterp} />
+            <CustomBarChart defs={presentOthers} sessions={selectedSessionData} interpByKey={interpByKey} />
           )}
         </div>
       </div>
