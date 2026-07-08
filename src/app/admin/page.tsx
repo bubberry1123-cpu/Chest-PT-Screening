@@ -362,7 +362,7 @@ function TrendChart({ data }: { data: { label: string; initial: number | null; d
 // Each metric is normalized to its own max (units differ across metrics), so
 // units + value labels carry the magnitude rather than a shared y-scale.
 function ErasGroupedChart({ data }: {
-  data: { label: string; unit: string; phaseAvgs: (number | null)[] }[]
+  data: { label: string; unit: string; phaseAvgs: (number | null)[]; prehabOnly?: boolean; maxRef?: number }[]
 }) {
   const BAR_H = 400 // plotting area height (px)
 
@@ -383,31 +383,32 @@ function ErasGroupedChart({ data }: {
             {data.map((metric, mi) => {
               const vals = metric.phaseAvgs.filter((v): v is number => v !== null)
               const maxV = vals.length > 0 ? Math.max(...vals, 1) : 1
+              const denom = metric.maxRef ?? maxV
+              // InBody metrics: a single Pre-hab bar (#378ADD) instead of one per phase.
+              const bars = metric.prehabOnly
+                ? [{ v: metric.phaseAvgs[0] ?? null, color: INBODY_COLOR }]
+                : metric.phaseAvgs.map((v, pi) => ({ v, color: ERAS_PHASE_COLORS[ERAS_PHASE_ORDER[pi]] }))
               return (
                 <div key={mi} className="flex flex-col items-center gap-1.5">
                   <div className="flex items-end gap-1.5" style={{ height: BAR_H }}>
-                    {metric.phaseAvgs.map((v, pi) => {
-                      const phase = ERAS_PHASE_ORDER[pi]
-                      const color = ERAS_PHASE_COLORS[phase]
-                      return (
-                        <div key={pi} className="flex flex-col items-center justify-end" style={{ height: BAR_H }}>
-                          {v !== null && (
-                            <span className="text-[13px] font-semibold mb-1" style={{ color }}>
-                              {v % 1 === 0 ? v : v.toFixed(1)}
-                            </span>
-                          )}
-                          <div
-                            className="w-12 rounded-t-md"
-                            style={{
-                              backgroundColor: color,
-                              height: v !== null && v > 0 ? `${Math.max((v / maxV) * (BAR_H - 36), 4)}px` : '0',
-                              opacity: v !== null ? 1 : 0.12,
-                              minHeight: v !== null ? '3px' : '0',
-                            }}
-                          />
-                        </div>
-                      )
-                    })}
+                    {bars.map((b, bi) => (
+                      <div key={bi} className="flex flex-col items-center justify-end" style={{ height: BAR_H }}>
+                        {b.v !== null && (
+                          <span className="text-[13px] font-semibold mb-1" style={{ color: b.color }}>
+                            {b.v % 1 === 0 ? b.v : b.v.toFixed(1)}
+                          </span>
+                        )}
+                        <div
+                          className="w-12 rounded-t-md"
+                          style={{
+                            backgroundColor: b.color,
+                            height: b.v !== null && b.v > 0 ? `${Math.max((b.v / denom) * (BAR_H - 36), 4)}px` : '0',
+                            opacity: b.v !== null ? 1 : 0.12,
+                            minHeight: b.v !== null ? '3px' : '0',
+                          }}
+                        />
+                      </div>
+                    ))}
                   </div>
                   <span className="text-sm text-slate-700 font-semibold text-center leading-tight">{metric.label}</span>
                   <span className="text-xs text-slate-400 text-center leading-none">({metric.unit})</span>
@@ -432,70 +433,14 @@ function ErasGroupedChart({ data }: {
   )
 }
 
-// ── ERAS InBody averages (Prehabilitation only) ───────────────────────────────
+// ── ERAS InBody (Prehabilitation only) ────────────────────────────────────────
+// Appended to the ERAS Outcome Trend chart after 2-Meter. Pre-hab bar color.
+const INBODY_COLOR = '#378ADD'
 const INBODY_TREND_DEFS = [
-  { key: 'inbody_bmi',            label: 'BMI',                  unit: 'kg/m²', maxRef: 40, color: '#378ADD' },
-  { key: 'inbody_skeletalMuscle', label: 'Skeletal Muscle Mass', unit: 'kg',    maxRef: 50, color: '#1D9E75' },
-  { key: 'inbody_bodyFatPct',     label: 'Body Fat %',           unit: '%',     maxRef: 50, color: '#EF9F27' },
+  { key: 'inbody_bmi',            label: 'BMI',                  unit: 'kg/m²', maxRef: 40 },
+  { key: 'inbody_skeletalMuscle', label: 'Skeletal Muscle Mass', unit: 'kg',    maxRef: 50 },
+  { key: 'inbody_bodyFatPct',     label: 'Body Fat %',           unit: '%',     maxRef: 50 },
 ] as const
-
-function InBodyAvgChart({ rows }: { rows: { outcomes: OutcomeMeasurement[] }[] }) {
-  const PLOT_H = 200
-  const stats = INBODY_TREND_DEFS.map(d => {
-    const vals: number[] = []
-    rows.forEach(({ outcomes }) => {
-      const v = outcomes.find(o => o.session === 'Prehabilitation')?.items[d.key]?.value
-      if (v !== undefined) vals.push(v)
-    })
-    const avg = vals.length > 0 ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null
-    return { ...d, avg, n: vals.length }
-  })
-
-  if (!stats.some(s => s.avg !== null)) return (
-    <div className="h-32 flex items-center justify-center text-slate-400 text-sm">No InBody data in this scope</div>
-  )
-
-  return (
-    <div className="w-full">
-      {/* Bars — 3 categories spread evenly across the full width.
-          Bar width = 40% of each column ≈ categoryPercentage 0.5 × barPercentage 0.8 */}
-      <div className="flex w-full items-end pt-6 px-2" style={{ height: PLOT_H }}>
-        {stats.map(s => (
-          <div key={s.key} className="flex-1 flex flex-col items-center justify-end h-full">
-            {s.avg !== null ? (
-              <>
-                <span className="text-[13px] font-semibold mb-1" style={{ color: s.color }}>{s.avg}</span>
-                <div
-                  className="rounded-t-md"
-                  style={{
-                    width: '40%',
-                    backgroundColor: s.color,
-                    height: `${Math.max((s.avg / s.maxRef) * (PLOT_H - 28), 4)}px`,
-                  }}
-                />
-              </>
-            ) : (
-              <span className="text-slate-300 text-sm">No data</span>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Labels under each bar: name / unit / patient count */}
-      <div className="flex w-full mt-1.5 px-2">
-        {stats.map(s => (
-          <div key={s.key} className="flex-1 flex flex-col items-center text-center px-1">
-            <span className="text-sm text-slate-700 font-semibold leading-tight">{s.label}</span>
-            <span className="text-xs text-slate-400 leading-none mt-0.5">{s.unit}</span>
-            <span className="text-[11px] text-slate-400 leading-none mt-0.5">
-              avg of {s.n} patient{s.n !== 1 ? 's' : ''}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 // ── Patient Detail Modal ──────────────────────────────────────────────────────
 function PatientModal({ row, onClose }: { row: PatientRow; onClose: () => void }) {
@@ -1076,7 +1021,7 @@ export default function AdminPage() {
   }, [erasRows, erasMonthKey])
 
   const erasTrendData = useMemo(() => {
-    return ERAS_METRICS.map(m => {
+    const base = ERAS_METRICS.map(m => {
       const phaseAvgs = ERAS_PHASE_ORDER.map(phase => {
         const vals: number[] = []
         erasScopedRows.forEach(({ outcomes }) => {
@@ -1088,6 +1033,17 @@ export default function AdminPage() {
       })
       return { label: m.label, unit: m.unit, phaseAvgs }
     })
+    // InBody (Pre-hab only) appended after 2-Meter — single #378ADD bar each.
+    const inbody = INBODY_TREND_DEFS.map(d => {
+      const vals: number[] = []
+      erasScopedRows.forEach(({ outcomes }) => {
+        const v = outcomes.find(o => o.session === 'Prehabilitation')?.items[d.key]?.value
+        if (v !== undefined) vals.push(v)
+      })
+      const avg = vals.length > 0 ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null
+      return { label: d.label, unit: d.unit, phaseAvgs: [avg], prehabOnly: true, maxRef: d.maxRef }
+    }).filter(m => m.phaseAvgs[0] !== null)
+    return [...base, ...inbody]
   }, [erasScopedRows])
 
   // ── Filtered table rows ────────────────────────────────────────────────────
@@ -1654,22 +1610,14 @@ export default function AdminPage() {
                 </div>
 
                 {/* Charts — each in its own card, stacked on mobile */}
-                {/* Outcome Trend (full width) */}
+                {/* Outcome Trend (full width) — InBody (BMI / SMM / Body Fat %) appended after 2-Meter */}
                 <div className="rounded-2xl border border-slate-200 p-4 shadow-sm bg-white">
                   <h4 className="text-sm font-semibold text-slate-700">ERAS Outcome Trend</h4>
                   <p className="text-xs text-slate-400 mt-0.5 mb-4">
-                    Average outcome value at each surgical phase (higher = better, except 2-Meter where lower = faster)
+                    Average outcome value at each surgical phase (higher = better, except 2-Meter where lower = faster).
+                    InBody measures show the Prehabilitation average only.
                   </p>
                   <ErasGroupedChart data={erasTrendData} />
-                </div>
-
-                {/* InBody averages (Prehabilitation) */}
-                <div className="rounded-2xl border border-slate-200 p-4 shadow-sm bg-white">
-                  <h4 className="text-sm font-semibold text-slate-700">Inbody — Pre-hab</h4>
-                  <p className="text-xs text-slate-400 mt-0.5 mb-4">
-                    Average InBody values across ERAS patients with Prehabilitation data
-                  </p>
-                  <InBodyAvgChart rows={erasScopedRows} />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -321,11 +321,30 @@ const SIDE_PAD = 8
 const GAP_WITHIN = 2
 const GAP_BETWEEN = 14
 
-export function CustomBarChart({ defs, sessions }: { defs: OtherDef[]; sessions: SessionDatum[] }) {
+// Pre-hab bar color for the appended ERAS InBody groups.
+const INBODY_COLOR = '#378ADD'
+
+export function CustomBarChart({ defs, sessions, inbodyDefs }: {
+  defs: OtherDef[]
+  sessions: SessionDatum[]
+  // ERAS only: InBody measures appended after the normal groups. Each renders a
+  // single Pre-hab bar (#378ADD); the group is dropped when Pre-hab isn't shown.
+  inbodyDefs?: OtherDef[]
+}) {
   const N = sessions.length
   const BAR_W = Math.min(40, Math.max(14, Math.floor(64 / N)))
   const groupW = N * BAR_W + Math.max(0, N - 1) * GAP_WITHIN
-  const svgW = SIDE_PAD * 2 + defs.length * groupW + Math.max(0, defs.length - 1) * GAP_BETWEEN
+
+  // InBody: Prehabilitation session only, and only defs that actually have a value.
+  const prehab = sessions.find(s => s.session === 'Prehabilitation')
+  const presentInbody = (inbodyDefs ?? []).filter(d => prehab?.o?.items[d.key]?.value !== undefined)
+  const inbodyBase = SIDE_PAD + defs.length * (groupW + GAP_BETWEEN)
+
+  const totalGroups = defs.length + presentInbody.length
+  const svgW = SIDE_PAD * 2
+    + defs.length * groupW
+    + presentInbody.length * BAR_W
+    + Math.max(0, totalGroups - 1) * GAP_BETWEEN
   const svgH = VAL_PAD + MAX_H + LBL_PAD
 
   return (
@@ -385,6 +404,44 @@ export function CustomBarChart({ defs, sessions }: { defs: OtherDef[]; sessions:
             </g>
           )
         })}
+
+        {/* ERAS InBody — appended after 2-Meter, single Pre-hab bar each (#378ADD) */}
+        {presentInbody.map((def, ii) => {
+          const val = prehab!.o!.items[def.key]!.value
+          const barX = inbodyBase + ii * (BAR_W + GAP_BETWEEN)
+          const groupCenterX = barX + BAR_W / 2
+          const barH = Math.max(MIN_H, (val / def.maxRef) * MAX_H)
+          const barY = VAL_PAD + MAX_H - barH
+
+          return (
+            <g key={def.key}>
+              <rect
+                x={barX} y={barY}
+                width={BAR_W} height={barH}
+                fill={INBODY_COLOR} stroke={INBODY_COLOR} strokeWidth={1}
+                rx={2}
+              />
+              <text
+                transform={`translate(${barX + BAR_W / 2},${barY - 4}) rotate(-90)`}
+                textAnchor="start" fontSize="8.5" fill="#334155" fontWeight="600"
+              >
+                {fmtVal(val, def.unit)}
+              </text>
+              <text
+                x={groupCenterX} y={VAL_PAD + MAX_H + 16}
+                textAnchor="middle" fontSize="10" fill="#475569" fontWeight="600"
+              >
+                {def.label}
+              </text>
+              <text
+                x={groupCenterX} y={VAL_PAD + MAX_H + 28}
+                textAnchor="middle" fontSize="8.5" fill="#94a3b8"
+              >
+                {def.unit}
+              </text>
+            </g>
+          )
+        })}
       </svg>
     </div>
   )
@@ -395,16 +452,22 @@ export function CustomBarChart({ defs, sessions }: { defs: OtherDef[]; sessions:
 export function OutcomeSummaryChartCore({
   sessions,
   otherDefs,
+  inbodyDefs,
 }: {
   sessions: SessionDatum[]
   otherDefs: OtherDef[]
+  inbodyDefs?: OtherDef[]
 }) {
   const showBrfa  = sessions.some(sd => BRFA_PARTS.some(p => sd.o?.items[p.key]?.value !== undefined))
   const showAmpac = sessions.some(sd => AMPAC_PARTS.some(p => sd.o?.items[p.key]?.value !== undefined))
   const presentOthers = otherDefs.filter(d => sessions.some(sd => sd.o?.items[d.key]?.value !== undefined))
   const showOther = presentOthers.length > 0
 
-  if (!showBrfa && !showAmpac && !showOther)
+  // InBody (ERAS) — Prehabilitation session only.
+  const prehab = sessions.find(s => s.session === 'Prehabilitation')
+  const showInbody = (inbodyDefs ?? []).some(d => prehab?.o?.items[d.key]?.value !== undefined)
+
+  if (!showBrfa && !showAmpac && !showOther && !showInbody)
     return <div className="text-center py-8 text-slate-400 text-sm">No data for selected sessions</div>
 
   const legendItems = sessions.map(sd => {
@@ -427,7 +490,9 @@ export function OutcomeSummaryChartCore({
       <div className="flex items-end gap-1">
         {showBrfa  && <BrfaSegmentBar  sessions={sessions} />}
         {showAmpac && <AmpacSegmentBar sessions={sessions} />}
-        {showOther && <CustomBarChart  defs={presentOthers} sessions={sessions} />}
+        {(showOther || showInbody) && (
+          <CustomBarChart defs={presentOthers} sessions={sessions} inbodyDefs={inbodyDefs} />
+        )}
       </div>
     </div>
   )

@@ -53,18 +53,13 @@ const COLORS         = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '
 const CARD_COLORS    = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6']
 const SESSION_COLORS = ['#3b82f6', '#10b981', '#f97316', '#ef4444', '#8b5cf6']
 
-// ERAS phase → bright bar colors (used by the ERAS-only grouped bar chart + InBody)
-const ERAS_PHASE_COLORS: Record<string, string> = {
-  'Prehabilitation': '#378ADD', // Pre-hab
-  'Pre-op':          '#1D9E75',
-  'DC':              '#EF9F27', // D/C
-  'Follow-up':       '#7F77DD', // F/U
-}
-const ERAS_INBODY_DEFS = [
-  { key: 'inbody_bmi',            label: 'BMI',                  unit: 'kg/m²', maxRef: 40, color: '#378ADD' },
-  { key: 'inbody_skeletalMuscle', label: 'Skeletal Muscle Mass', unit: 'kg',    maxRef: 50, color: '#1D9E75' },
-  { key: 'inbody_bodyFatPct',     label: 'Body Fat %',           unit: '%',     maxRef: 50, color: '#EF9F27' },
-] as const
+// ERAS InBody defs — appended to the ERAS Outcome Trends chart after 2-Meter.
+// Prehabilitation-only, all rendered in the Pre-hab color (#378ADD).
+const ERAS_INBODY_OTHER_DEFS: OtherDef[] = [
+  { key: 'inbody_bmi',            label: 'BMI',                  unit: 'kg/m²', color: '#378ADD', maxRef: 40 },
+  { key: 'inbody_skeletalMuscle', label: 'Skeletal Muscle Mass', unit: 'kg',    color: '#378ADD', maxRef: 50 },
+  { key: 'inbody_bodyFatPct',     label: 'Body Fat %',           unit: '%',     color: '#378ADD', maxRef: 50 },
+]
 
 // ── Session timelines (5 key points for Standard, 4 for ERAS) ─────────────────
 
@@ -427,83 +422,6 @@ function OutcomeCardGrid({ pointsData, sessionLabels, metrics, cardDefs, color }
   return <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{cards}</div>
 }
 
-// ── ERAS InBody bars (Prehabilitation only) ───────────────────────────────────
-// Rendered *inside* the Outcome Summary card (not a separate box) so InBody sits
-// together with the main outcome bars. Average across patients, or a single
-// patient's Pre-hab values when in single mode.
-
-function ErasInBodyBars({ patients, mode, singlePatient }: {
-  patients: PInfo[]
-  mode: ViewMode
-  singlePatient: PInfo | null
-}) {
-  const PLOT_H = 300
-  const BAR_COLOR = ERAS_PHASE_COLORS['Prehabilitation'] // #378ADD — Pre-hab, single color, no session comparison
-  const stats = ERAS_INBODY_DEFS.map(d => {
-    if (mode === 'single') {
-      const v = singlePatient?.outcomes.find(o => o.session === 'Prehabilitation')?.items[d.key]?.value
-      return { ...d, avg: v ?? null, n: v !== undefined ? 1 : 0 }
-    }
-    const vals: number[] = []
-    patients.forEach(p => {
-      const v = p.outcomes.find(o => o.session === 'Prehabilitation')?.items[d.key]?.value
-      if (v !== undefined) vals.push(v)
-    })
-    const avg = vals.length > 0 ? Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10 : null
-    return { ...d, avg, n: vals.length }
-  })
-
-  // Nothing to show → render nothing (no empty box inside the card).
-  if (!stats.some(s => s.avg !== null)) return null
-
-  return (
-    <div className="mt-4 pt-4 border-t border-slate-200">
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <p className="text-xs font-semibold text-slate-600">InBody — Pre-hab</p>
-        <div className="flex items-center gap-1.5">
-          <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: BAR_COLOR }} />
-          <span className="text-[11px] text-slate-500">Pre-hab</span>
-        </div>
-      </div>
-
-      {/* Bars — 3 categories spread evenly across the full width.
-          Bar width = 40% of each column ≈ categoryPercentage 0.5 × barPercentage 0.8 */}
-      <div className="flex w-full items-end pt-6 px-2" style={{ height: PLOT_H }}>
-        {stats.map(s => (
-          <div key={s.key} className="flex-1 flex flex-col items-center justify-end h-full">
-            {s.avg !== null && (
-              <span className="text-[13px] font-semibold mb-1" style={{ color: '#1a1a1a' }}>{s.avg}</span>
-            )}
-            <div
-              className="rounded-t-md"
-              style={{
-                width: '40%',
-                backgroundColor: BAR_COLOR,
-                height: s.avg !== null && s.avg > 0 ? `${Math.max((s.avg / s.maxRef) * (PLOT_H - 36), 4)}px` : '0',
-                opacity: s.avg !== null ? 1 : 0.12,
-                minHeight: s.avg !== null ? '3px' : '0',
-              }}
-            />
-          </div>
-        ))}
-      </div>
-
-      {/* Labels under each bar: name / unit / patient count */}
-      <div className="flex w-full mt-1.5 px-2">
-        {stats.map(s => (
-          <div key={s.key} className="flex-1 flex flex-col items-center text-center px-1">
-            <span className="text-sm text-slate-700 font-semibold leading-tight">{s.label}</span>
-            <span className="text-xs text-slate-400 leading-none mt-0.5">{s.unit}</span>
-            <span className="text-[11px] text-slate-400 leading-none mt-0.5">
-              {s.n} patient{s.n !== 1 ? 's' : ''}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ── One block (Standard or ERAS) ──────────────────────────────────────────────
 
 function OutcomeBlock({
@@ -550,6 +468,7 @@ function OutcomeBlock({
       'ampac_part1', 'ampac_part2', 'ampac_part3',
       'brfa_part1', 'brfa_part2', 'brfa_q20', 'brfa_q21',
       ...otherDefs.map(d => d.key),
+      'inbody_bmi', 'inbody_skeletalMuscle', 'inbody_bodyFatPct',
     ]
     const total = selectedSessions.length
     return selectedSessions.map((sess, sessIdx) => {
@@ -876,12 +795,13 @@ function OutcomeBlock({
               {(mode === 'average' || showBarAndGrid) && (
                 <div ref={barChartRef} className="bg-slate-50 rounded-xl border border-slate-100 p-4">
                   <p className="text-xs font-semibold text-slate-600 mb-3">Outcome Summary — {mode === 'average' ? 'All patients (average)' : singlePatient ? `${singlePatient.firstName} ${singlePatient.lastName}` : ''}</p>
-                  {/* Standard and ERAS share the same chart core so both render identically */}
-                  <OutcomeSummaryChartCore sessions={chartSessions} otherDefs={otherDefs} />
-                  {/* ERAS InBody (Pre-hab) merged into the same Outcome Summary card */}
-                  {blockType === 'eras' && (
-                    <ErasInBodyBars patients={patients} mode={mode} singlePatient={singlePatient} />
-                  )}
+                  {/* Standard and ERAS share the same chart core. For ERAS, InBody
+                      items are appended after 2-Meter (Pre-hab session only). */}
+                  <OutcomeSummaryChartCore
+                    sessions={chartSessions}
+                    otherDefs={otherDefs}
+                    inbodyDefs={blockType === 'eras' ? ERAS_INBODY_OTHER_DEFS : undefined}
+                  />
                 </div>
               )}
 
