@@ -511,18 +511,29 @@ function OutcomeBlock({
       if (mode === 'single') {
         if (!singlePatient) { res[key] = null; return }
         const { firstVal, lastVal } = gripFirstLast(singlePatient.outcomes, key, order, dischargeSession)
+        // eslint-disable-next-line no-console
+        console.log('[grip]', key, { mode, sex: singlePatient.sex, nationality: singlePatient.nationality, firstVal, lastVal })
         res[key] = gripInterpretationSingle({ nationality: singlePatient.nationality, sex: singlePatient.sex, firstVal, lastVal })
       } else if (mode === 'average') {
-        const firsts: number[] = [], lasts: number[] = []
-        patients.forEach(p => {
-          const { firstVal, lastVal } = gripFirstLast(p.outcomes, key, order, dischargeSession)
-          if (firstVal !== undefined) firsts.push(firstVal)
-          if (lastVal !== undefined) lasts.push(lastVal)
-        })
-        res[key] = gripInterpretationAverage({
-          firstAvg: firsts.length ? firsts.reduce((a, b) => a + b, 0) / firsts.length : undefined,
-          lastAvg:  lasts.length  ? lasts.reduce((a, b) => a + b, 0) / lasts.length   : undefined,
-        })
+        // Per-patient first/last, keeping only those with data.
+        const withData = patients
+          .map(p => ({ p, ...gripFirstLast(p.outcomes, key, order, dischargeSession) }))
+          .filter(x => x.lastVal !== undefined)
+        if (withData.length === 1) {
+          // "Average" of a single patient is not really an average — no mixing of
+          // sex/nationality — so interpret it fully with the cut-off.
+          const { p, firstVal, lastVal } = withData[0]
+          // eslint-disable-next-line no-console
+          console.log('[grip]', key, { mode: 'average(n=1)', sex: p.sex, nationality: p.nationality, firstVal, lastVal })
+          res[key] = gripInterpretationSingle({ nationality: p.nationality, sex: p.sex, firstVal, lastVal })
+        } else {
+          const firsts = withData.map(x => x.firstVal).filter((v): v is number => v !== undefined)
+          const lasts  = withData.map(x => x.lastVal!).filter((v): v is number => v !== undefined)
+          res[key] = gripInterpretationAverage({
+            firstAvg: firsts.length ? firsts.reduce((a, b) => a + b, 0) / firsts.length : undefined,
+            lastAvg:  lasts.length  ? lasts.reduce((a, b) => a + b, 0) / lasts.length   : undefined,
+          })
+        }
       } else {
         res[key] = null
       }

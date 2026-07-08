@@ -191,10 +191,12 @@ export interface GripInterp { text: string; color: string }
 //   AWGS 2019 (Thai, CLMV, Asia): Male < 28, Female < 18
 //   EWGSOP2   (Inter, Arab):      Male < 27, Female < 16
 function gripCutoff(nationality: string, sex: string): number | null {
-  const ewgsop2 = nationality === 'Inter' || nationality === 'Arab'
-  if (sex === 'Male')   return ewgsop2 ? 27 : 28
-  if (sex === 'Female') return ewgsop2 ? 16 : 18
-  return null // 'Other' → cannot pick a cut-off
+  const n = (nationality ?? '').trim().toLowerCase()
+  const ewgsop2 = n.startsWith('inter') || n.startsWith('arab') // else AWGS (Thai, CLMV, Asia)
+  const s = (sex ?? '').trim().toLowerCase()
+  if (s === 'male'   || s === 'm' || s === 'ชาย')  return ewgsop2 ? 27 : 28
+  if (s === 'female' || s === 'f' || s === 'หญิง') return ewgsop2 ? 16 : 18
+  return null // 'Other'/unknown → cannot pick a cut-off
 }
 
 // First (Initial) and last (Discharge, else latest) grip value for one key,
